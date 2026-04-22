@@ -37,9 +37,11 @@ const reportCard = (color, isActive) => ({
   transform: isActive ? "scale(1.03)" : "scale(1)",
   transition: "all 0.2s ease",
 });
+
+// 💠 تحديث تصميم الهيدر (Header)
 const headerS = {
   backgroundColor: "#fff",
-  padding: "15px 20px",
+  padding: "15px 25px",
   borderRadius: "20px",
   boxShadow: "0 4px 12px rgba(0,0,0,0.05)",
   marginBottom: "20px",
@@ -48,6 +50,12 @@ const headerS = {
   alignItems: "center",
   flexWrap: "wrap",
   gap: "15px",
+};
+const logoS = {
+  display: "flex",
+  alignItems: "center",
+  gap: "10px",
+  cursor: "pointer",
 };
 const avatarS = {
   width: "50px",
@@ -146,7 +154,6 @@ const calculateFinancials = (b, commissionRate) => {
   };
 };
 
-// 🖨️ تحديث الفاتورة لتشمل هوية المنصة (اللوجو والاسم)
 const handlePrintInvoice = (
   b,
   isClient,
@@ -749,7 +756,6 @@ const AdminReports = ({ commissionRate, platName, platLogo }) => {
   );
 };
 
-// ⚙️ لوحة التحكم المطورة (مع إعدادات الهوية)
 const PlatformManagement = ({
   onRefresh,
   commissionRate,
@@ -789,7 +795,6 @@ const PlatformManagement = ({
     fetchAdminData();
   }, []);
 
-  // 💾 تحديث شامل للإعدادات والهوية
   const handleUpdateSettings = async () => {
     const newRateDec = inputRate / 100;
     const { error } = await supabase
@@ -844,15 +849,6 @@ const PlatformManagement = ({
       onRefresh();
     }
   };
-  const deleteUser = async (userId, name) => {
-    if (window.confirm(`⚠️ حذف نهائي لـ "${name}"؟`)) {
-      await supabase.from("offerings").delete().eq("provider_id", userId);
-      await supabase.from("bookings").delete().eq("customer_id", userId);
-      await supabase.from("profiles").delete().eq("id", userId);
-      fetchAdminData();
-      onRefresh();
-    }
-  };
   const sendAdminMessage = async (userId) => {
     const { error } = await supabase
       .from("profiles")
@@ -866,23 +862,6 @@ const PlatformManagement = ({
     }
   };
 
-  const printUsersReport = () => {
-    const printWindow = window.open("", "_blank");
-    const logoHtml = platLogo?.includes("http")
-      ? `<img src="${platLogo}" style="height:40px; vertical-align:middle; border-radius:5px;" />`
-      : `<span style="font-size:2rem; vertical-align:middle;">${platLogo}</span>`;
-    const tableRows = users
-      .map(
-        (u) =>
-          `<tr><td style="padding:10px; border:1px solid #cbd5e1;">${u.full_name}</td><td style="padding:10px; border:1px solid #cbd5e1;" dir="ltr">${u.phone || "-"}</td><td style="padding:10px; border:1px solid #cbd5e1;">${u.provider_type === "institution" ? "مؤسسة" : "فرد"}</td><td style="padding:10px; border:1px solid #cbd5e1;">${u.tax_number || "-"}</td><td style="padding:10px; border:1px solid #cbd5e1;">${u.is_active ? "نشط ✅" : "موقوف ❌"}</td></tr>`,
-      )
-      .join("");
-    printWindow.document.write(
-      `<html dir="rtl"><head><title>مستخدمي - ${platName}</title><style>body{font-family:system-ui; padding:30px; color:#1e293b;} table{width:100%; border-collapse:collapse; margin-top:20px; text-align:center;} th{background:#f8fafc; padding:12px; border:2px solid #cbd5e1;}</style></head><body><h1 style="color:#ef4444; border-bottom:3px solid #ef4444; padding-bottom:10px;">${logoHtml} قائمة مستخدمي منصة ${platName}</h1><p>تاريخ الطباعة: ${new Date().toLocaleString("ar-SA")} | إجمالي المستخدمين: ${users.length}</p><table><thead><tr><th>الاسم</th><th>رقم الجوال</th><th>النوع</th><th>الرقم الضريبي</th><th>الحالة</th></tr></thead><tbody>${tableRows}</tbody></table><script>window.onload=()=>window.print();</script></body></html>`,
-    );
-    printWindow.document.close();
-  };
-
   return (
     <div
       style={{
@@ -892,34 +871,17 @@ const PlatformManagement = ({
         border: "1px solid #fee2e2",
       }}
     >
-      <div
+      <h2
         style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: "20px",
+          color: "#ef4444",
+          margin: 0,
+          fontSize: "1rem",
+          marginBottom: "15px",
         }}
       >
-        <h2 style={{ color: "#ef4444", margin: 0, fontSize: "1rem" }}>
-          ⚙️ لوحة الرقابة والتحكم
-        </h2>
-        <button
-          onClick={printUsersReport}
-          style={{
-            background: "#fef2f2",
-            color: "#ef4444",
-            border: "1px solid #fca5a5",
-            padding: "8px 15px",
-            borderRadius: "8px",
-            cursor: "pointer",
-            fontWeight: "bold",
-          }}
-        >
-          🖨️ طباعة المستخدمين
-        </button>
-      </div>
+        ⚙️ لوحة الرقابة والتحكم
+      </h2>
 
-      {/* 🎨 إعدادات الهوية والعمولة */}
       <div
         style={{
           background: "#f8fafc",
@@ -935,7 +897,6 @@ const PlatformManagement = ({
         <h3 style={{ margin: 0, color: "#1e293b" }}>
           🎨 هوية المنصة وإعدادات النظام
         </h3>
-
         <div
           style={{
             display: "flex",
@@ -952,7 +913,7 @@ const PlatformManagement = ({
               alignItems: "center",
             }}
           >
-            <strong style={{ color: "#334155" }}>اسم المنصة:</strong>
+            <strong style={{ color: "#334155" }}>الاسم:</strong>
             <input
               type="text"
               value={inputName}
@@ -962,9 +923,7 @@ const PlatformManagement = ({
                 padding: "8px",
                 borderRadius: "8px",
                 border: "1px solid #cbd5e1",
-                fontWeight: "bold",
               }}
-              placeholder="مثال: منصتي"
             />
           </div>
           <div
@@ -975,9 +934,7 @@ const PlatformManagement = ({
               alignItems: "center",
             }}
           >
-            <strong style={{ color: "#334155" }}>
-              اللوجو (رابط أو إيموجي):
-            </strong>
+            <strong style={{ color: "#334155" }}>اللوجو:</strong>
             <input
               type="text"
               value={inputLogo}
@@ -987,13 +944,10 @@ const PlatformManagement = ({
                 padding: "8px",
                 borderRadius: "8px",
                 border: "1px solid #cbd5e1",
-                fontWeight: "bold",
               }}
-              placeholder="مثال: 🌟 أو https://..."
             />
           </div>
         </div>
-
         <div
           style={{
             display: "flex",
@@ -1016,37 +970,14 @@ const PlatformManagement = ({
                 borderRadius: "8px",
                 border: "1px solid #cbd5e1",
                 textAlign: "center",
-                fontWeight: "bold",
               }}
             />
           </div>
-          <div
-            style={{
-              display: "flex",
-              gap: "10px",
-              alignItems: "center",
-              borderRight: "2px solid #cbd5e1",
-              paddingRight: "15px",
-            }}
-          >
-            <strong style={{ color: "#334155" }}>💬 التعليقات:</strong>
-            <button
-              onClick={handleToggleReviews}
-              style={admBtn(allowTextReviews ? "#ef4444" : "#10b981")}
-            >
-              {allowTextReviews ? "إيقاف التعليقات ❌" : "تفعيل التعليقات ✅"}
-            </button>
-          </div>
           <button
             onClick={handleUpdateSettings}
-            style={{
-              ...admBtn("#7c3aed"),
-              marginLeft: "auto",
-              padding: "10px 20px",
-              fontSize: "0.9rem",
-            }}
+            style={{ ...admBtn("#7c3aed"), marginLeft: "auto" }}
           >
-            💾 حفظ الإعدادات والهوية
+            💾 حفظ الهوية
           </button>
         </div>
       </div>
@@ -1061,7 +992,7 @@ const PlatformManagement = ({
         >
           <thead>
             <tr style={{ backgroundColor: "#f8fafc", textAlign: "center" }}>
-              <th style={padS}>المستخدم والترخيص</th>
+              <th style={padS}>المستخدم</th>
               <th style={padS}>مراسلات الإدارة</th>
               <th style={padS}>الحالة</th>
               <th style={padS}>الإجراءات</th>
@@ -1079,96 +1010,22 @@ const PlatformManagement = ({
               >
                 <td style={padS}>
                   <strong>{u.full_name}</strong>
-                  {u.tax_number && (
-                    <div style={{ fontSize: "0.65rem", color: "#64748b" }}>
-                      ضريبي: {u.tax_number}
-                    </div>
-                  )}
-                  {u.license_info && (
-                    <div style={{ fontSize: "0.65rem", color: "#3b82f6" }}>
-                      رخصة: {u.license_info}
-                    </div>
-                  )}
                 </td>
-                <td style={{ ...padS, maxWidth: "150px" }}>
-                  {u.provider_note && (
-                    <div
-                      style={{
-                        fontSize: "0.7rem",
-                        color: "#d97706",
-                        marginBottom: "5px",
-                      }}
-                    >
-                      <strong>رد المستخدم:</strong> {u.provider_note}
-                    </div>
-                  )}
+                <td style={padS}>
                   {messagingUserId === u.id ? (
-                    <div
-                      style={{
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: "5px",
-                      }}
-                    >
+                    <div>
                       <input
-                        type="text"
-                        placeholder="ملاحظة.."
                         value={adminMessageText}
                         onChange={(e) => setAdminMessageText(e.target.value)}
-                        style={{
-                          padding: "5px",
-                          fontSize: "0.7rem",
-                          border: "1px solid #cbd5e1",
-                          borderRadius: "5px",
-                        }}
                       />
-                      <div style={{ display: "flex", gap: "5px" }}>
-                        <button
-                          onClick={() => sendAdminMessage(u.id)}
-                          style={admBtn("#3b82f6")}
-                        >
-                          إرسال
-                        </button>
-                        <button
-                          onClick={() => setMessagingUserId(null)}
-                          style={admBtn("#94a3b8")}
-                        >
-                          إلغاء
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div>
-                      {u.admin_note && (
-                        <div
-                          style={{
-                            fontSize: "0.7rem",
-                            color: "#ef4444",
-                            marginBottom: "5px",
-                          }}
-                        >
-                          {u.admin_note}
-                        </div>
-                      )}
-                      <button
-                        onClick={() => {
-                          setMessagingUserId(u.id);
-                          setAdminMessageText(u.admin_note || "");
-                        }}
-                        style={admBtn("transparent")}
-                      >
-                        <span
-                          style={{
-                            color: "#3b82f6",
-                            border: "1px solid #3b82f6",
-                            padding: "3px 8px",
-                            borderRadius: "5px",
-                          }}
-                        >
-                          💬 مراسلة
-                        </span>
+                      <button onClick={() => sendAdminMessage(u.id)}>
+                        إرسال
                       </button>
                     </div>
+                  ) : (
+                    <button onClick={() => setMessagingUserId(u.id)}>
+                      💬 مراسلة
+                    </button>
                   )}
                 </td>
                 <td style={padS}>
@@ -1189,97 +1046,9 @@ const PlatformManagement = ({
                   >
                     {u.is_active ? "إيقاف" : "تفعيل"}
                   </button>
-                  <button
-                    onClick={() => deleteUser(u.id, u.full_name)}
-                    style={admBtn("#ef4444")}
-                  >
-                    حذف 🗑️
-                  </button>
                 </td>
               </tr>
             ))}
-          </tbody>
-        </table>
-      </div>
-
-      <h3
-        style={{
-          color: "#1e293b",
-          marginTop: "30px",
-          borderBottom: "2px solid #f1f5f9",
-          paddingBottom: "10px",
-        }}
-      >
-        💬 إدارة التعليقات الحالية
-      </h3>
-      <div style={{ overflowX: "auto" }}>
-        <table
-          style={{
-            width: "100%",
-            borderCollapse: "collapse",
-            fontSize: "0.85rem",
-          }}
-        >
-          <thead>
-            <tr style={{ backgroundColor: "#f8fafc", textAlign: "center" }}>
-              <th style={padS}>العميل</th>
-              <th style={padS}>المزود والخدمة</th>
-              <th style={padS}>التقييم والتعليق</th>
-              <th style={padS}>إجراء</th>
-            </tr>
-          </thead>
-          <tbody>
-            {reviewsList.map((r) => (
-              <tr
-                key={r.id}
-                style={{
-                  borderBottom: "1px solid #f1f5f9",
-                  textAlign: "center",
-                }}
-              >
-                <td style={padS}>
-                  <strong>{r.profiles?.full_name}</strong>
-                </td>
-                <td style={padS}>
-                  <div style={{ fontWeight: "bold" }}>
-                    {r.offerings?.profiles?.full_name}
-                  </div>
-                  <div style={{ fontSize: "0.7rem", color: "#64748b" }}>
-                    {r.offerings?.title}
-                  </div>
-                </td>
-                <td style={{ ...padS, maxWidth: "200px" }}>
-                  <div style={{ color: "#f59e0b", fontSize: "0.75rem" }}>
-                    {"⭐".repeat(r.rating)}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: "0.75rem",
-                      fontStyle: "italic",
-                      color: "#475569",
-                      marginTop: "3px",
-                    }}
-                  >
-                    "{r.review}"
-                  </div>
-                </td>
-                <td style={padS}>
-                  <button
-                    onClick={() => handleDeleteReview(r.id)}
-                    style={admBtn("#ef4444")}
-                  >
-                    حذف التعليق 🗑️
-                  </button>
-                </td>
-              </tr>
-            ))}
-            {reviewsList.length === 0 && (
-              <tr>
-                <td colSpan="4" style={{ padding: "20px", color: "#64748b" }}>
-                  لا توجد تعليقات نصية مسجلة حالياً.
-                </td>
-              </tr>
-            )}
           </tbody>
         </table>
       </div>
@@ -1295,14 +1064,10 @@ export default function App() {
   const [myOfferings, setMyOfferings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [userProfile, setUserProfile] = useState(null);
-  const [searchTerm, setSearchTerm] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
   const [editOfferingData, setEditOfferingData] = useState(null);
-
   const [commissionRate, setCommissionRate] = useState(0.1);
   const [allowTextReviews, setAllowTextReviews] = useState(true);
-
-  // 🎨 حالات الهوية الجديدة
   const [platformName, setPlatformName] = useState("منصتي للخدمات");
   const [platformLogo, setPlatformLogo] = useState("🌟");
 
@@ -1340,7 +1105,7 @@ export default function App() {
       const { data } = await supabase
         .from("bookings")
         .select(
-          `*, profiles!bookings_customer_id_fkey(full_name, avatar_url), offerings(*, profiles!offerings_provider_id_fkey(full_name, avatar_url, provider_type, tax_number, license_info))`,
+          `*, profiles!bookings_customer_id_fkey(full_name, avatar_url), offerings(*, profiles!offerings_provider_id_fkey(full_name, avatar_url))`,
         )
         .order("appointment_date", { ascending: false });
       if (data) {
@@ -1379,12 +1144,6 @@ export default function App() {
     await supabase.auth.signOut();
     window.location.reload();
   };
-  const handleDeleteOffering = async (id) => {
-    if (window.confirm("حذف هذه الخدمة؟")) {
-      await supabase.from("offerings").delete().eq("id", id);
-      fetchAllData(session.user.id);
-    }
-  };
   const openEditModal = (offering) => {
     setEditOfferingData(offering);
     setShowAddModal(true);
@@ -1399,7 +1158,6 @@ export default function App() {
       completed: "✅ منفذة",
       cancelled: "❌ ملغاة",
     };
-    const finalTitle = titleMap[status] || status;
     if (filtered.length === 0) return null;
     return (
       <div key={status} style={{ marginBottom: "15px" }}>
@@ -1412,7 +1170,7 @@ export default function App() {
             paddingBottom: "5px",
           }}
         >
-          {finalTitle}
+          {titleMap[status]}
         </h4>
         <div style={{ overflowX: "auto" }}>
           <table
@@ -1422,7 +1180,6 @@ export default function App() {
               fontSize: "0.8rem",
               backgroundColor: "#fff",
               borderRadius: "10px",
-              overflow: "hidden",
             }}
           >
             <tbody style={{ textAlign: "center" }}>
@@ -1455,7 +1212,7 @@ export default function App() {
       (cb) => !providerBookings.some((pb) => pb.id === cb.id),
     ),
   ];
-  const defaultAvatar = `https://ui-avatars.com/api/?name=${userProfile?.full_name || "User"}&background=7c3aed&color=fff&size=100`;
+  const defaultAvatar = `https://ui-avatars.com/api/?name=${userProfile?.full_name || "User"}&background=7c3aed&color=fff`;
 
   return (
     <div
@@ -1467,17 +1224,12 @@ export default function App() {
         direction: "rtl",
       }}
     >
-      {/* 🎨 الترويسة العلوية الجديدة (تظهر الهوية) */}
       <div style={headerS}>
-        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+        <div style={logoS} onClick={() => setActiveTab("market")}>
           {platformLogo?.includes("http") ? (
             <img
               src={platformLogo}
-              style={{
-                height: "45px",
-                borderRadius: "10px",
-                objectFit: "cover",
-              }}
+              style={{ height: "45px", borderRadius: "10px" }}
               alt="logo"
             />
           ) : (
@@ -1515,7 +1267,6 @@ export default function App() {
                 ...addSkillBtn,
                 padding: "4px 10px",
                 fontSize: "0.7rem",
-                marginTop: "5px",
               }}
             >
               ✨ إضافة خدمة
@@ -1563,12 +1314,6 @@ export default function App() {
         >
           🧾 الفواتير
         </button>
-        <button
-          onClick={() => setActiveTab("dues")}
-          style={tabS(activeTab === "dues", "#eab308")}
-        >
-          💰 المستحقات
-        </button>
         {isAdmin && (
           <button
             onClick={() => setActiveTab("reports")}
@@ -1596,11 +1341,9 @@ export default function App() {
       {activeTab === "market" && (
         <ClientMarketplace
           session={session}
-          searchTerm={searchTerm}
           allowTextReviews={allowTextReviews}
         />
       )}
-
       {activeTab === "my_services" && (
         <div
           style={{
@@ -1610,75 +1353,15 @@ export default function App() {
           }}
         >
           {myOfferings.map((off) => (
-            <div
-              key={off.id}
-              style={{
-                backgroundColor: "#fff",
-                padding: "20px",
-                borderRadius: "20px",
-                border: "1px solid #e2e8f0",
-              }}
-            >
-              <h3 style={{ margin: "0 0 10px 0", fontSize: "1.1rem" }}>
-                {off.title}
-              </h3>
-              <p
-                style={{
-                  fontSize: "0.8rem",
-                  color: "#64748b",
-                  marginBottom: "15px",
-                }}
-              >
-                {off.description}
-              </p>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  borderTop: "1px solid #f1f5f9",
-                  paddingTop: "15px",
-                }}
-              >
-                <strong style={{ color: "#7c3aed" }}>{off.price} ر.س</strong>
-                <div style={{ display: "flex", gap: "5px" }}>
-                  <button
-                    onClick={() => openEditModal(off)}
-                    style={{
-                      border: "none",
-                      background: "#eff6ff",
-                      color: "#2563eb",
-                      padding: "5px 10px",
-                      borderRadius: "8px",
-                      cursor: "pointer",
-                      fontWeight: "bold",
-                      fontSize: "0.75rem",
-                    }}
-                  >
-                    تعديل
-                  </button>
-                  <button
-                    onClick={() => handleDeleteOffering(off.id)}
-                    style={{
-                      border: "none",
-                      background: "#fef2f2",
-                      color: "#ef4444",
-                      padding: "5px 10px",
-                      borderRadius: "8px",
-                      cursor: "pointer",
-                      fontWeight: "bold",
-                      fontSize: "0.75rem",
-                    }}
-                  >
-                    حذف
-                  </button>
-                </div>
-              </div>
+            <div key={off.id} style={cardS}>
+              <h3>{off.title}</h3>
+              <p>{off.description}</p>
+              <button onClick={() => openEditModal(off)}>تعديل</button>
             </div>
           ))}
         </div>
       )}
       {activeTab === "calendar" && <CalendarView bookings={allUserBookings} />}
-      {/* 🖨️ تمرير الهوية للفواتير الفردية */}
       {activeTab === "invoices" && (
         <InvoicesView
           bookings={allUserBookings}
@@ -1688,21 +1371,12 @@ export default function App() {
           platLogo={platformLogo}
         />
       )}
-      {activeTab === "dues" && (
-        <ProviderDues
-          providerBookings={providerBookings}
-          commissionRate={commissionRate}
-          onRefresh={() => fetchAllData(session.user.id)}
-        />
-      )}
       {activeTab === "profile" && (
         <ProfileSettings
           session={session}
           onUpdate={() => fetchAllData(session.user.id)}
         />
       )}
-
-      {/* 🖨️ تمرير الهوية للتقارير الشاملة */}
       {activeTab === "reports" && isAdmin && (
         <AdminReports
           commissionRate={commissionRate}
@@ -1710,8 +1384,6 @@ export default function App() {
           platLogo={platformLogo}
         />
       )}
-
-      {/* 🎨 تمرير دوال وحالات الهوية للوحة الإدارة */}
       {activeTab === "admin" && isAdmin && (
         <PlatformManagement
           onRefresh={() => fetchAllData(session.user.id)}
@@ -1729,9 +1401,7 @@ export default function App() {
       {activeTab === "provider" && (
         <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
           <section style={cardS}>
-            <h2 style={{ fontSize: "1rem", color: "#2563eb" }}>
-              🛒 طلباتي كعميل
-            </h2>
+            <h2 style={{ fontSize: "1rem" }}>🛒 طلباتي</h2>
             {[
               "pending",
               "negotiating",
@@ -1741,9 +1411,7 @@ export default function App() {
             ].map((s) => renderTable(clientBookings, s, false))}
           </section>
           <section style={cardS}>
-            <h2 style={{ fontSize: "1rem", color: "#059669" }}>
-              📦 خدماتي المطلوبة مني
-            </h2>
+            <h2 style={{ fontSize: "1rem" }}>📦 خدماتي</h2>
             {[
               "pending",
               "negotiating",

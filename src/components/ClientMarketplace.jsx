@@ -229,6 +229,14 @@ export default function ClientMarketplace({
 
   return (
     <div style={{ direction: "rtl" }}>
+      {/* 🌟 القسم الترحيبي (Hero Section) */}
+      <div style={heroSectionS}>
+        <h1 style={heroTitleS}>مرحباً بك في منصة مَحلي ✨</h1>
+        <p style={heroSubTitleS}>
+          اكتشف أفضل الخدمات المهنية والإبداعية في مكان واحد
+        </p>
+      </div>
+
       <div style={searchBarContainer}>
         <span style={{ marginLeft: "10px", fontSize: "1.2rem" }}>🔍</span>
         <input
@@ -553,7 +561,6 @@ export default function ClientMarketplace({
                           {"⭐".repeat(rev.rating)}
                         </span>
                       </div>
-                      {/* 🛡️ إخفاء التعليق في السوق إذا منعه المدير */}
                       {rev.review && allowTextReviews && (
                         <div
                           style={{
@@ -694,6 +701,21 @@ export default function ClientMarketplace({
   );
 }
 
+const heroSectionS = {
+  background: "linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%)",
+  padding: "40px 20px",
+  borderRadius: "24px",
+  textAlign: "center",
+  color: "white",
+  marginBottom: "30px",
+  boxShadow: "0 10px 25px rgba(79, 70, 229, 0.2)",
+};
+const heroTitleS = {
+  fontSize: "1.8rem",
+  margin: "0 0 10px 0",
+  fontWeight: "800",
+};
+const heroSubTitleS = { fontSize: "1rem", opacity: "0.9", margin: 0 };
 const searchBarContainer = {
   display: "flex",
   alignItems: "center",
