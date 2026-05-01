@@ -8,8 +8,13 @@ export default function ProfileSettings({ session, onUpdate }) {
   const [providerType, setProviderType] = useState("individual");
   const [maxCapacity, setMaxCapacity] = useState(1);
   const [phone, setPhone] = useState("");
+
+  // 📱 روابط السوشيال ميديا
   const [instagramUrl, setInstagramUrl] = useState("");
   const [youtubeUrl, setYoutubeUrl] = useState("");
+  const [twitterUrl, setTwitterUrl] = useState("");
+  const [tiktokUrl, setTiktokUrl] = useState("");
+
   const [is24x7, setIs24x7] = useState(true);
   const [workStart, setWorkStart] = useState("08:00");
   const [workEnd, setWorkEnd] = useState("22:00");
@@ -18,6 +23,11 @@ export default function ProfileSettings({ session, onUpdate }) {
   const [licenseInfo, setLicenseInfo] = useState("");
   const [adminNote, setAdminNote] = useState("");
   const [providerNote, setProviderNote] = useState("");
+
+  // 🛡️ حالات نظام التوثيق الجديد
+  const [nationalId, setNationalId] = useState("");
+  const [bankIban, setBankIban] = useState("");
+  const [verificationStatus, setVerificationStatus] = useState("unverified");
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -36,15 +46,25 @@ export default function ProfileSettings({ session, onUpdate }) {
         setProviderType(data.provider_type || "individual");
         setMaxCapacity(data.max_concurrent_bookings || 1);
         setPhone(data.phone || "");
+
         setInstagramUrl(data.instagram_url || "");
         setYoutubeUrl(data.youtube_url || "");
+        setTwitterUrl(data.twitter_url || "");
+        setTiktokUrl(data.tiktok_url || "");
+
         setIs24x7(data.is_24_7 !== false);
         setWorkStart(data.work_start_time?.substring(0, 5) || "08:00");
         setWorkEnd(data.work_end_time?.substring(0, 5) || "22:00");
+
         setTaxNumber(data.tax_number || "");
         setLicenseInfo(data.license_info || "");
         setAdminNote(data.admin_note || "");
         setProviderNote(data.provider_note || "");
+
+        // استرجاع بيانات التوثيق
+        setNationalId(data.national_id || "");
+        setBankIban(data.bank_iban || "");
+        setVerificationStatus(data.verification_status || "unverified");
       }
       setLoading(false);
     }
@@ -74,7 +94,6 @@ export default function ProfileSettings({ session, onUpdate }) {
     }
   };
 
-  // 📩 دالة مخصصة لإرسال الرد الفوري للإدارة
   const handleSendReply = async () => {
     if (!providerNote.trim()) return alert("الرجاء كتابة رد أولاً ✍️");
     setIsSubmitting(true);
@@ -85,6 +104,37 @@ export default function ProfileSettings({ session, onUpdate }) {
     setIsSubmitting(false);
     if (!error) alert("تم إرسال الرد للإدارة بنجاح ✅");
     else alert("خطأ في إرسال الرد: " + error.message);
+  };
+
+  // 🛡️ دالة إرسال طلب التوثيق للإدارة
+  const handleVerificationRequest = async () => {
+    if (!nationalId || !bankIban)
+      return alert("الرجاء إدخال رقم الهوية ورقم الآيبان البنكي لتقديم الطلب.");
+
+    if (
+      window.confirm(
+        "هل أنت متأكد من صحة البيانات؟ (لن تتمكن من تعديلها أثناء المراجعة)",
+      )
+    ) {
+      setIsSubmitting(true);
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          national_id: nationalId,
+          bank_iban: bankIban,
+          verification_status: "pending", // تغيير الحالة إلى "قيد المراجعة"
+        })
+        .eq("id", session.user.id);
+
+      setIsSubmitting(false);
+
+      if (!error) {
+        setVerificationStatus("pending");
+        alert("تم إرسال طلب التوثيق للإدارة بنجاح! سيتم مراجعته قريباً ✅");
+      } else {
+        alert("حدث خطأ أثناء الإرسال: " + error.message);
+      }
+    }
   };
 
   const handleUpdate = async (e) => {
@@ -101,6 +151,8 @@ export default function ProfileSettings({ session, onUpdate }) {
         phone,
         instagram_url: instagramUrl,
         youtube_url: youtubeUrl,
+        twitter_url: twitterUrl,
+        tiktok_url: tiktokUrl,
         is_24_7: is24x7,
         work_start_time: workStart,
         work_end_time: workEnd,
@@ -124,6 +176,7 @@ export default function ProfileSettings({ session, onUpdate }) {
         ⏳ جاري التحميل...
       </div>
     );
+
   const defaultAvatar = `https://ui-avatars.com/api/?name=${fullName || "User"}&background=7c3aed&color=fff&size=100`;
 
   return (
@@ -193,11 +246,188 @@ export default function ProfileSettings({ session, onUpdate }) {
         </div>
       </div>
 
+      {/* 🛡️ قسم التوثيق الجديد (محفز وجذاب) 🛡️ */}
+      <div
+        style={{
+          backgroundColor:
+            verificationStatus === "verified" ? "#ecfdf5" : "#fffbeb",
+          padding: "20px",
+          borderRadius: "15px",
+          border:
+            verificationStatus === "verified"
+              ? "2px solid #10b981"
+              : "1px solid #fcd34d",
+          marginBottom: "25px",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: "15px",
+          }}
+        >
+          <h3
+            style={{
+              margin: 0,
+              color: verificationStatus === "verified" ? "#059669" : "#d97706",
+              display: "flex",
+              alignItems: "center",
+              gap: "5px",
+            }}
+          >
+            🛡️ توثيق الحساب (Nafath)
+          </h3>
+          {/* شارات الحالة */}
+          {verificationStatus === "verified" && (
+            <span
+              style={{
+                backgroundColor: "#10b981",
+                color: "#fff",
+                padding: "4px 10px",
+                borderRadius: "8px",
+                fontSize: "0.75rem",
+                fontWeight: "bold",
+              }}
+            >
+              ✅ حساب موثق
+            </span>
+          )}
+          {verificationStatus === "pending" && (
+            <span
+              style={{
+                backgroundColor: "#f59e0b",
+                color: "#fff",
+                padding: "4px 10px",
+                borderRadius: "8px",
+                fontSize: "0.75rem",
+                fontWeight: "bold",
+              }}
+            >
+              ⏳ قيد المراجعة الإدارية
+            </span>
+          )}
+          {verificationStatus === "rejected" && (
+            <span
+              style={{
+                backgroundColor: "#ef4444",
+                color: "#fff",
+                padding: "4px 10px",
+                borderRadius: "8px",
+                fontSize: "0.75rem",
+                fontWeight: "bold",
+              }}
+            >
+              ❌ مرفوض (راجع البيانات)
+            </span>
+          )}
+          {verificationStatus === "unverified" && (
+            <span
+              style={{
+                backgroundColor: "#94a3b8",
+                color: "#fff",
+                padding: "4px 10px",
+                borderRadius: "8px",
+                fontSize: "0.75rem",
+                fontWeight: "bold",
+              }}
+            >
+              غير موثق
+            </span>
+          )}
+        </div>
+
+        {verificationStatus === "verified" ? (
+          <p
+            style={{
+              fontSize: "0.85rem",
+              color: "#065f46",
+              margin: 0,
+              fontWeight: "bold",
+            }}
+          >
+            تهانينا! حسابك موثق رسمياً. ستظهر علامة التوثيق الخضراء للعملاء
+            بجانب اسمك مما يزيد من المبيعات والثقة.
+          </p>
+        ) : (
+          <div>
+            <p
+              style={{
+                fontSize: "0.8rem",
+                color: "#92400e",
+                marginBottom: "15px",
+                lineHeight: "1.5",
+              }}
+            >
+              احصل على شارة التوثيق الخضراء لزيادة ثقة العملاء بك ومضاعفة
+              حجوزاتك! 🚀
+              <br />
+              يرجى إدخال بياناتك الرسمية لمطابقتها من قبل الإدارة. (هذه البيانات
+              سرية ولن تظهر للعامة).
+            </p>
+            <div
+              style={{ display: "flex", gap: "10px", flexDirection: "column" }}
+            >
+              <div style={{ display: "flex", gap: "10px" }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{ ...lblS, color: "#92400e" }}>
+                    رقم الهوية الوطنية / الإقامة:
+                  </label>
+                  <input
+                    type="text"
+                    style={inpS}
+                    value={nationalId}
+                    onChange={(e) => setNationalId(e.target.value)}
+                    disabled={verificationStatus === "pending"}
+                    placeholder="مثال: 10xxxxxxxxx"
+                  />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={{ ...lblS, color: "#92400e" }}>
+                    رقم الحساب البنكي (IBAN):
+                  </label>
+                  <input
+                    type="text"
+                    dir="ltr"
+                    style={{ ...inpS, textAlign: "left" }}
+                    value={bankIban}
+                    onChange={(e) => setBankIban(e.target.value)}
+                    disabled={verificationStatus === "pending"}
+                    placeholder="SAxxxxxxxxxxxxxxxxxxxxxx"
+                  />
+                </div>
+              </div>
+              {verificationStatus !== "pending" && (
+                <button
+                  type="button"
+                  onClick={handleVerificationRequest}
+                  disabled={isSubmitting}
+                  style={{
+                    backgroundColor: "#d97706",
+                    color: "#fff",
+                    border: "none",
+                    padding: "10px",
+                    borderRadius: "8px",
+                    fontWeight: "bold",
+                    cursor: "pointer",
+                    marginTop: "5px",
+                  }}
+                >
+                  {isSubmitting
+                    ? "⏳ جاري الإرسال..."
+                    : "إرسال طلب التوثيق الآن 🚀"}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
       <form
         onSubmit={handleUpdate}
         style={{ display: "flex", flexDirection: "column", gap: "20px" }}
       >
-        {/* 📩 صندوق بريد الإدارة المطور مع زر الرد */}
         <div
           style={{
             ...sectionS,
@@ -241,16 +471,19 @@ export default function ProfileSettings({ session, onUpdate }) {
               onChange={(e) => setProviderNote(e.target.value)}
               placeholder="اكتب ملاحظاتك أو ردك للإدارة هنا..."
             />
-            {/* زر الإرسال الفوري للرد */}
             <button
               type="button"
               onClick={handleSendReply}
               disabled={isSubmitting}
               style={{
-                ...btnS("#3b82f6"),
+                width: "100%",
+                backgroundColor: "#3b82f6",
+                color: "#fff",
+                border: "none",
                 padding: "10px",
-                fontSize: "0.85rem",
-                width: "auto",
+                borderRadius: "8px",
+                fontWeight: "bold",
+                cursor: "pointer",
               }}
             >
               {isSubmitting ? "⏳ جاري الإرسال..." : "📤 إرسال الرد للإدارة"}
@@ -260,47 +493,89 @@ export default function ProfileSettings({ session, onUpdate }) {
 
         <div style={sectionS}>
           <h3 style={secTitle}>البيانات الأساسية والتواصل</h3>
-          <div>
-            <label style={lblS}>الاسم الكامل:</label>
-            <input
-              type="text"
-              required
-              style={inpS}
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-            />
-          </div>
-          <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
+          <div style={{ display: "flex", gap: "10px" }}>
+            <div style={{ flex: 2 }}>
+              <label style={lblS}>الاسم الكامل:</label>
+              <input
+                type="text"
+                required
+                style={inpS}
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+              />
+            </div>
             <div style={{ flex: 1 }}>
               <label style={lblS}>رقم الجوال:</label>
               <input
                 type="tel"
-                style={inpS}
+                style={{ ...inpS, textAlign: "left" }}
+                dir="ltr"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="05XXXXXXXX"
               />
             </div>
-            <div style={{ flex: 1 }}>
-              <label style={lblS}>انستقرام (رابط):</label>
+          </div>
+          <h4
+            style={{
+              margin: "15px 0 10px 0",
+              fontSize: "0.9rem",
+              color: "#3b82f6",
+            }}
+          >
+            روابط السوشيال ميديا (اختياري):
+          </h4>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: "10px",
+            }}
+          >
+            <div>
+              <label style={lblS}>يوتيوب:</label>
               <input
                 type="url"
-                style={inpS}
+                dir="ltr"
+                style={{ ...inpS, textAlign: "left" }}
+                value={youtubeUrl}
+                onChange={(e) => setYoutubeUrl(e.target.value)}
+                placeholder="https://youtube.com/..."
+              />
+            </div>
+            <div>
+              <label style={lblS}>انستقرام:</label>
+              <input
+                type="url"
+                dir="ltr"
+                style={{ ...inpS, textAlign: "left" }}
                 value={instagramUrl}
                 onChange={(e) => setInstagramUrl(e.target.value)}
                 placeholder="https://instagram.com/..."
               />
             </div>
-          </div>
-          <div style={{ marginTop: "10px" }}>
-            <label style={lblS}>يوتيوب (رابط القناة/فيديو):</label>
-            <input
-              type="url"
-              style={inpS}
-              value={youtubeUrl}
-              onChange={(e) => setYoutubeUrl(e.target.value)}
-              placeholder="https://youtube.com/..."
-            />
+            <div>
+              <label style={lblS}>تويتر (X):</label>
+              <input
+                type="url"
+                dir="ltr"
+                style={{ ...inpS, textAlign: "left" }}
+                value={twitterUrl}
+                onChange={(e) => setTwitterUrl(e.target.value)}
+                placeholder="https://x.com/..."
+              />
+            </div>
+            <div>
+              <label style={lblS}>تيك توك:</label>
+              <input
+                type="url"
+                dir="ltr"
+                style={{ ...inpS, textAlign: "left" }}
+                value={tiktokUrl}
+                onChange={(e) => setTiktokUrl(e.target.value)}
+                placeholder="https://tiktok.com/..."
+              />
+            </div>
           </div>
         </div>
 
@@ -372,7 +647,15 @@ export default function ProfileSettings({ session, onUpdate }) {
           type="submit"
           disabled={isSubmitting || isUploading}
           style={{
-            ...btnS(isSubmitting ? "#94a3b8" : "#10b981"),
+            width: "100%",
+            backgroundColor:
+              isSubmitting || isUploading ? "#94a3b8" : "#10b981",
+            color: "white",
+            border: "none",
+            padding: "15px",
+            borderRadius: "12px",
+            fontWeight: "bold",
+            fontSize: "1rem",
             cursor: isSubmitting || isUploading ? "not-allowed" : "pointer",
           }}
         >
@@ -412,17 +695,6 @@ const inpS = {
   boxSizing: "border-box",
   fontFamily: "inherit",
 };
-const btnS = (bg) => ({
-  width: "100%",
-  backgroundColor: bg,
-  color: "white",
-  border: "none",
-  padding: "15px",
-  borderRadius: "12px",
-  fontWeight: "bold",
-  fontSize: "1rem",
-  transition: "0.3s",
-});
 const uploadBtn = (disabled) => ({
   width: "100%",
   backgroundColor: disabled ? "#cbd5e1" : "#3b82f6",

@@ -5,6 +5,26 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>mytaim-app</title>
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#7c3aed" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <link rel="apple-touch-icon" href="/logo192.png" />
+
+    <script>
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", () => {
+          navigator.serviceWorker.register("/sw.js");
+        });
+      }
+    </script>
+    <!-- Moyasar Styles -->
+    <link
+      rel="stylesheet"
+      href="https://cdn.moyasar.com/mpf/1.13.0/moyasar.css"
+    />
+    <!-- Moyasar Script -->
+    <script src="https://cdn.moyasar.com/mpf/1.13.0/moyasar.js"></script>
   </head>
   <body>
     <div id="root"></div>

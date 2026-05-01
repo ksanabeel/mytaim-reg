@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { supabase } from "../lib/supabase";
+import { useTranslation } from "react-i18next";
 
 export default function BookingRow({
   booking,
@@ -7,6 +8,7 @@ export default function BookingRow({
   isProviderView,
   allowTextReviews = true,
 }) {
+  const { t, i18n } = useTranslation();
   const [extraCosts, setExtraCosts] = useState("");
   const [isCanceling, setIsCanceling] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
@@ -25,23 +27,22 @@ export default function BookingRow({
       .update(updatePayload)
       .eq("id", booking.id);
     if (!error) {
-      alert("تم التحديث بنجاح ✅");
+      alert(t("update_success_booking"));
       setIsCanceling(false);
       onRefresh();
     } else {
-      alert("خطأ: " + error.message);
+      alert(t("error_prefix") + error.message);
     }
   };
 
   const handleCancelSubmit = () => {
-    if (!cancelReason.trim()) return alert("يرجى كتابة سبب الإلغاء ✍️");
+    if (!cancelReason.trim()) return alert(t("cancel_reason_required"));
     updateStatus("cancelled", null, cancelReason);
   };
 
   const submitRating = async () => {
-    if (ratingValue === 0) return alert("يرجى تحديد عدد النجوم أولاً ⭐");
+    if (ratingValue === 0) return alert(t("rating_required"));
 
-    // إذا كان المدير موقف التعليقات، نجبر النص على أن يكون فارغاً
     const finalReview = allowTextReviews ? reviewText : null;
 
     const { error } = await supabase
@@ -71,11 +72,11 @@ export default function BookingRow({
             .eq("id", providerId);
         }
       }
-      alert("شكراً لتقييمك! تم حفظ التقييم بنجاح ✅");
+      alert(t("rating_success"));
       setIsRatingMode(false);
       onRefresh();
     } else {
-      alert("خطأ في حفظ التقييم: " + error.message);
+      alert(t("rating_error") + error.message);
     }
   };
 
@@ -83,17 +84,22 @@ export default function BookingRow({
   const qty = booking.quantity || 1;
   const subTotal = basePrice * qty;
   const modelLabels = {
-    fixed: "مهمة",
-    hourly: "ساعة",
-    period: "فترة",
-    daily: "يوم",
-    monthly: "شهر",
-    yearly: "سنة",
-    free: "تطوع",
+    fixed: t("task"),
+    hourly: t("hour"),
+    period: t("period"),
+    daily: t("day"),
+    monthly: t("month"),
+    yearly: t("year"),
+    free: t("volunteer"),
   };
   const label = modelLabels[booking.offerings?.pricing_model || "fixed"];
   const canCancel =
     booking.status !== "completed" && booking.status !== "cancelled";
+
+  const formatDate = (dateString) => {
+    const locale = i18n.language === "ar" ? "ar-SA" : "en-US";
+    return new Date(dateString).toLocaleString(locale);
+  };
 
   return (
     <tr style={{ borderBottom: "1px solid #f1f5f9" }}>
@@ -103,6 +109,32 @@ export default function BookingRow({
             ? booking.profiles?.full_name
             : booking.offerings?.profiles?.full_name}
         </strong>
+
+        {/* ✨ إظهار رقم تواصل العميل لمقدم الخدمة فقط ✨ */}
+        {isProviderView && booking.client_contact && (
+          <div style={{ marginTop: "8px" }}>
+            <a
+              href={`https://wa.me/${booking.client_contact.replace(/\D/g, "")}`}
+              target="_blank"
+              rel="noreferrer"
+              style={{
+                fontSize: "0.7rem",
+                color: "#059669",
+                backgroundColor: "#ecfdf5",
+                padding: "4px 8px",
+                borderRadius: "6px",
+                border: "1px solid #10b981",
+                textDecoration: "none",
+                fontWeight: "bold",
+                display: "inline-block",
+                direction: "ltr",
+              }}
+              title="تواصل عبر واتساب"
+            >
+              📞 {booking.client_contact}
+            </a>
+          </div>
+        )}
       </td>
       <td style={tdS}>
         <div style={{ fontWeight: "bold" }}>{booking.offerings?.title}</div>
@@ -116,7 +148,7 @@ export default function BookingRow({
               rel="noreferrer"
               style={mapBtn}
             >
-              📍 عرض الخريطة
+              {t("view_map")}
             </a>
           ) : (
             `📍 ${booking.location}`
@@ -127,11 +159,11 @@ export default function BookingRow({
         <div
           style={{ color: "#10b981", fontWeight: "bold", marginBottom: "3px" }}
         >
-          البدء: {new Date(booking.appointment_date).toLocaleString("ar-SA")}
+          {t("start_time_label")} {formatDate(booking.appointment_date)}
         </div>
         {booking.end_time && (
           <div style={{ color: "#ef4444", fontWeight: "bold" }}>
-            الانتهاء: {new Date(booking.end_time).toLocaleString("ar-SA")}
+            {t("end_time_label")} {formatDate(booking.end_time)}
           </div>
         )}
       </td>
@@ -144,11 +176,12 @@ export default function BookingRow({
                 : "#7c3aed",
             fontWeight: "bold",
             fontSize: "1.1rem",
+            direction: i18n.language === "en" ? "ltr" : "rtl",
           }}
         >
           {booking.offerings?.pricing_model === "free"
-            ? "مجاني"
-            : `${subTotal} ر.س`}
+            ? t("free")
+            : `${subTotal} ${t("currency_sar")}`}
         </div>
         <div style={{ fontSize: "0.65rem", color: "#64748b" }}>
           {qty} {label} × {basePrice}
@@ -164,7 +197,7 @@ export default function BookingRow({
               borderRadius: "6px",
             }}
           >
-            + {booking.additional_costs} إضافي
+            + {booking.additional_costs} {t("extra_cost_label")}
           </div>
         )}
       </td>
@@ -188,24 +221,24 @@ export default function BookingRow({
                 fontWeight: "bold",
               }}
             >
-              لماذا تريد الإلغاء؟
+              {t("cancel_reason_question")}
             </label>
             <input
               type="text"
-              placeholder="اكتب السبب.."
+              placeholder={t("type_reason_placeholder")}
               style={smInput}
               value={cancelReason}
               onChange={(e) => setCancelReason(e.target.value)}
             />
             <div style={{ display: "flex", gap: "5px" }}>
               <button onClick={handleCancelSubmit} style={btn("#ef4444")}>
-                تأكيد
+                {t("confirm_btn")}
               </button>
               <button
                 onClick={() => setIsCanceling(false)}
                 style={btn("#94a3b8")}
               >
-                تراجع
+                {t("cancel_back_btn")}
               </button>
             </div>
           </div>
@@ -219,12 +252,12 @@ export default function BookingRow({
                   onClick={() => updateStatus("confirmed", 0)}
                   style={btn("#10b981")}
                 >
-                  قبول الطلب
+                  {t("accept_order")}
                 </button>
                 <div style={{ display: "flex", gap: "5px" }}>
                   <input
                     type="number"
-                    placeholder="إضافي.."
+                    placeholder={t("extra_placeholder")}
                     style={smInput}
                     value={extraCosts}
                     onChange={(e) => setExtraCosts(e.target.value)}
@@ -233,7 +266,7 @@ export default function BookingRow({
                     onClick={() => updateStatus("negotiating", extraCosts)}
                     style={btn("#f59e0b")}
                   >
-                    تسعيرة
+                    {t("negotiate_price")}
                   </button>
                 </div>
               </div>
@@ -254,15 +287,17 @@ export default function BookingRow({
                     marginBottom: "8px",
                     color: "#059669",
                     fontWeight: "bold",
+                    direction: i18n.language === "en" ? "ltr" : "rtl",
                   }}
                 >
-                  الإجمالي: {subTotal + booking.additional_costs} ر.س
+                  {t("total_label")} {subTotal + booking.additional_costs}{" "}
+                  {t("currency_sar")}
                 </div>
                 <button
                   onClick={() => updateStatus("confirmed")}
                   style={btn("#10b981")}
                 >
-                  أوافق وأؤكد ✅
+                  {t("agree_confirm")}
                 </button>
               </div>
             )}
@@ -274,10 +309,12 @@ export default function BookingRow({
                     onClick={() => updateStatus("completed")}
                     style={btn("#3b82f6")}
                   >
-                    تأكيد التنفيذ ✅
+                    {t("confirm_execution")}
                   </button>
                 ) : (
-                  <span style={badge("#eff6ff", "#2563eb")}>📅 موعد مؤكد</span>
+                  <span style={badge("#eff6ff", "#2563eb")}>
+                    {t("confirmed_appointment")}
+                  </span>
                 )}
               </div>
             )}
@@ -291,7 +328,9 @@ export default function BookingRow({
                   alignItems: "center",
                 }}
               >
-                <span style={badge("#ecfdf5", "#059669")}>✅ تم التنفيذ</span>
+                <span style={badge("#ecfdf5", "#059669")}>
+                  {t("completed_status")}
+                </span>
 
                 {booking.rating ? (
                   <div
@@ -314,7 +353,6 @@ export default function BookingRow({
                     >
                       {"⭐".repeat(booking.rating)}
                     </div>
-                    {/* إخفاء التعليق إذا منعه المدير */}
                     {booking.review && allowTextReviews && (
                       <div
                         style={{
@@ -366,10 +404,9 @@ export default function BookingRow({
                           </span>
                         ))}
                       </div>
-                      {/* 🛡️ إخفاء حقل النص إذا منع المدير التعليقات */}
                       {allowTextReviews && (
                         <textarea
-                          placeholder="اكتب ملاحظاتك عن الخدمة (اختياري).."
+                          placeholder={t("review_placeholder")}
                           style={{
                             ...smInput,
                             height: "50px",
@@ -381,13 +418,13 @@ export default function BookingRow({
                       )}
                       <div style={{ display: "flex", gap: "5px" }}>
                         <button onClick={submitRating} style={btn("#f59e0b")}>
-                          حفظ التقييم
+                          {t("save_rating")}
                         </button>
                         <button
                           onClick={() => setIsRatingMode(false)}
                           style={btn("#94a3b8")}
                         >
-                          إلغاء
+                          {t("cancel_btn")}
                         </button>
                       </div>
                     </div>
@@ -401,7 +438,7 @@ export default function BookingRow({
                         marginTop: "5px",
                       }}
                     >
-                      ⭐ تقييم الخدمة
+                      {t("rate_service")}
                     </button>
                   ))
                 )}
@@ -410,7 +447,7 @@ export default function BookingRow({
 
             {booking.status === "pending" && !isProviderView && (
               <span style={{ fontSize: "0.8rem", color: "#64748b" }}>
-                ⏳ بانتظار المزود..
+                {t("waiting_provider")}
               </span>
             )}
             {canCancel && (
@@ -424,8 +461,8 @@ export default function BookingRow({
                 }}
               >
                 {isProviderView && booking.status === "pending"
-                  ? "رفض الطلب ❌"
-                  : "إلغاء الطلب ❌"}
+                  ? t("reject_order")
+                  : t("cancel_order")}
               </button>
             )}
           </>
@@ -447,7 +484,7 @@ export default function BookingRow({
                 fontSize: "0.85rem",
               }}
             >
-              ❌ ملغى
+              {t("cancelled_status")}
             </div>
             {booking.cancellation_reason && (
               <div
@@ -457,7 +494,8 @@ export default function BookingRow({
                   marginTop: "5px",
                 }}
               >
-                <strong>السبب:</strong> {booking.cancellation_reason}
+                <strong>{t("reason_label")}</strong>{" "}
+                {booking.cancellation_reason}
               </div>
             )}
           </div>
