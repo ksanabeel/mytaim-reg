@@ -1,7 +1,7 @@
+// تحديث جديد
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 import { useTranslation } from "react-i18next";
-
 export default function ClientMarketplace({
   session,
   allowTextReviews = true,
