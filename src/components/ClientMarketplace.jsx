@@ -14,14 +14,14 @@ export default function ClientMarketplace({
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
 
-  // ✨ فلاتر البحث الأساسية والمطورة ✨
+  // فلاتر البحث
   const [localSearch, setLocalSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState("all");
   const [filterCountry, setFilterCountry] = useState("all");
   const [filterCity, setFilterCity] = useState("all");
   const [filterDate, setFilterDate] = useState("");
-  const [filterStartTime, setFilterStartTime] = useState(""); // ✨ فلتر بداية الوقت
-  const [filterEndTime, setFilterEndTime] = useState(""); // ✨ فلتر نهاية الوقت
+  const [filterStartTime, setFilterStartTime] = useState("");
+  const [filterEndTime, setFilterEndTime] = useState("");
 
   const [reviews, setReviews] = useState([]);
   const [bookingData, setBookingData] = useState({
@@ -93,12 +93,11 @@ export default function ClientMarketplace({
     ),
   ];
 
-  // ✨ الفلتر الذكي المطور (يطابق فترة العمل من - إلى) ✨
   const filtered = offerings.filter((item) => {
-    // 1. فلاتر النص، القسم، الدولة، المدينة
     const s = localSearch.toLowerCase();
     const matchesSearch =
       (item.title || "").toLowerCase().includes(s) ||
+      (item.nickname || "").toLowerCase().includes(s) ||
       (item.provider_name || "").toLowerCase().includes(s) ||
       (item.profiles?.full_name || "").toLowerCase().includes(s) ||
       (item.description || "").toLowerCase().includes(s);
@@ -109,7 +108,6 @@ export default function ClientMarketplace({
       filterCountry === "all" || item.country === filterCountry;
     const matchesCity = filterCity === "all" || item.city === filterCity;
 
-    // 2. فلتر التاريخ (الأيام المتاحة)
     let matchesDate = true;
     if (filterDate) {
       const selectedDay = new Date(filterDate);
@@ -124,7 +122,6 @@ export default function ClientMarketplace({
       }
     }
 
-    // 3. فلتر الوقت الدقيق (من ساعة - إلى ساعة)
     let matchesTime = true;
     if (
       (filterStartTime || filterEndTime) &&
@@ -140,20 +137,15 @@ export default function ClientMarketplace({
 
       const pStart = toMins(item.work_start_time.substring(0, 5));
       let pEnd = toMins(item.work_end_time.substring(0, 5));
-      if (pEnd <= pStart) pEnd += 24 * 60; // معالجة الدوام لليوم التالي
+      if (pEnd <= pStart) pEnd += 24 * 60;
 
-      // إذا لم يحدد العميل وقتاً نعتبره وقت عمل المزود الافتراضي
       let fStart = filterStartTime ? toMins(filterStartTime) : pStart;
       let fEnd = filterEndTime ? toMins(filterEndTime) : pEnd;
 
-      // إذا اختار العميل فترة تمتد لليوم التالي (مثلاً من 23:00 إلى 02:00)
       if (fEnd <= fStart && filterStartTime && filterEndTime) fEnd += 24 * 60;
-
-      // مطابقة توقيت العميل مع توقيت المزود (حتى لو كان المزود يعمل بعد منتصف الليل)
       if (fStart < pStart && pEnd > 24 * 60) fStart += 24 * 60;
       if (fEnd < pStart && pEnd > 24 * 60) fEnd += 24 * 60;
 
-      // إذا كان وقت بداية العميل قبل دوام المزود، أو وقت نهاية العميل بعد انتهاء دوام المزود = استبعاد
       if (fStart < pStart || fEnd > pEnd) {
         matchesTime = false;
       }
@@ -282,6 +274,103 @@ export default function ClientMarketplace({
     }
 
     setBookingData({ ...bookingData, [field]: value });
+  };
+
+  // ✨ الدالة الجديدة: اقتراح أقرب موعد متاح للبدء ✨
+  const handleSuggestNextSlot = () => {
+    if (!selected) return;
+
+    const now = new Date();
+    let proposedStart = new Date(now.getTime() + 60 * 60 * 1000); // إضافة ساعة كمسافة أمان
+
+    // تقريب الوقت لأقرب نصف ساعة
+    const mins = proposedStart.getMinutes();
+    if (mins > 0 && mins <= 30) {
+      proposedStart.setMinutes(30, 0, 0);
+    } else if (mins > 30) {
+      proposedStart.setHours(proposedStart.getHours() + 1);
+      proposedStart.setMinutes(0, 0, 0);
+    }
+
+    const dayMap = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
+    const activeDays =
+      Array.isArray(selected.available_days) &&
+      selected.available_days.length > 0
+        ? selected.available_days
+        : dayMap;
+
+    let foundDate = null;
+
+    // فحص الأيام السبعة القادمة للعثور على أول وقت يتطابق مع ساعات العمل والأيام المتاحة
+    for (let i = 0; i < 7; i++) {
+      const checkDate = new Date(proposedStart);
+      checkDate.setDate(checkDate.getDate() + i);
+      const dayId = dayMap[checkDate.getDay()];
+
+      if (activeDays.includes(dayId)) {
+        if (selected.is_24_7) {
+          if (i === 0) {
+            foundDate = checkDate;
+          } else {
+            checkDate.setHours(8, 0, 0, 0); // افتراضي الصباح في الأيام القادمة
+            foundDate = checkDate;
+          }
+          break;
+        } else {
+          const pStartStr = selected.work_start_time || "08:00";
+          const pEndStr = selected.work_end_time || "22:00";
+          const startH = parseInt(pStartStr.split(":")[0]);
+          const startM = parseInt(pStartStr.split(":")[1]);
+
+          if (i === 0) {
+            // التحقق من ساعات عمل اليوم الحالي
+            const currentMins =
+              checkDate.getHours() * 60 + checkDate.getMinutes();
+            const pStartMins = startH * 60 + startM;
+            let pEndMins =
+              parseInt(pEndStr.split(":")[0]) * 60 +
+              parseInt(pEndStr.split(":")[1]);
+            if (pEndMins <= pStartMins) pEndMins += 24 * 60;
+
+            if (currentMins >= pStartMins && currentMins < pEndMins - 60) {
+              foundDate = checkDate;
+              break;
+            } else if (currentMins < pStartMins) {
+              checkDate.setHours(startH, startM, 0, 0);
+              foundDate = checkDate;
+              break;
+            }
+          } else {
+            // يوم في المستقبل، نبدأ من بداية الدوام
+            checkDate.setHours(startH, startM, 0, 0);
+            foundDate = checkDate;
+            break;
+          }
+        }
+      }
+    }
+
+    if (foundDate) {
+      const pad = (num) => String(num).padStart(2, "0");
+      const fmt = (d) =>
+        `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+
+      const startStr = fmt(foundDate);
+      const endDate = new Date(foundDate.getTime() + 60 * 60 * 1000); // زيادة ساعة للنهاية تلقائياً
+      const endStr = fmt(endDate);
+
+      setBookingData({
+        ...bookingData,
+        startDateTime: startStr,
+        endDateTime: endStr,
+      });
+    } else {
+      alert(
+        i18n.language === "ar"
+          ? "لا يمكن تحديد موعد تلقائي، يرجى الاختيار يدوياً."
+          : "Cannot auto-suggest a slot.",
+      );
+    }
   };
 
   const handleBook = async () => {
@@ -422,7 +511,6 @@ export default function ClientMarketplace({
         <p style={heroSubTitleS}>{heroSubtitle}</p>
       </div>
 
-      {/* ✨ شريط الفلاتر والبحث (من ساعة / إلى ساعة) ✨ */}
       <div
         style={{
           display: "flex",
@@ -488,7 +576,6 @@ export default function ClientMarketplace({
           ))}
         </select>
 
-        {/* فلاتر التاريخ والوقت المطورة */}
         <input
           type="date"
           min={todayDate}
@@ -524,7 +611,6 @@ export default function ClientMarketplace({
           />
         </div>
 
-        {/* زر مسح الفلاتر */}
         {(filterDate ||
           filterStartTime ||
           filterEndTime ||
@@ -574,7 +660,6 @@ export default function ClientMarketplace({
         ))}
       </div>
 
-      {/* رسالة توضيحية لنتائج الفلتر */}
       {(filterDate || filterStartTime || filterEndTime) && (
         <div
           style={{
@@ -635,7 +720,10 @@ export default function ClientMarketplace({
                       gap: "5px",
                     }}
                   >
-                    {item.provider_name || item.profiles?.full_name}
+                    {item.nickname ||
+                      item.provider_name ||
+                      item.profiles?.full_name}
+
                     {(item.license_number || item.profiles?.license_info) && (
                       <span
                         style={{
@@ -799,7 +887,9 @@ export default function ClientMarketplace({
                 }}
               >
                 <h3 style={{ margin: 0, color: "#1e293b", fontSize: "1.1rem" }}>
-                  {selected.provider_name || selected.profiles?.full_name}
+                  {selected.nickname ||
+                    selected.provider_name ||
+                    selected.profiles?.full_name}
                 </h3>
                 <div
                   style={{
@@ -1082,12 +1172,45 @@ export default function ClientMarketplace({
                 marginBottom: "20px",
               }}
             >
+              {/* ✨ التعديل هنا: إضافة زر اقتراح أقرب موعد ✨ */}
               <div style={dateTimeCard}>
-                <label
-                  style={{ ...labelS, color: "#059669", fontSize: "0.85rem" }}
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: "8px",
+                  }}
                 >
-                  🟢 موعد البدء (اليوم والساعة):
-                </label>
+                  <label
+                    style={{
+                      ...labelS,
+                      color: "#059669",
+                      fontSize: "0.85rem",
+                      margin: 0,
+                    }}
+                  >
+                    🟢 موعد البدء (اليوم والساعة):
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleSuggestNextSlot}
+                    style={{
+                      backgroundColor: "#ecfdf5",
+                      color: "#059669",
+                      border: "1px solid #10b981",
+                      padding: "4px 10px",
+                      borderRadius: "8px",
+                      fontSize: "0.75rem",
+                      fontWeight: "bold",
+                      cursor: "pointer",
+                      transition: "0.2s",
+                    }}
+                  >
+                    ✨ اقتراح أقرب موعد
+                  </button>
+                </div>
+
                 <input
                   type="datetime-local"
                   min={nowStr}
@@ -1098,6 +1221,7 @@ export default function ClientMarketplace({
                   }
                 />
               </div>
+
               <div style={dateTimeCard}>
                 <label
                   style={{ ...labelS, color: "#ef4444", fontSize: "0.85rem" }}

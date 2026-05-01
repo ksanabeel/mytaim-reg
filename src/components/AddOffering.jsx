@@ -53,13 +53,17 @@ export default function AddOffering({
   const { t, i18n } = useTranslation();
 
   // 1. البيانات الأساسية
+  const [providerName, setProviderName] = useState(
+    editData?.provider_name || "",
+  ); // ✨ حقل الاسم
+  const [nickname, setNickname] = useState(editData?.nickname || ""); // ✨ حقل اسم الشهرة
   const [title, setTitle] = useState(editData?.title || "");
   const [description, setDescription] = useState(editData?.description || "");
   const [price, setPrice] = useState(editData?.price || "");
   const [category, setCategory] = useState(editData?.category || "");
   const [dbCategories, setDbCategories] = useState([]);
 
-  // ✨ إضافة العملة ✨
+  // إضافة العملة
   const [currency, setCurrency] = useState(editData?.currency || "SAR");
 
   // الحقول: الدولة والمدينة
@@ -207,10 +211,12 @@ export default function AddOffering({
 
     const payload = {
       provider_id: session.user.id,
+      provider_name: providerName, // ✨ إضافة حقل الاسم للـ payload
+      nickname: nickname, // ✨ إضافة حقل اسم الشهرة للـ payload
       title,
       description,
       price: finalPrice,
-      currency, // ✨ إضافة العملة ليتم حفظها ✨
+      currency, // إضافة العملة ليتم حفظها
       category,
       pricing_model: pricingModel,
       duration_details: durationDetails,
@@ -310,6 +316,31 @@ export default function AddOffering({
           style={{ display: "flex", flexDirection: "column", gap: "15px" }}
         >
           {/* 1. البيانات الأساسية */}
+
+          {/* ✨ حقول الاسم واسم الشهرة الجديدة ✨ */}
+          <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+            <div style={{ flex: 1, minWidth: "150px" }}>
+              <label style={labelS}>اسم مقدم الخدمة (اختياري):</label>
+              <input
+                type="text"
+                value={providerName}
+                onChange={(e) => setProviderName(e.target.value)}
+                style={inputS}
+                placeholder="مثال: أحمد محمد"
+              />
+            </div>
+            <div style={{ flex: 1, minWidth: "150px" }}>
+              <label style={labelS}>اسم الشهرة / اللقب (اختياري):</label>
+              <input
+                type="text"
+                value={nickname}
+                onChange={(e) => setNickname(e.target.value)}
+                style={inputS}
+                placeholder="مثال: أبو طلال"
+              />
+            </div>
+          </div>
+
           <div>
             <label style={labelS}>{t("service_title", "عنوان الخدمة")}:</label>
             <input
@@ -353,7 +384,7 @@ export default function AddOffering({
             />
           </div>
 
-          {/* ✨ الموقع (الدولة والمدينة) ✨ */}
+          {/* الموقع (الدولة والمدينة)  */}
           <div
             style={{
               display: "flex",
@@ -431,7 +462,7 @@ export default function AddOffering({
                     placeholder="مثال: 150"
                   />
                 </div>
-                {/* ✨ خيار العملة الجديد ✨ */}
+                {/* خيار العملة الجديد  */}
                 <div style={{ flex: 1 }}>
                   <label style={labelS}>العملة:</label>
                   <select
