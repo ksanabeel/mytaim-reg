@@ -1,7 +1,7 @@
-// تحديث جديد
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 import { useTranslation } from "react-i18next";
+
 export default function ClientMarketplace({
   session,
   allowTextReviews = true,
@@ -24,9 +24,12 @@ export default function ClientMarketplace({
   const [filterEndTime, setFilterEndTime] = useState("");
 
   const [reviews, setReviews] = useState([]);
+
   const [bookingData, setBookingData] = useState({
-    startDateTime: "",
-    endDateTime: "",
+    startDate: "",
+    startTime: "",
+    endDate: "",
+    endTime: "",
     manualLocation: "",
     gpsLocation: "",
     manualQuantity: 1,
@@ -39,7 +42,6 @@ export default function ClientMarketplace({
     text: "",
   });
 
-  const nowStr = new Date().toISOString().slice(0, 16);
   const todayDate = new Date().toISOString().split("T")[0];
 
   const dayLabels = {
@@ -192,11 +194,13 @@ export default function ClientMarketplace({
     } else if (
       model !== "fixed" &&
       model !== "free" &&
-      bookingData.startDateTime &&
-      bookingData.endDateTime
+      bookingData.startDate &&
+      bookingData.endDate
     ) {
-      const start = new Date(bookingData.startDateTime);
-      const end = new Date(bookingData.endDateTime);
+      const startStr = `${bookingData.startDate}T${bookingData.startTime || "00:00"}`;
+      const endStr = `${bookingData.endDate}T${bookingData.endTime || "23:59"}`;
+      const start = new Date(startStr);
+      const end = new Date(endStr);
       let diffHours = (end - start) / (1000 * 60 * 60);
       if (diffHours <= 0) diffHours += 24;
 
@@ -247,7 +251,7 @@ export default function ClientMarketplace({
     );
   };
 
-  const handleDateTimeChange = (field, value) => {
+  const handleDateChange = (field, value) => {
     if (!value) {
       setBookingData({ ...bookingData, [field]: value });
       return;
@@ -266,7 +270,7 @@ export default function ClientMarketplace({
     if (!activeDays.includes(dayId)) {
       alert(
         i18n.language === "ar"
-          ? `⛔ عذراً! المزود لا يعمل في يوم (${dayLabels[dayId] || dayId}). الرجاء اختيار وقت آخر.`
+          ? `⛔ عذراً! المزود لا يعمل في يوم (${dayLabels[dayId] || dayId}). الرجاء اختيار يوم آخر.`
           : "⛔ The provider does not work on this day.",
       );
       setBookingData({ ...bookingData, [field]: "" });
@@ -276,14 +280,12 @@ export default function ClientMarketplace({
     setBookingData({ ...bookingData, [field]: value });
   };
 
-  // ✨ الدالة الجديدة: اقتراح أقرب موعد متاح للبدء ✨
   const handleSuggestNextSlot = () => {
     if (!selected) return;
 
     const now = new Date();
-    let proposedStart = new Date(now.getTime() + 60 * 60 * 1000); // إضافة ساعة كمسافة أمان
+    let proposedStart = new Date(now.getTime() + 60 * 60 * 1000);
 
-    // تقريب الوقت لأقرب نصف ساعة
     const mins = proposedStart.getMinutes();
     if (mins > 0 && mins <= 30) {
       proposedStart.setMinutes(30, 0, 0);
@@ -301,7 +303,6 @@ export default function ClientMarketplace({
 
     let foundDate = null;
 
-    // فحص الأيام السبعة القادمة للعثور على أول وقت يتطابق مع ساعات العمل والأيام المتاحة
     for (let i = 0; i < 7; i++) {
       const checkDate = new Date(proposedStart);
       checkDate.setDate(checkDate.getDate() + i);
@@ -312,7 +313,7 @@ export default function ClientMarketplace({
           if (i === 0) {
             foundDate = checkDate;
           } else {
-            checkDate.setHours(8, 0, 0, 0); // افتراضي الصباح في الأيام القادمة
+            checkDate.setHours(8, 0, 0, 0);
             foundDate = checkDate;
           }
           break;
@@ -323,7 +324,6 @@ export default function ClientMarketplace({
           const startM = parseInt(pStartStr.split(":")[1]);
 
           if (i === 0) {
-            // التحقق من ساعات عمل اليوم الحالي
             const currentMins =
               checkDate.getHours() * 60 + checkDate.getMinutes();
             const pStartMins = startH * 60 + startM;
@@ -341,7 +341,6 @@ export default function ClientMarketplace({
               break;
             }
           } else {
-            // يوم في المستقبل، نبدأ من بداية الدوام
             checkDate.setHours(startH, startM, 0, 0);
             foundDate = checkDate;
             break;
@@ -352,17 +351,23 @@ export default function ClientMarketplace({
 
     if (foundDate) {
       const pad = (num) => String(num).padStart(2, "0");
-      const fmt = (d) =>
-        `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+      const fmtDate = (d) =>
+        `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+      const fmtTime = (d) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 
-      const startStr = fmt(foundDate);
-      const endDate = new Date(foundDate.getTime() + 60 * 60 * 1000); // زيادة ساعة للنهاية تلقائياً
-      const endStr = fmt(endDate);
+      const startDateStr = fmtDate(foundDate);
+      const startTimeStr = fmtTime(foundDate);
+
+      const endDateObj = new Date(foundDate.getTime() + 60 * 60 * 1000);
+      const endDateStr = fmtDate(endDateObj);
+      const endTimeStr = fmtTime(endDateObj);
 
       setBookingData({
         ...bookingData,
-        startDateTime: startStr,
-        endDateTime: endStr,
+        startDate: startDateStr,
+        startTime: startTimeStr,
+        endDate: endDateStr,
+        endTime: endTimeStr,
       });
     } else {
       alert(
@@ -374,11 +379,16 @@ export default function ClientMarketplace({
   };
 
   const handleBook = async () => {
+    const isTimeOptional =
+      ["fixed", "daily"].includes(selected?.pricing_model) ||
+      selected?.price_upon_agreement;
+
     const finalLocation = bookingData.manualLocation || bookingData.gpsLocation;
 
     if (
-      !bookingData.startDateTime ||
-      !bookingData.endDateTime ||
+      !bookingData.startDate ||
+      !bookingData.endDate ||
+      (!isTimeOptional && (!bookingData.startTime || !bookingData.endTime)) ||
       !finalLocation ||
       !bookingData.clientContact
     ) {
@@ -389,16 +399,21 @@ export default function ClientMarketplace({
       );
     }
 
-    const requestedStart = new Date(bookingData.startDateTime);
-    let requestedEnd = new Date(bookingData.endDateTime);
+    const requestedStart = new Date(
+      `${bookingData.startDate}T${bookingData.startTime || "00:00"}`,
+    );
+    let requestedEnd = new Date(
+      `${bookingData.endDate}T${bookingData.endTime || "23:59"}`,
+    );
     const now = new Date();
 
-    if (requestedStart < now)
+    if (requestedStart < now && bookingData.startTime)
       return alert(
         i18n.language === "ar"
           ? "⛔ لا يمكن الحجز في الماضي."
           : "⛔ Cannot book in the past.",
       );
+
     if (requestedEnd <= requestedStart)
       return alert(
         i18n.language === "ar"
@@ -406,10 +421,12 @@ export default function ClientMarketplace({
           : "⛔ End time must be after start time.",
       );
 
+    const hasTime = bookingData.startTime && bookingData.endTime;
     if (
       selected.is_24_7 === false &&
       selected.work_start_time &&
-      selected.work_end_time
+      selected.work_end_time &&
+      hasTime
     ) {
       const getMins = (dateObj) =>
         dateObj.getHours() * 60 + dateObj.getMinutes();
@@ -458,6 +475,10 @@ export default function ClientMarketplace({
       );
     }
 
+    const payloadStatus = selected.price_upon_agreement
+      ? "awaiting_pricing"
+      : "pending";
+
     const { error } = await supabase.from("bookings").insert([
       {
         offering_id: selected.id,
@@ -466,7 +487,7 @@ export default function ClientMarketplace({
         end_time: requestedEnd.toISOString(),
         location: finalLocation,
         quantity: calculatedData.quantity,
-        status: "pending",
+        status: payloadStatus,
         client_contact: bookingData.clientContact,
       },
     ]);
@@ -474,7 +495,9 @@ export default function ClientMarketplace({
     if (!error) {
       alert(
         i18n.language === "ar"
-          ? "تم إرسال الطلب للمزود بنجاح ✅"
+          ? selected.price_upon_agreement
+            ? "تم إرسال طلب التسعير للمزود بنجاح 📨"
+            : "تم إرسال الطلب للمزود بنجاح ✅"
           : "Request sent successfully ✅",
       );
       setSelected(null);
@@ -492,186 +515,214 @@ export default function ClientMarketplace({
     yearly: t("year"),
     free: t("volunteer"),
   };
-  const renderStars = (rating) =>
-    "⭐".repeat(Math.round(rating || 5)) + ` (${(rating || 5).toFixed(1)})`;
-  const defaultAvatar = (name) =>
-    `https://ui-avatars.com/api/?name=${name || "User"}&background=7c3aed&color=fff`;
+  const renderStars = (rating) => "⭐ " + (rating ? rating.toFixed(1) : "5.0");
+
+  const defaultAvatar = (name, hexColor = "#7c3aed") => {
+    const cleanHex = hexColor.replace("#", "");
+    return `https://ui-avatars.com/api/?name=${name || "User"}&background=${cleanHex}20&color=${cleanHex}&bold=true`;
+  };
 
   if (loading)
     return (
-      <div style={{ textAlign: "center", padding: "50px" }}>
+      <div
+        style={{
+          textAlign: "center",
+          padding: "50px",
+          color: "#7c3aed",
+          fontWeight: "bold",
+        }}
+      >
         ⏳ {i18n.language === "ar" ? "جاري التحميل..." : "Loading..."}
       </div>
     );
 
+  const isTimeOptional =
+    selected &&
+    (["fixed", "daily"].includes(selected.pricing_model) ||
+      selected.price_upon_agreement);
+  const isRTL = i18n.language === "ar";
+
+  // ✨ استخراج لون الهوية الخاص بالمزود بمجرد الضغط على بطاقته ✨
+  const themeColor = selected?.profiles?.theme_color || "#7c3aed";
+
   return (
-    <div style={{ direction: i18n.language === "ar" ? "rtl" : "ltr" }}>
+    <div style={{ direction: isRTL ? "rtl" : "ltr" }}>
+      {/* ✨ أكواد CSS المدمجة لتأثيرات الـ Hover وإخفاء شريط التمرير ✨ */}
+      <style>{`
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .smart-card { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); top: 0; }
+        .smart-card:hover { transform: translateY(-5px); box-shadow: 0 15px 30px rgba(0,0,0,0.08); }
+        .search-container { position: relative; z-index: 10; margin-top: -35px; margin-bottom: 30px; }
+      `}</style>
+
+      {/* 1. البانر الترحيبي (Hero Section) */}
       <div style={heroSectionS}>
         <h1 style={heroTitleS}>{welcomeMsg}</h1>
         <p style={heroSubTitleS}>{heroSubtitle}</p>
       </div>
 
-      <div
-        style={{
-          display: "flex",
-          gap: "10px",
-          flexWrap: "wrap",
-          marginBottom: "20px",
-          backgroundColor: "#fff",
-          padding: "15px",
-          borderRadius: "20px",
-          border: "1px solid #f1f5f9",
-          boxShadow: "0 2px 10px rgba(0,0,0,0.02)",
-        }}
-      >
-        <div
-          style={{
-            flex: "1 1 250px",
-            display: "flex",
-            alignItems: "center",
-            backgroundColor: "#f8fafc",
-            padding: "10px 15px",
-            borderRadius: "12px",
-            border: "1px solid #cbd5e1",
-          }}
-        >
-          <span style={{ margin: "0 10px" }}>🔍</span>
-          <input
-            type="text"
-            placeholder={
-              i18n.language === "ar" ? "ابحث عن خدمة، مزود..." : "Search..."
-            }
-            style={searchField}
-            value={localSearch}
-            onChange={(e) => setLocalSearch(e.target.value)}
-          />
-        </div>
-
-        <select
-          value={filterCountry}
-          onChange={(e) => {
-            setFilterCountry(e.target.value);
-            setFilterCity("all");
-          }}
-          style={filterSelectS}
-        >
-          <option value="all">{t("filter_country", "البلد")}</option>
-          {availableCountries.map((c) => (
-            <option key={c} value={c}>
-              {c}
-            </option>
-          ))}
-        </select>
-
-        <select
-          value={filterCity}
-          onChange={(e) => setFilterCity(e.target.value)}
-          style={filterSelectS}
-        >
-          <option value="all">{t("filter_city", "المدينة")}</option>
-          {availableCities.map((c) => (
-            <option key={c} value={c}>
-              {c}
-            </option>
-          ))}
-        </select>
-
-        <input
-          type="date"
-          min={todayDate}
-          value={filterDate}
-          onChange={(e) => setFilterDate(e.target.value)}
-          style={filterSelectS}
-          title={
-            i18n.language === "ar" ? "تاريخ الحجز (اختياري)" : "Date (Optional)"
-          }
-        />
+      {/* 2. شريط البحث العائم (Floating Search Bar) */}
+      <div className="search-container" style={{ padding: "0 15px" }}>
         <div
           style={{
             display: "flex",
-            alignItems: "center",
-            gap: "5px",
-            flex: "1 1 200px",
+            flexWrap: "wrap",
+            backgroundColor: "#fff",
+            borderRadius: "20px",
+            boxShadow: "0 10px 25px rgba(0,0,0,0.06)",
+            border: "1px solid #f1f5f9",
+            overflow: "hidden",
           }}
         >
-          <input
-            type="time"
-            value={filterStartTime}
-            onChange={(e) => setFilterStartTime(e.target.value)}
-            style={{ ...filterSelectS, flex: 1 }}
-            title={i18n.language === "ar" ? "من الساعة (اختياري)" : "From Time"}
-          />
-          <span style={{ color: "#64748b", fontWeight: "bold" }}>-</span>
-          <input
-            type="time"
-            value={filterEndTime}
-            onChange={(e) => setFilterEndTime(e.target.value)}
-            style={{ ...filterSelectS, flex: 1 }}
-            title={i18n.language === "ar" ? "إلى الساعة (اختياري)" : "To Time"}
-          />
+          {/* حقل البحث الرئيسي */}
+          <div
+            style={{
+              flex: "2 1 250px",
+              display: "flex",
+              alignItems: "center",
+              padding: "12px 20px",
+              borderRight: isRTL ? "none" : "1px solid #f1f5f9",
+              borderLeft: isRTL ? "1px solid #f1f5f9" : "none",
+            }}
+          >
+            <span
+              style={{
+                fontSize: "1.2rem",
+                margin: isRTL ? "0 0 0 10px" : "0 10px 0 0",
+                color: "#7c3aed",
+              }}
+            >
+              🔍
+            </span>
+            <input
+              type="text"
+              placeholder={
+                isRTL ? "ابحث عن خدمة، مزود، أو تخصص..." : "Search..."
+              }
+              style={searchField}
+              value={localSearch}
+              onChange={(e) => setLocalSearch(e.target.value)}
+            />
+          </div>
+
+          {/* فلاتر الدول والمدن */}
+          <div
+            style={{ flex: "1 1 120px", display: "flex", alignItems: "center" }}
+          >
+            <select
+              value={filterCountry}
+              onChange={(e) => {
+                setFilterCountry(e.target.value);
+                setFilterCity("all");
+              }}
+              style={floatingSelectS(isRTL)}
+            >
+              <option value="all">🌍 {t("filter_country", "كل الدول")}</option>
+              {availableCountries.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div
+            style={{ flex: "1 1 120px", display: "flex", alignItems: "center" }}
+          >
+            <select
+              value={filterCity}
+              onChange={(e) => setFilterCity(e.target.value)}
+              style={floatingSelectS(isRTL)}
+            >
+              <option value="all">🏙️ {t("filter_city", "كل المدن")}</option>
+              {availableCities.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* فلتر التاريخ والوقت */}
+          <div
+            style={{
+              flex: "1.5 1 150px",
+              display: "flex",
+              alignItems: "center",
+              padding: "0 10px",
+            }}
+          >
+            <input
+              type="date"
+              min={todayDate}
+              value={filterDate}
+              onChange={(e) => setFilterDate(e.target.value)}
+              style={{ ...floatingSelectS(isRTL), border: "none" }}
+              title={isRTL ? "تاريخ الحجز (اختياري)" : "Date (Optional)"}
+            />
+          </div>
+
+          {/* زر تفريغ الفلاتر */}
+          {(filterDate ||
+            filterStartTime ||
+            filterEndTime ||
+            filterCountry !== "all" ||
+            filterCity !== "all" ||
+            localSearch) && (
+            <button
+              onClick={() => {
+                setFilterDate("");
+                setFilterStartTime("");
+                setFilterEndTime("");
+                setFilterCountry("all");
+                setFilterCity("all");
+                setLocalSearch("");
+              }}
+              style={{
+                backgroundColor: "#fef2f2",
+                color: "#ef4444",
+                border: "none",
+                padding: "0 20px",
+                cursor: "pointer",
+                fontWeight: "bold",
+                transition: "0.2s",
+              }}
+              title="مسح الفلاتر"
+            >
+              ✖ مسح
+            </button>
+          )}
         </div>
-
-        {(filterDate ||
-          filterStartTime ||
-          filterEndTime ||
-          filterCountry !== "all" ||
-          filterCity !== "all" ||
-          localSearch) && (
-          <button
-            onClick={() => {
-              setFilterDate("");
-              setFilterStartTime("");
-              setFilterEndTime("");
-              setFilterCountry("all");
-              setFilterCity("all");
-              setLocalSearch("");
-            }}
-            style={{
-              backgroundColor: "#fee2e2",
-              color: "#ef4444",
-              border: "none",
-              padding: "10px",
-              borderRadius: "12px",
-              cursor: "pointer",
-              fontWeight: "bold",
-            }}
-          >
-            ✖
-          </button>
-        )}
       </div>
 
-      <div style={categoryBarS}>
-        {displayCategories.map((cat) => (
-          <button
-            key={cat.id}
-            onClick={() => setActiveCategory(cat.id)}
-            style={{
-              ...catBtnS,
-              backgroundColor:
-                activeCategory === cat.id ? "#7c3aed" : "#f1f5f9",
-              color: activeCategory === cat.id ? "#fff" : "#475569",
-              borderColor:
-                activeCategory === cat.id ? "#7c3aed" : "transparent",
-            }}
-          >
-            <span>{cat.icon}</span> {cat.label}
-          </button>
-        ))}
+      {/* 3. شريط الأقسام الأفقي (Horizontal Scrollable Categories) */}
+      <div className="hide-scrollbar" style={categoryScrollWrapperS}>
+        {displayCategories.map((cat) => {
+          const isActive = activeCategory === cat.id;
+          return (
+            <button
+              key={cat.id}
+              onClick={() => setActiveCategory(cat.id)}
+              style={{
+                ...catBtnS,
+                backgroundColor: isActive ? "#1e293b" : "#f8fafc",
+                color: isActive ? "#fff" : "#475569",
+                border: isActive ? "1px solid #1e293b" : "1px solid #e2e8f0",
+                boxShadow: isActive
+                  ? "0 4px 10px rgba(30, 41, 59, 0.2)"
+                  : "none",
+              }}
+            >
+              <span style={{ fontSize: "1.1rem" }}>{cat.icon}</span> {cat.label}
+            </button>
+          );
+        })}
       </div>
 
+      {/* تنبيه نتيجة البحث */}
       {(filterDate || filterStartTime || filterEndTime) && (
-        <div
-          style={{
-            marginBottom: "15px",
-            fontSize: "0.85rem",
-            color: "#059669",
-            backgroundColor: "#ecfdf5",
-            padding: "10px 15px",
-            borderRadius: "10px",
-            border: "1px dashed #10b981",
-          }}
-        >
+        <div style={searchAlertS}>
           ✅{" "}
           {i18n.language === "ar"
             ? `نعرض لك فقط المزودين المتاحين للعمل ${filterDate ? `يوم (${filterDate})` : ""} ${filterStartTime ? `من (${filterStartTime})` : ""} ${filterEndTime ? `إلى (${filterEndTime})` : ""}`
@@ -679,159 +730,184 @@ export default function ClientMarketplace({
         </div>
       )}
 
+      {/* 4. شبكة البطاقات الذكية (Smart Cards Grid) */}
       <div
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
-          gap: "20px",
+          gap: "25px",
+          alignItems: "stretch",
         }}
       >
         {filtered.length > 0 ? (
-          filtered.map((item) => (
-            <div key={item.id} style={cardS}>
-              <div
-                style={{
-                  display: "flex",
-                  gap: "10px",
-                  alignItems: "center",
-                  marginBottom: "10px",
-                }}
-              >
-                <img
-                  src={
-                    item.profiles?.avatar_url ||
-                    defaultAvatar(item.profiles?.full_name)
-                  }
-                  style={avS}
-                  alt="avatar"
-                />
-                <div
-                  style={{
-                    flex: 1,
-                    textAlign: i18n.language === "ar" ? "right" : "left",
-                  }}
-                >
-                  <h4
+          filtered.map((item) => {
+            const isFree = item.pricing_model === "free";
+            const isAgreement = item.price_upon_agreement;
+            const itemThemeColor = item.profiles?.theme_color || "#7c3aed"; // لون خاص بكل بطاقة لو أردنا
+
+            return (
+              <div key={item.id} className="smart-card" style={smartCardS}>
+                {/* الجزء العلوي: الغطاء (Cover) والأوسمة */}
+                <div style={cardCoverS(isFree)}>
+                  <div
                     style={{
-                      margin: 0,
-                      fontSize: "0.9rem",
                       display: "flex",
-                      alignItems: "center",
                       gap: "5px",
+                      padding: "12px",
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    {item.profiles?.provider_type === "institution" && (
+                      <span style={coverBadgeS("#1e293b", "#fff")}>
+                        🏢 {t("institution")}
+                      </span>
+                    )}
+                    {(item.license_number || item.profiles?.license_info) && (
+                      <span style={coverBadgeS("#ecfdf5", "#059669")}>
+                        🛡️ {t("verified", "موثق")}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* الجزء الأوسط: البيانات */}
+                <div style={cardBodyS}>
+                  {/* الصورة والتقييم */}
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "flex-start",
+                      marginTop: "-45px",
+                      marginBottom: "10px",
+                      position: "relative",
+                      zIndex: 10,
+                    }}
+                  >
+                    <img
+                      src={
+                        item.profiles?.avatar_url ||
+                        defaultAvatar(item.profiles?.full_name, itemThemeColor)
+                      }
+                      style={cardAvatarS}
+                      alt="avatar"
+                    />
+                    <div
+                      style={{
+                        marginTop: "40px",
+                        fontSize: "0.85rem",
+                        color: "#f59e0b",
+                        fontWeight: "900",
+                        backgroundColor: "#fffbeb",
+                        padding: "2px 8px",
+                        borderRadius: "10px",
+                      }}
+                    >
+                      {renderStars(item.profiles?.rating)}
+                    </div>
+                  </div>
+
+                  {/* اسم المزود */}
+                  <div
+                    style={{
+                      fontSize: "0.8rem",
+                      color: "#64748b",
+                      fontWeight: "bold",
+                      marginBottom: "4px",
                     }}
                   >
                     {item.nickname ||
                       item.provider_name ||
                       item.profiles?.full_name}
+                  </div>
 
-                    {(item.license_number || item.profiles?.license_info) && (
-                      <span
-                        style={{
-                          fontSize: "0.55rem",
-                          backgroundColor: "#ecfdf5",
-                          color: "#059669",
-                          padding: "2px 6px",
-                          borderRadius: "10px",
-                          fontWeight: "bold",
-                          border: "1px solid #10b981",
-                        }}
-                      >
-                        {t("verified", "موثق")}
-                      </span>
-                    )}
-                  </h4>
-                  <div
+                  {/* اسم الخدمة */}
+                  <h3
                     style={{
-                      fontSize: "0.7rem",
-                      color: "#f59e0b",
-                      fontWeight: "bold",
+                      margin: "0 0 8px 0",
+                      fontSize: "1.1rem",
+                      color: "#1e293b",
+                      fontWeight: "900",
+                      lineHeight: "1.4",
                     }}
                   >
-                    {renderStars(item.profiles?.rating)}
-                  </div>
+                    {item.title}
+                  </h3>
+
+                  {/* الوصف (محدود بـ 3 أسطر) */}
+                  <p style={cardDescriptionS} title={item.description}>
+                    {item.description}
+                  </p>
+
+                  {/* الموقع الجغرافي */}
                   <div
                     style={{
-                      fontSize: "0.65rem",
-                      color: "#475569",
-                      marginTop: "2px",
+                      fontSize: "0.75rem",
+                      color: "#94a3b8",
+                      marginTop: "auto",
+                      marginBottom: "15px",
                       fontWeight: "bold",
                     }}
                   >
                     📍 {item.country || "-"}, {item.city || "-"}
                   </div>
+
+                  {/* الجزء السفلي: السعر وزر الحجز */}
+                  <div style={cardFooterS}>
+                    <div style={{ display: "flex", flexDirection: "column" }}>
+                      <span
+                        style={{
+                          fontWeight: "900",
+                          fontSize: isAgreement ? "0.95rem" : "1.2rem",
+                          color: isAgreement
+                            ? "#3b82f6"
+                            : isFree
+                              ? "#10b981"
+                              : "#7c3aed",
+                        }}
+                      >
+                        {isAgreement
+                          ? "حسب الاتفاق 🤝"
+                          : isFree
+                            ? t("free")
+                            : `${item.price} SAR`}
+                      </span>
+                      {!isAgreement && (
+                        <span
+                          style={{
+                            fontSize: "0.7rem",
+                            color: "#64748b",
+                            fontWeight: "bold",
+                          }}
+                        >
+                          {t("per")}{" "}
+                          {modelLabels[item.pricing_model || "fixed"]}
+                        </span>
+                      )}
+                    </div>
+
+                    <button
+                      onClick={() => setSelected(item)}
+                      style={smartBookBtnS}
+                    >
+                      {t("view_book", "احجز الآن")}
+                    </button>
+                  </div>
                 </div>
-                {item.profiles?.provider_type === "institution" && (
-                  <span style={instBadge(i18n.language)}>
-                    {t("institution")}
-                  </span>
-                )}
               </div>
-              <h3
-                style={{
-                  fontSize: "1.05rem",
-                  margin: "10px 0",
-                  color: "#1e293b",
-                  height: "40px",
-                  overflow: "hidden",
-                  textAlign: i18n.language === "ar" ? "right" : "left",
-                }}
-              >
-                {item.title}
-              </h3>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  borderTop: "1px solid #f1f5f9",
-                  paddingTop: "15px",
-                }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    textAlign: i18n.language === "ar" ? "right" : "left",
-                  }}
-                >
-                  <span
-                    style={{
-                      fontWeight: "bold",
-                      color:
-                        item.pricing_model === "free" ? "#10b981" : "#7c3aed",
-                      fontSize: "1.1rem",
-                    }}
-                  >
-                    {item.pricing_model === "free"
-                      ? t("free")
-                      : `${item.price} SAR`}
-                  </span>
-                  <span style={{ fontSize: "0.7rem", color: "#64748b" }}>
-                    {t("per")} {modelLabels[item.pricing_model || "fixed"]}
-                  </span>
-                </div>
-                <button onClick={() => setSelected(item)} style={bookB}>
-                  {t("view_book")}
-                </button>
-              </div>
-            </div>
-          ))
+            );
+          })
         ) : (
-          <div
-            style={{
-              gridColumn: "1 / -1",
-              textAlign: "center",
-              padding: "40px",
-              color: "#94a3b8",
-            }}
-          >
+          <div style={noResultsS}>
+            <div style={{ fontSize: "3rem", marginBottom: "15px" }}>🕵️‍♂️</div>
             {i18n.language === "ar"
-              ? "لا توجد خدمات متاحة تطابق بحثك.."
-              : "No services available.."}
+              ? "لم نجد خدمات تطابق بحثك حالياً.."
+              : "No services match your search.."}
           </div>
         )}
       </div>
 
+      {/* النافذة المنبثقة الذكية المتفاعلة مع لون المزود 🎨 */}
       {selected && (
         <div style={modalOverlay}>
           <div style={modalContent}>
@@ -849,10 +925,13 @@ export default function ClientMarketplace({
                   border: "none",
                   fontSize: "1.5rem",
                   cursor: "pointer",
-                  color: "#ef4444",
+                  color: "#94a3b8",
+                  transition: "0.2s",
                 }}
+                onMouseOver={(e) => (e.target.style.color = "#ef4444")}
+                onMouseOut={(e) => (e.target.style.color = "#94a3b8")}
               >
-                ×
+                ✖
               </button>
             </div>
 
@@ -869,24 +948,26 @@ export default function ClientMarketplace({
               <img
                 src={
                   selected.profiles?.avatar_url ||
-                  defaultAvatar(selected.profiles?.full_name)
+                  defaultAvatar(selected.profiles?.full_name, themeColor)
                 }
                 style={{
-                  width: "65px",
-                  height: "65px",
+                  width: "70px",
+                  height: "70px",
                   borderRadius: "50%",
                   objectFit: "cover",
-                  border: "2px solid #7c3aed",
+                  border: `2px solid ${themeColor}`, // ✨ إطار صورة المزود بلونه ✨
                 }}
                 alt="avatar"
               />
-              <div
-                style={{
-                  flex: 1,
-                  textAlign: i18n.language === "ar" ? "right" : "left",
-                }}
-              >
-                <h3 style={{ margin: 0, color: "#1e293b", fontSize: "1.1rem" }}>
+              <div style={{ flex: 1, textAlign: isRTL ? "right" : "left" }}>
+                <h3
+                  style={{
+                    margin: "0 0 5px 0",
+                    color: "#1e293b",
+                    fontSize: "1.2rem",
+                    fontWeight: "900",
+                  }}
+                >
                   {selected.nickname ||
                     selected.provider_name ||
                     selected.profiles?.full_name}
@@ -895,7 +976,7 @@ export default function ClientMarketplace({
                   style={{
                     fontSize: "0.85rem",
                     color: "#f59e0b",
-                    margin: "3px 0",
+                    fontWeight: "bold",
                   }}
                 >
                   {renderStars(selected.profiles?.rating)}
@@ -904,8 +985,8 @@ export default function ClientMarketplace({
                 <div
                   style={{
                     display: "flex",
-                    gap: "5px",
-                    marginTop: "8px",
+                    gap: "6px",
+                    marginTop: "10px",
                     flexWrap: "wrap",
                   }}
                 >
@@ -953,28 +1034,6 @@ export default function ClientMarketplace({
                       إنستغرام
                     </a>
                   )}
-                  {(selected.youtube_url || selected.profiles?.youtube_url) && (
-                    <a
-                      href={
-                        selected.youtube_url || selected.profiles.youtube_url
-                      }
-                      target="_blank"
-                      rel="noreferrer"
-                      style={socialBtn("#ef4444")}
-                    >
-                      يوتيوب
-                    </a>
-                  )}
-                  {(selected.tiktok_url || selected.profiles?.tiktok_url) && (
-                    <a
-                      href={selected.tiktok_url || selected.profiles.tiktok_url}
-                      target="_blank"
-                      rel="noreferrer"
-                      style={socialBtn("#000000")}
-                    >
-                      تيك توك
-                    </a>
-                  )}
                 </div>
               </div>
             </div>
@@ -982,36 +1041,43 @@ export default function ClientMarketplace({
             <div
               style={{
                 backgroundColor: "#f8fafc",
-                padding: "15px",
-                borderRadius: "12px",
+                padding: "20px",
+                borderRadius: "16px",
                 border: "1px solid #e2e8f0",
-                marginBottom: "15px",
-                textAlign: i18n.language === "ar" ? "right" : "left",
+                marginBottom: "20px",
+                textAlign: isRTL ? "right" : "left",
               }}
             >
-              <h4 style={{ margin: "0 0 5px 0", color: "#7c3aed" }}>
+              <h4
+                style={{
+                  margin: "0 0 8px 0",
+                  color: themeColor, // ✨ عنوان الخدمة بلون المزود ✨
+                  fontSize: "1.1rem",
+                  fontWeight: "900",
+                }}
+              >
                 📌 {selected.title}
               </h4>
               <p
                 style={{
-                  margin: "0 0 10px 0",
-                  fontSize: "0.85rem",
+                  margin: "0 0 15px 0",
+                  fontSize: "0.9rem",
                   color: "#475569",
-                  lineHeight: "1.5",
+                  lineHeight: "1.6",
                 }}
               >
                 {selected.description}
               </p>
 
               <div
-                style={{ borderTop: "1px dashed #cbd5e1", paddingTop: "10px" }}
+                style={{ borderTop: "1px dashed #cbd5e1", paddingTop: "12px" }}
               >
                 <strong
                   style={{
-                    fontSize: "0.8rem",
+                    fontSize: "0.85rem",
                     color: "#1e293b",
                     display: "block",
-                    marginBottom: "5px",
+                    marginBottom: "8px",
                   }}
                 >
                   🕒 أوقات الدوام المتاحة:
@@ -1019,9 +1085,9 @@ export default function ClientMarketplace({
                 <div
                   style={{
                     display: "flex",
-                    gap: "5px",
+                    gap: "6px",
                     flexWrap: "wrap",
-                    marginBottom: "8px",
+                    marginBottom: "10px",
                   }}
                 >
                   {(Array.isArray(selected.available_days) &&
@@ -1034,9 +1100,9 @@ export default function ClientMarketplace({
                       style={{
                         backgroundColor: "#e0e7ff",
                         color: "#4338ca",
-                        padding: "2px 8px",
-                        borderRadius: "5px",
-                        fontSize: "0.7rem",
+                        padding: "4px 10px",
+                        borderRadius: "8px",
+                        fontSize: "0.75rem",
                         fontWeight: "bold",
                       }}
                     >
@@ -1047,11 +1113,11 @@ export default function ClientMarketplace({
                 {selected.is_24_7 ? (
                   <span
                     style={{
-                      fontSize: "0.75rem",
+                      fontSize: "0.8rem",
                       color: "#059669",
                       backgroundColor: "#ecfdf5",
-                      padding: "3px 8px",
-                      borderRadius: "5px",
+                      padding: "4px 10px",
+                      borderRadius: "8px",
                       fontWeight: "bold",
                     }}
                   >
@@ -1060,11 +1126,11 @@ export default function ClientMarketplace({
                 ) : (
                   <span
                     style={{
-                      fontSize: "0.75rem",
+                      fontSize: "0.8rem",
                       color: "#d97706",
                       backgroundColor: "#fffbeb",
-                      padding: "3px 8px",
-                      borderRadius: "5px",
+                      padding: "4px 10px",
+                      borderRadius: "8px",
                       fontWeight: "bold",
                     }}
                   >
@@ -1078,11 +1144,10 @@ export default function ClientMarketplace({
             <h4
               style={{
                 color: "#1e293b",
-                marginBottom: "10px",
-                fontSize: "1rem",
-                textAlign: i18n.language === "ar" ? "right" : "left",
-                borderBottom: "2px solid #f1f5f9",
-                paddingBottom: "5px",
+                marginBottom: "15px",
+                fontSize: "1.1rem",
+                textAlign: isRTL ? "right" : "left",
+                fontWeight: "900",
               }}
             >
               📝 نموذج الحجز المباشر:
@@ -1092,17 +1157,13 @@ export default function ClientMarketplace({
               style={{
                 display: "flex",
                 flexDirection: "column",
-                gap: "10px",
-                marginBottom: "15px",
+                gap: "15px",
+                marginBottom: "20px",
               }}
             >
-              <div
-                style={{ textAlign: i18n.language === "ar" ? "right" : "left" }}
-              >
+              <div style={{ textAlign: isRTL ? "right" : "left" }}>
                 <label style={labelS}>
-                  {i18n.language === "ar"
-                    ? "رقم الجوال للتواصل:"
-                    : "Contact Number:"}
+                  {isRTL ? "رقم الجوال للتواصل:" : "Contact Number:"}
                 </label>
                 <input
                   type="tel"
@@ -1111,7 +1172,8 @@ export default function ClientMarketplace({
                   style={{
                     ...inputS,
                     textAlign: "left",
-                    border: "1px solid #3b82f6",
+                    border: "2px solid #bfdbfe",
+                    backgroundColor: "#eff6ff",
                   }}
                   value={bookingData.clientContact}
                   onChange={(e) =>
@@ -1122,20 +1184,15 @@ export default function ClientMarketplace({
                   }
                 />
               </div>
-              <div
-                style={{ textAlign: i18n.language === "ar" ? "right" : "left" }}
-              >
+
+              <div style={{ textAlign: isRTL ? "right" : "left" }}>
                 <label style={labelS}>
-                  {i18n.language === "ar"
-                    ? "الموقع (كتابة أو GPS):"
-                    : "Location:"}
+                  {isRTL ? "الموقع (كتابة أو GPS):" : "Location:"}
                 </label>
                 <input
                   type="text"
                   placeholder={
-                    i18n.language === "ar"
-                      ? "اسم الحي، القاعة، أو رابط.."
-                      : "Location details.."
+                    isRTL ? "اسم الحي، القاعة، أو رابط.." : "Location details.."
                   }
                   style={{ ...inputS, marginBottom: "8px" }}
                   value={bookingData.manualLocation}
@@ -1149,16 +1206,13 @@ export default function ClientMarketplace({
                 />
                 {bookingData.gpsLocation ? (
                   <div style={locOk}>
-                    {i18n.language === "ar"
+                    {isRTL
                       ? "تم التقاط الموقع بنجاح ✅"
                       : "Location captured ✅"}
                   </div>
                 ) : (
                   <button onClick={handleGetLocation} style={gpsBtn}>
-                    📍{" "}
-                    {i18n.language === "ar"
-                      ? "استخدام موقعي الحالي"
-                      : "Use current location"}
+                    📍 {isRTL ? "استخدام موقعي الحالي" : "Use current location"}
                   </button>
                 )}
               </div>
@@ -1168,110 +1222,225 @@ export default function ClientMarketplace({
               style={{
                 display: "flex",
                 flexDirection: "column",
-                gap: "10px",
-                marginBottom: "20px",
+                gap: "15px",
+                marginBottom: "25px",
               }}
             >
-              {/* ✨ التعديل هنا: إضافة زر اقتراح أقرب موعد ✨ */}
               <div style={dateTimeCard}>
                 <div
                   style={{
                     display: "flex",
                     justifyContent: "space-between",
                     alignItems: "center",
-                    marginBottom: "8px",
+                    marginBottom: "12px",
                   }}
                 >
                   <label
                     style={{
                       ...labelS,
                       color: "#059669",
-                      fontSize: "0.85rem",
+                      fontSize: "0.9rem",
                       margin: 0,
                     }}
                   >
-                    🟢 موعد البدء (اليوم والساعة):
+                    🟢 موعد البدء:
                   </label>
                   <button
                     type="button"
                     onClick={handleSuggestNextSlot}
                     style={{
-                      backgroundColor: "#ecfdf5",
-                      color: "#059669",
-                      border: "1px solid #10b981",
-                      padding: "4px 10px",
-                      borderRadius: "8px",
+                      backgroundColor: themeColor, // ✨ زر اقتراح موعد بلون المزود ✨
+                      color: "#fff",
+                      border: "none",
+                      padding: "6px 12px",
+                      borderRadius: "10px",
                       fontSize: "0.75rem",
                       fontWeight: "bold",
                       cursor: "pointer",
                       transition: "0.2s",
+                      boxShadow: `0 2px 8px ${themeColor}40`,
                     }}
                   >
-                    ✨ اقتراح أقرب موعد
+                    ✨ اقتراح موعد
                   </button>
                 </div>
-
-                <input
-                  type="datetime-local"
-                  min={nowStr}
-                  style={fancyDateTimeInput}
-                  value={bookingData.startDateTime}
-                  onChange={(e) =>
-                    handleDateTimeChange("startDateTime", e.target.value)
-                  }
-                />
+                <div style={{ display: "flex", gap: "12px" }}>
+                  <div style={{ flex: 1 }}>
+                    <label
+                      style={{
+                        fontSize: "0.75rem",
+                        color: "#64748b",
+                        fontWeight: "bold",
+                        display: "block",
+                        marginBottom: "4px",
+                      }}
+                    >
+                      التاريخ:
+                    </label>
+                    <input
+                      type="date"
+                      min={todayDate}
+                      style={fancyDateTimeInput}
+                      value={bookingData.startDate}
+                      onChange={(e) =>
+                        handleDateChange("startDate", e.target.value)
+                      }
+                    />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label
+                      style={{
+                        fontSize: "0.75rem",
+                        color: "#64748b",
+                        fontWeight: "bold",
+                        display: "block",
+                        marginBottom: "4px",
+                      }}
+                    >
+                      الوقت {isTimeOptional && "(اختياري)"}:
+                    </label>
+                    <input
+                      type="time"
+                      style={fancyDateTimeInput}
+                      value={bookingData.startTime}
+                      onChange={(e) =>
+                        setBookingData({
+                          ...bookingData,
+                          startTime: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+                </div>
               </div>
 
               <div style={dateTimeCard}>
                 <label
-                  style={{ ...labelS, color: "#ef4444", fontSize: "0.85rem" }}
+                  style={{
+                    ...labelS,
+                    color: "#ef4444",
+                    fontSize: "0.9rem",
+                    marginBottom: "12px",
+                  }}
                 >
-                  🏁 موعد الانتهاء (اليوم والساعة):
+                  🏁 موعد الانتهاء:
                 </label>
-                <input
-                  type="datetime-local"
-                  min={bookingData.startDateTime || nowStr}
-                  style={fancyDateTimeInput}
-                  value={bookingData.endDateTime}
-                  onChange={(e) =>
-                    handleDateTimeChange("endDateTime", e.target.value)
-                  }
-                />
+                <div style={{ display: "flex", gap: "12px" }}>
+                  <div style={{ flex: 1 }}>
+                    <label
+                      style={{
+                        fontSize: "0.75rem",
+                        color: "#64748b",
+                        fontWeight: "bold",
+                        display: "block",
+                        marginBottom: "4px",
+                      }}
+                    >
+                      التاريخ:
+                    </label>
+                    <input
+                      type="date"
+                      min={bookingData.startDate || todayDate}
+                      style={fancyDateTimeInput}
+                      value={bookingData.endDate}
+                      onChange={(e) =>
+                        handleDateChange("endDate", e.target.value)
+                      }
+                    />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label
+                      style={{
+                        fontSize: "0.75rem",
+                        color: "#64748b",
+                        fontWeight: "bold",
+                        display: "block",
+                        marginBottom: "4px",
+                      }}
+                    >
+                      الوقت {isTimeOptional && "(اختياري)"}:
+                    </label>
+                    <input
+                      type="time"
+                      style={fancyDateTimeInput}
+                      value={bookingData.endTime}
+                      onChange={(e) =>
+                        setBookingData({
+                          ...bookingData,
+                          endTime: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+                </div>
               </div>
             </div>
 
             <div
               style={{
-                backgroundColor: "#eff6ff",
-                padding: "15px",
-                borderRadius: "12px",
-                border: "1px dashed #3b82f6",
-                marginBottom: "15px",
+                backgroundColor: selected.price_upon_agreement
+                  ? "#f0fdf4"
+                  : "#f8fafc",
+                padding: "18px",
+                borderRadius: "16px",
+                border: `1px dashed ${selected.price_upon_agreement ? "#10b981" : themeColor}`, // ✨ إطار الصندوق بلون المزود ✨
+                marginBottom: "20px",
                 textAlign: "center",
               }}
             >
-              <span style={{ fontSize: "0.85rem" }}>
-                {t("total")} {calculatedData.quantity} {calculatedData.text}
-                :{" "}
-              </span>
-              <span
-                style={{
-                  fontSize: "1.2rem",
-                  fontWeight: "bold",
-                  color:
-                    selected.pricing_model === "free" ? "#10b981" : "#2563eb",
-                }}
-              >
-                {selected.pricing_model === "free"
-                  ? `${t("free")} 💚`
-                  : `${calculatedData.price} SAR`}
-              </span>
+              {selected.price_upon_agreement ? (
+                <span
+                  style={{
+                    fontSize: "1.1rem",
+                    fontWeight: "900",
+                    color: "#059669",
+                  }}
+                >
+                  🤝 سيتم تحديد السعر لاحقاً من قبل المزود (حسب الاتفاق)
+                </span>
+              ) : (
+                <>
+                  <span
+                    style={{
+                      fontSize: "0.9rem",
+                      color: "#475569",
+                      fontWeight: "bold",
+                    }}
+                  >
+                    {t("total")} {calculatedData.quantity} {calculatedData.text}
+                    :{" "}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: "1.4rem",
+                      fontWeight: "900",
+                      color:
+                        selected.pricing_model === "free"
+                          ? "#10b981"
+                          : themeColor, // ✨ السعر يظهر بلون المزود ✨
+                    }}
+                  >
+                    {selected.pricing_model === "free"
+                      ? `${t("free")} 💚`
+                      : `${calculatedData.price} SAR`}
+                  </span>
+                </>
+              )}
             </div>
 
-            <button onClick={handleBook} style={confirmBtn}>
-              {i18n.language === "ar"
-                ? "تأكيد وإرسال الطلب ✅"
-                : "Confirm Booking ✅"}
+            <button
+              onClick={handleBook}
+              style={{
+                ...confirmBtn,
+                backgroundColor: themeColor, // ✨ الزر الرئيسي بلون المزود ✨
+                boxShadow: `0 4px 15px ${themeColor}40`,
+              }}
+            >
+              {selected.price_upon_agreement
+                ? "إرسال طلب تسعير للمزود 📨"
+                : isRTL
+                  ? "تأكيد وإرسال الطلب ✅"
+                  : "Confirm Booking ✅"}
             </button>
           </div>
         </div>
@@ -1280,21 +1449,34 @@ export default function ClientMarketplace({
   );
 }
 
+// ✨ التنسيقات العصرية الجديدة ✨
 const heroSectionS = {
-  background: "linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%)",
-  padding: "40px 20px",
+  background: "linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)", // تدرج بنفسجي متناسق ومشرق 100%
+  padding: "55px 20px 85px", // زدنا المساحة السفلية ليتنفس شريط البحث
   borderRadius: "24px",
   textAlign: "center",
-  color: "white",
-  marginBottom: "20px",
-  boxShadow: "0 10px 25px rgba(79, 70, 229, 0.2)",
+  color: "#ffffff",
+  boxShadow: "0 10px 30px rgba(109, 40, 217, 0.25)", // ظل بنفسجي ناعم
+  marginTop: "25px",
 };
+
 const heroTitleS = {
-  fontSize: "1.8rem",
-  margin: "0 0 10px 0",
-  fontWeight: "800",
+  fontSize: "2.4rem", // تكبير الخط قليلاً ليكون أفخم
+  color: "#ffffff", // إجبار النص على اللون الأبيض الناصع (بدل الأسود)
+  margin: "0 0 18px 0", // زيادة المسافة السفلية لتباعد الأسطر
+  fontWeight: "900",
+  lineHeight: "1.4",
+  textShadow: "0 2px 10px rgba(0,0,0,0.15)", // ظل خفيف جداً للنص ليفصل عن الخلفية
 };
-const heroSubTitleS = { fontSize: "1rem", opacity: "0.9", margin: 0 };
+
+const heroSubTitleS = {
+  fontSize: "1.15rem",
+  color: "#f1f5f9", // أبيض مائل للرمادي الفاتح ليعطي تبايناً مع العنوان الرئيسي
+  opacity: "0.95",
+  margin: 0,
+  lineHeight: "1.6", // إعطاء مساحة تنفس للسطر نفسه
+  fontWeight: "500",
+};
 const searchField = {
   border: "none",
   outline: "none",
@@ -1302,164 +1484,226 @@ const searchField = {
   background: "transparent",
   fontSize: "0.95rem",
   fontFamily: "inherit",
+  fontWeight: "bold",
+  color: "#1e293b",
 };
-const filterSelectS = {
-  flex: "1 1 120px",
-  padding: "10px",
-  borderRadius: "12px",
-  border: "1px solid #cbd5e1",
+const floatingSelectS = (isRTL) => ({
+  width: "100%",
+  padding: "12px",
+  border: "none",
   outline: "none",
-  backgroundColor: "#f8fafc",
-  color: "#334155",
+  backgroundColor: "transparent",
+  color: "#475569",
   fontWeight: "bold",
   fontSize: "0.85rem",
-};
-const categoryBarS = {
+  borderRight: isRTL ? "none" : "1px solid #f1f5f9",
+  borderLeft: isRTL ? "1px solid #f1f5f9" : "none",
+  cursor: "pointer",
+});
+
+const categoryScrollWrapperS = {
   display: "flex",
-  gap: "10px",
   flexWrap: "wrap",
   justifyContent: "flex-start",
+  gap: "12px",
+  padding: "10px 5px 15px",
   marginBottom: "20px",
 };
 const catBtnS = {
   display: "flex",
   alignItems: "center",
-  gap: "5px",
-  padding: "8px 16px",
-  borderRadius: "20px",
-  border: "1px solid",
+  gap: "8px",
+  padding: "10px 20px",
+  borderRadius: "25px",
   cursor: "pointer",
   fontWeight: "bold",
-  fontSize: "0.85rem",
+  fontSize: "0.9rem",
   whiteSpace: "nowrap",
   transition: "all 0.2s ease",
 };
-const cardS = {
-  backgroundColor: "#fff",
-  padding: "18px",
+
+const smartCardS = {
+  display: "flex",
+  flexDirection: "column",
   borderRadius: "20px",
+  overflow: "hidden",
+  boxShadow: "0 4px 15px rgba(0,0,0,0.04)",
+  backgroundColor: "#fff",
   border: "1px solid #f1f5f9",
-  boxShadow: "0 2px 4px rgba(0,0,0,0.02)",
 };
-const avS = {
-  width: "45px",
-  height: "45px",
+const cardCoverS = (isFree) => ({
+  height: "90px",
+  background: isFree
+    ? "linear-gradient(135deg, #a7f3d0, #10b981)"
+    : "linear-gradient(135deg, #ddd6fe, #8b5cf6)",
+  position: "relative",
+});
+const coverBadgeS = (bg, color) => ({
+  backgroundColor: bg,
+  color: color,
+  padding: "4px 10px",
+  borderRadius: "12px",
+  fontSize: "0.7rem",
+  fontWeight: "bold",
+  boxShadow: "0 2px 5px rgba(0,0,0,0.1)",
+});
+const cardBodyS = {
+  padding: "0 20px 20px",
+  display: "flex",
+  flexDirection: "column",
+  flex: 1,
+};
+const cardAvatarS = {
+  width: "70px",
+  height: "70px",
   borderRadius: "50%",
+  border: "4px solid #fff",
+  backgroundColor: "#fff",
   objectFit: "cover",
-  border: "2px solid #f1f5f9",
+  boxShadow: "0 4px 10px rgba(0,0,0,0.1)",
 };
-const bookB = {
-  backgroundColor: "#7c3aed",
-  color: "white",
+const cardDescriptionS = {
+  margin: "0 0 15px 0",
+  fontSize: "0.85rem",
+  color: "#64748b",
+  display: "-webkit-box",
+  WebkitLineClamp: 3,
+  WebkitBoxOrient: "vertical",
+  overflow: "hidden",
+  lineHeight: "1.6",
+};
+const cardFooterS = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  borderTop: "1px solid #f1f5f9",
+  paddingTop: "15px",
+};
+const smartBookBtnS = {
+  backgroundColor: "#1e293b",
+  color: "#fff",
   border: "none",
-  padding: "10px 15px",
+  padding: "10px 18px",
   borderRadius: "12px",
   cursor: "pointer",
-  fontSize: "0.8rem",
+  fontSize: "0.85rem",
+  fontWeight: "bold",
+  transition: "0.2s",
+};
+smartBookBtnS[":hover"] = { backgroundColor: "#0f172a" };
+
+const searchAlertS = {
+  marginBottom: "20px",
+  fontSize: "0.9rem",
+  color: "#059669",
+  backgroundColor: "#ecfdf5",
+  padding: "12px 20px",
+  borderRadius: "12px",
+  border: "1px dashed #10b981",
   fontWeight: "bold",
 };
+const noResultsS = {
+  gridColumn: "1 / -1",
+  textAlign: "center",
+  padding: "60px 20px",
+  color: "#64748b",
+  backgroundColor: "#f8fafc",
+  borderRadius: "20px",
+  border: "2px dashed #cbd5e1",
+  fontWeight: "bold",
+};
+
 const modalOverlay = {
   position: "fixed",
   inset: 0,
-  backgroundColor: "rgba(0,0,0,0.6)",
+  backgroundColor: "rgba(15, 23, 42, 0.7)",
+  backdropFilter: "blur(4px)",
   display: "flex",
   justifyContent: "center",
   alignItems: "center",
-  zIndex: 3000,
+  zIndex: 4000,
   padding: "20px",
 };
 const modalContent = {
   backgroundColor: "#fff",
-  padding: "25px",
-  borderRadius: "25px",
+  padding: "30px",
+  borderRadius: "24px",
   width: "100%",
-  maxWidth: "450px",
+  maxWidth: "500px",
   maxHeight: "90vh",
   overflowY: "auto",
   boxShadow: "0 20px 40px rgba(0,0,0,0.2)",
 };
 const labelS = {
   display: "block",
-  fontSize: "0.8rem",
+  fontSize: "0.85rem",
   color: "#475569",
-  marginBottom: "6px",
+  marginBottom: "8px",
   fontWeight: "bold",
 };
 const inputS = {
   width: "100%",
   padding: "12px",
-  borderRadius: "10px",
+  borderRadius: "12px",
   border: "1px solid #cbd5e1",
   outline: "none",
   boxSizing: "border-box",
-  fontSize: "0.9rem",
+  fontSize: "0.95rem",
   fontFamily: "inherit",
 };
 const confirmBtn = {
   width: "100%",
-  backgroundColor: "#059669",
   color: "white",
   border: "none",
-  padding: "15px",
-  borderRadius: "15px",
-  fontWeight: "bold",
+  padding: "16px",
+  borderRadius: "16px",
+  fontWeight: "900",
   cursor: "pointer",
   fontSize: "1.1rem",
   transition: "0.3s",
-  boxShadow: "0 4px 12px rgba(5, 150, 105, 0.3)",
 };
 const gpsBtn = {
   width: "100%",
-  padding: "10px",
-  borderRadius: "10px",
+  padding: "12px",
+  borderRadius: "12px",
   border: "1px dashed #3b82f6",
   backgroundColor: "#eff6ff",
   color: "#2563eb",
   fontWeight: "bold",
   cursor: "pointer",
-  fontSize: "0.85rem",
+  fontSize: "0.9rem",
 };
-const instBadge = (lang) => ({
-  fontSize: "0.6rem",
-  backgroundColor: "#1e293b",
-  color: "#fff",
-  padding: "2px 6px",
-  borderRadius: "10px",
-  fontWeight: "bold",
-  marginLeft: lang === "ar" ? "auto" : "0",
-  marginRight: lang === "en" ? "auto" : "0",
-});
 const locOk = {
-  padding: "10px",
+  padding: "12px",
   backgroundColor: "#ecfdf5",
   border: "1px solid #10b981",
-  borderRadius: "10px",
+  borderRadius: "12px",
   textAlign: "center",
   color: "#059669",
   fontWeight: "bold",
-  fontSize: "0.85rem",
+  fontSize: "0.9rem",
 };
 const socialBtn = (bg) => ({
   backgroundColor: bg,
   color: "#fff",
-  padding: "4px 8px",
-  borderRadius: "6px",
+  padding: "6px 12px",
+  borderRadius: "8px",
   textDecoration: "none",
-  fontSize: "0.7rem",
+  fontSize: "0.75rem",
   fontWeight: "bold",
 });
 const dateTimeCard = {
   backgroundColor: "#f8fafc",
-  padding: "15px",
-  borderRadius: "15px",
+  padding: "18px",
+  borderRadius: "16px",
   border: "1px solid #e2e8f0",
 };
 const fancyDateTimeInput = {
   width: "100%",
-  padding: "12px 15px",
+  padding: "10px",
   borderRadius: "10px",
-  border: "2px solid #cbd5e1",
-  fontSize: "1rem",
+  border: "1px solid #cbd5e1",
+  fontSize: "0.95rem",
   color: "#1e293b",
   backgroundColor: "#fff",
   outline: "none",

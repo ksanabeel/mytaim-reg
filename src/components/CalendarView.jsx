@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { supabase } from "../lib/supabase";
-import BookingRow from "./BookingRow"; // ✨ استدعاء سطر الحجز للتحكم به من التقويم
+import BookingRow from "./BookingRow";
 
 export default function CalendarView({
   bookings = [],
@@ -12,7 +12,6 @@ export default function CalendarView({
   const { t, i18n } = useTranslation();
   const [curr, setCurr] = useState(new Date());
 
-  // ✨ جلب الـ ID الخاص بالمستخدم الحالي في حال لم يتم تمريره من App.jsx ✨
   const [localUserId, setLocalUserId] = useState(userId);
   useEffect(() => {
     if (!localUserId) {
@@ -22,13 +21,21 @@ export default function CalendarView({
     }
   }, [localUserId]);
 
-  // ✨ حالة النافذة المنبثقة للتقويم ✨
   const [selectedDate, setSelectedDate] = useState(null);
   const [dayBookings, setDayBookings] = useState([]);
-  const [managingBookingId, setManagingBookingId] = useState(null); // لمعرفة أي حجز يتم إدارته حالياً
+  const [managingBookingId, setManagingBookingId] = useState(null);
+
+  const [roleFilter, setRoleFilter] = useState("all");
 
   const daysInMonth = (y, m) => new Date(y, m + 1, 0).getDate();
   const firstDay = new Date(curr.getFullYear(), curr.getMonth(), 1).getDay();
+
+  // ✨ متغير لمعرفة تاريخ اليوم الحالي لتمييزه في التقويم ✨
+  const today = new Date();
+  const isCurrentMonth =
+    today.getMonth() === curr.getMonth() &&
+    today.getFullYear() === curr.getFullYear();
+  const todayDate = today.getDate();
 
   const days = [];
   for (let i = 0; i < firstDay; i++) days.push(null);
@@ -40,27 +47,70 @@ export default function CalendarView({
     return `${curr.getFullYear()}-${String(curr.getMonth() + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
   };
 
+  const getLocalDateString = (utcDateString) => {
+    if (!utcDateString) return null;
+    const localDate = new Date(utcDateString);
+    const year = localDate.getFullYear();
+    const month = String(localDate.getMonth() + 1).padStart(2, "0");
+    const day = String(localDate.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
+  const filteredBookings = bookings.filter((b) => {
+    const isProvider = localUserId === b.offerings?.provider_id;
+    const isClient = localUserId === b.customer_id;
+    if (roleFilter === "provider") return isProvider;
+    if (roleFilter === "client") return isClient;
+    return true;
+  });
+
   const getStatus = (day) => {
     const dStr = getDateString(day);
     if (!dStr) return "free";
-    const dayB = bookings.filter((b) => b.appointment_date?.startsWith(dStr));
+
+    const dayB = filteredBookings.filter(
+      (b) => getLocalDateString(b.appointment_date) === dStr,
+    );
+
     if (dayB.length === 0) return "free";
     if (dayB.some((b) => b.status === "confirmed" || b.status === "completed"))
       return "ok";
-    if (dayB.some((b) => b.status === "pending" || b.status === "negotiating"))
+    if (
+      dayB.some(
+        (b) =>
+          b.status === "pending" ||
+          b.status === "negotiating" ||
+          b.status === "awaiting_pricing" ||
+          b.status === "awaiting_client_approval",
+      )
+    )
       return "wait";
     return "free";
+  };
+
+  const getDayRoles = (day) => {
+    const dStr = getDateString(day);
+    if (!dStr) return { isProv: false, isCli: false };
+    const dayB = filteredBookings.filter(
+      (b) => getLocalDateString(b.appointment_date) === dStr,
+    );
+    const isProv = dayB.some((b) => b.offerings?.provider_id === localUserId);
+    const isCli = dayB.some((b) => b.customer_id === localUserId);
+    return { isProv, isCli };
   };
 
   const handleDayClick = (day) => {
     const dStr = getDateString(day);
     if (!dStr) return;
 
-    const bks = bookings.filter((b) => b.appointment_date?.startsWith(dStr));
+    const bks = filteredBookings.filter(
+      (b) => getLocalDateString(b.appointment_date) === dStr,
+    );
+
     if (bks.length > 0) {
       setDayBookings(bks);
       setSelectedDate(dStr);
-      setManagingBookingId(null); // إغلاق أي نافذة إدارة مفتوحة مسبقاً
+      setManagingBookingId(null);
     }
   };
 
@@ -128,16 +178,14 @@ export default function CalendarView({
   };
 
   const getStatusBadge = (status) => {
-    if (status === "confirmed")
+    if (status === "confirmed" || status === "completed")
       return {
-        text: i18n.language === "ar" ? "مؤكد" : "Confirmed",
-        bg: "#ecfdf5",
-        color: "#059669",
-        border: "#10b981",
-      };
-    if (status === "completed")
-      return {
-        text: i18n.language === "ar" ? "مكتمل" : "Completed",
+        text:
+          i18n.language === "ar"
+            ? status === "completed"
+              ? "مكتمل"
+              : "مؤكد"
+            : status,
         bg: "#ecfdf5",
         color: "#059669",
         border: "#10b981",
@@ -173,18 +221,30 @@ export default function CalendarView({
     <div
       style={{
         backgroundColor: "#fff",
-        padding: "20px",
-        borderRadius: "20px",
+        padding: "30px",
+        borderRadius: "24px",
         direction: isRTL ? "rtl" : "ltr",
-        border: "1px solid #f1f5f9",
+        border: "1px solid #e2e8f0",
+        boxShadow: "0 10px 30px rgba(0,0,0,0.03)",
       }}
     >
+      {/* ستايل لعمل تأثيرات الهوفر على أيام التقويم */}
+      <style>{`
+        .calendar-day-card { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .calendar-day-card:hover { transform: translateY(-3px) scale(1.03); box-shadow: 0 8px 20px rgba(0,0,0,0.08); z-index: 10; }
+        .filter-group button { transition: all 0.2s; }
+        .filter-group button:hover { opacity: 0.9; }
+      `}</style>
+
+      {/* ✨ رأس التقويم (الشهر والأسهم) بتصميم فخم ✨ */}
       <div
         style={{
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
-          marginBottom: "20px",
+          marginBottom: "25px",
+          paddingBottom: "20px",
+          borderBottom: "1px solid #f1f5f9",
         }}
       >
         <button
@@ -194,7 +254,14 @@ export default function CalendarView({
           {isRTL ? "▶" : "◀"}
         </button>
 
-        <h3 style={{ fontSize: "1.1rem", margin: 0, color: "#7c3aed" }}>
+        <h3
+          style={{
+            fontSize: "1.4rem",
+            margin: 0,
+            color: "#1e293b",
+            fontWeight: "900",
+          }}
+        >
           {curr.toLocaleString(dateLocale, { month: "long", year: "numeric" })}
         </h3>
 
@@ -206,71 +273,161 @@ export default function CalendarView({
         </button>
       </div>
 
+      {/* ✨ فلاتر عرض التقويم بنظام (Pill Toggle) ✨ */}
+      <div
+        className="filter-group"
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          marginBottom: "30px",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            backgroundColor: "#f1f5f9",
+            padding: "5px",
+            borderRadius: "15px",
+            gap: "5px",
+          }}
+        >
+          <button
+            onClick={() => setRoleFilter("all")}
+            style={filterBtn(roleFilter === "all", "#1e293b", "transparent")}
+          >
+            الكل
+          </button>
+          <button
+            onClick={() => setRoleFilter("provider")}
+            style={filterBtn(roleFilter === "provider", "#7c3aed", "#f3e8ff")}
+          >
+            💼 أعمالي
+          </button>
+          <button
+            onClick={() => setRoleFilter("client")}
+            style={filterBtn(roleFilter === "client", "#059669", "#ecfdf5")}
+          >
+            🛍️ طلباتي
+          </button>
+        </div>
+      </div>
+
+      {/* شبكة التقويم */}
       <div
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(7, 1fr)",
-          gap: "8px",
+          gap: "10px",
         }}
       >
+        {/* أيام الأسبوع */}
         {weekDays.map((d, index) => (
           <div
             key={index}
             style={{
               fontSize: "0.85rem",
-              color: "#64748b",
+              color: "#94a3b8",
               textAlign: "center",
-              fontWeight: "bold",
+              fontWeight: "900",
               marginBottom: "10px",
-              paddingBottom: "10px",
-              borderBottom: "2px solid #f1f5f9",
+              textTransform: "uppercase",
             }}
           >
             {d}
           </div>
         ))}
 
+        {/* خلايا الأيام */}
         {days.map((d, i) => {
           const s = getStatus(d);
           const hasBookings = s !== "free";
+          const roles = getDayRoles(d);
+          const isThisDay = isCurrentMonth && d === todayDate; // ✨ هل هذا هو اليوم الحالي؟
 
           return (
             <div
               key={i}
               onClick={() => handleDayClick(d)}
+              className={hasBookings ? "calendar-day-card" : ""}
               style={{
-                padding: "15px 0",
-                borderRadius: "12px",
-                textAlign: "center",
-                fontSize: "0.95rem",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                minHeight: "75px",
+                borderRadius: "16px",
+                fontSize: "1.1rem",
                 fontWeight: "bold",
                 cursor: hasBookings ? "pointer" : "default",
-                backgroundColor:
+
+                // ✨ التدرجات اللونية العصرية ✨
+                background:
                   s === "ok"
-                    ? "#10b981"
+                    ? "linear-gradient(135deg, #10b981, #059669)"
                     : s === "wait"
-                      ? "#f59e0b"
-                      : "transparent",
-                color: hasBookings ? "white" : "#1e293b",
+                      ? "linear-gradient(135deg, #f59e0b, #d97706)"
+                      : "#ffffff",
+
+                color: hasBookings
+                  ? "white"
+                  : isThisDay
+                    ? "#7c3aed"
+                    : "#334155",
+
                 border: d
-                  ? hasBookings
-                    ? "none"
-                    : "1px solid #f1f5f9"
+                  ? isThisDay && !hasBookings
+                    ? "2px solid #c4b5fd" // تمييز اليوم الحالي
+                    : hasBookings
+                      ? "none"
+                      : "1px solid #f1f5f9"
                   : "none",
+
                 opacity: d ? 1 : 0,
-                transform: hasBookings ? "scale(1.02)" : "scale(1)",
-                boxShadow: hasBookings ? "0 4px 10px rgba(0,0,0,0.1)" : "none",
-                transition: "all 0.2s ease",
+                position: "relative",
               }}
               title={hasBookings ? "اضغط لعرض وإدارة الحجوزات" : ""}
             >
-              {d}
+              <span style={{ position: "relative", zIndex: 2 }}>{d}</span>
+
+              {/* نقطة تمييز اليوم الحالي إذا كان فيه حجوزات (لكي لا تختفي مع الخلفية الملونة) */}
+              {isThisDay && hasBookings && (
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "6px",
+                    right: "6px",
+                    width: "8px",
+                    height: "8px",
+                    backgroundColor: "#fff",
+                    borderRadius: "50%",
+                    boxShadow: "0 2px 4px rgba(0,0,0,0.2)",
+                  }}
+                ></div>
+              )}
+
+              {/* ✨ الرموز التعبيرية أسفل اليوم ✨ */}
+              {d && hasBookings && (
+                <div
+                  style={{
+                    display: "flex",
+                    gap: "5px",
+                    marginTop: "6px",
+                    fontSize: "0.8rem",
+                    background: "rgba(255,255,255,0.2)",
+                    padding: "2px 8px",
+                    borderRadius: "10px",
+                  }}
+                >
+                  {roles.isProv && <span title="حجز لتقديم خدمة">💼</span>}
+                  {roles.isCli && <span title="حجز كطالب خدمة">🛍️</span>}
+                </div>
+              )}
             </div>
           );
         })}
       </div>
 
-      {/* ✨ نافذة عرض الحجوزات عند الضغط على يوم ✨ */}
+      {/* النافذة المنبثقة لتفاصيل اليوم */}
       {selectedDate && (
         <div style={modalOverlay}>
           <div style={modalContent}>
@@ -284,8 +441,16 @@ export default function CalendarView({
                 marginBottom: "15px",
               }}
             >
-              <h3 style={{ margin: 0, color: "#7c3aed" }}>
-                📅 حجوزات يوم:{" "}
+              <h3
+                style={{
+                  margin: 0,
+                  color: "#7c3aed",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "10px",
+                }}
+              >
+                <span style={{ fontSize: "1.5rem" }}>📅</span> حجوزات يوم:{" "}
                 {new Date(selectedDate).toLocaleDateString(dateLocale)}
               </h3>
               <button
@@ -295,10 +460,10 @@ export default function CalendarView({
                   border: "none",
                   fontSize: "1.5rem",
                   cursor: "pointer",
-                  color: "#ef4444",
+                  color: "#94a3b8",
                 }}
               >
-                ×
+                ✖
               </button>
             </div>
 
@@ -321,10 +486,11 @@ export default function CalendarView({
                   <div
                     key={b.id}
                     style={{
-                      backgroundColor: "#f8fafc",
-                      padding: "15px",
-                      borderRadius: "12px",
+                      backgroundColor: "#ffffff",
+                      padding: "20px",
+                      borderRadius: "16px",
                       border: "1px solid #e2e8f0",
+                      boxShadow: "0 4px 10px rgba(0,0,0,0.02)",
                     }}
                   >
                     <div
@@ -333,33 +499,71 @@ export default function CalendarView({
                         justifyContent: "space-between",
                         alignItems: "flex-start",
                         flexWrap: "wrap",
-                        gap: "10px",
+                        gap: "15px",
                       }}
                     >
                       <div>
-                        <h4
-                          style={{
-                            margin: "0 0 5px 0",
-                            color: "#1e293b",
-                            fontSize: "0.95rem",
-                          }}
-                        >
-                          📌 {b.offerings?.title || "الخدمة"}
-                        </h4>
+                        {/* توضيح نوع الحجز للمستخدم */}
                         <div
                           style={{
-                            fontSize: "0.75rem",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "8px",
+                            marginBottom: "8px",
+                          }}
+                        >
+                          <h4
+                            style={{
+                              margin: 0,
+                              color: "#1e293b",
+                              fontSize: "1.05rem",
+                              fontWeight: "900",
+                            }}
+                          >
+                            {b.offerings?.title || "الخدمة"}
+                          </h4>
+                          <span
+                            style={{
+                              fontSize: "0.65rem",
+                              padding: "4px 8px",
+                              borderRadius: "8px",
+                              backgroundColor: isProvider
+                                ? "#f3e8ff"
+                                : "#ecfdf5",
+                              color: isProvider ? "#7e22ce" : "#059669",
+                              fontWeight: "bold",
+                            }}
+                          >
+                            {isProvider ? "💼 أعمالي" : "🛍️ طلباتي"}
+                          </span>
+                        </div>
+
+                        <div
+                          style={{
+                            fontSize: "0.8rem",
                             color: "#64748b",
                             fontWeight: "bold",
                           }}
                         >
-                          رقم الحجز: #{b.id.substring(0, 6)}
+                          رقم الحجز:{" "}
+                          <span
+                            style={{
+                              direction: "ltr",
+                              display: "inline-block",
+                            }}
+                          >
+                            #{b.id.substring(0, 6)}
+                          </span>
                         </div>
                         <div
                           style={{
-                            fontSize: "0.75rem",
+                            fontSize: "0.8rem",
                             color: "#64748b",
-                            marginTop: "3px",
+                            marginTop: "4px",
+                            backgroundColor: "#f8fafc",
+                            display: "inline-block",
+                            padding: "4px 8px",
+                            borderRadius: "6px",
                           }}
                         >
                           🕒{" "}
@@ -380,10 +584,10 @@ export default function CalendarView({
                       >
                         <span
                           style={{
-                            fontSize: "0.7rem",
+                            fontSize: "0.75rem",
                             fontWeight: "bold",
-                            padding: "4px 8px",
-                            borderRadius: "6px",
+                            padding: "6px 12px",
+                            borderRadius: "8px",
                             backgroundColor: badge.bg,
                             color: badge.color,
                             border: `1px solid ${badge.border}`,
@@ -392,7 +596,6 @@ export default function CalendarView({
                           {badge.text}
                         </span>
 
-                        {/* ✨ زر فتح إدارة الحجز ✨ */}
                         <button
                           onClick={() =>
                             setManagingBookingId(
@@ -406,45 +609,44 @@ export default function CalendarView({
                                 : "#f59e0b",
                             color: "white",
                             border: "none",
-                            padding: "6px 12px",
-                            borderRadius: "8px",
+                            padding: "8px 14px",
+                            borderRadius: "10px",
                             fontWeight: "bold",
-                            fontSize: "0.75rem",
+                            fontSize: "0.8rem",
                             cursor: "pointer",
                             transition: "0.2s",
                           }}
                         >
                           {managingBookingId === b.id
-                            ? "❌ إغلاق الإدارة"
-                            : "⚙️ إدارة"}
+                            ? "❌ إغلاق"
+                            : "⚙️ إدارة الحجز"}
                         </button>
 
                         <button
                           onClick={() => handlePrintInvoice(b)}
                           style={{
-                            backgroundColor: "#3b82f6",
-                            color: "white",
-                            border: "none",
-                            padding: "6px 12px",
-                            borderRadius: "8px",
+                            backgroundColor: "#eff6ff",
+                            color: "#3b82f6",
+                            border: "1px solid #bfdbfe",
+                            padding: "8px 14px",
+                            borderRadius: "10px",
                             fontWeight: "bold",
-                            fontSize: "0.75rem",
+                            fontSize: "0.8rem",
                             cursor: "pointer",
                           }}
                         >
-                          🖨️ طباعة
+                          🖨️
                         </button>
                       </div>
                     </div>
 
-                    {/* ✨ استدعاء واجهة إدارة الحجز الكاملة هنا بذكاء ✨ */}
                     {managingBookingId === b.id && (
                       <div
                         style={{
                           width: "100%",
-                          marginTop: "15px",
-                          borderTop: "1px dashed #cbd5e1",
-                          paddingTop: "15px",
+                          marginTop: "20px",
+                          borderTop: "1px solid #f1f5f9",
+                          paddingTop: "20px",
                           overflowX: "auto",
                         }}
                       >
@@ -454,8 +656,6 @@ export default function CalendarView({
                             borderCollapse: "collapse",
                             fontSize: "0.8rem",
                             backgroundColor: "#fff",
-                            borderRadius: "10px",
-                            boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
                           }}
                         >
                           <tbody style={{ textAlign: "center" }}>
@@ -463,7 +663,7 @@ export default function CalendarView({
                               booking={b}
                               onRefresh={() => {
                                 if (onRefresh) onRefresh();
-                                else window.location.reload(); // تحديث الصفحة لتأكيد البيانات لو لم تكن الدالة ممررة
+                                else window.location.reload();
                               }}
                               isProviderView={isProvider}
                               allowTextReviews={allowTextReviews}
@@ -483,34 +683,51 @@ export default function CalendarView({
   );
 }
 
+// التنسيقات
 const navB = {
   border: "1px solid #e2e8f0",
-  background: "#f8fafc",
-  borderRadius: "8px",
-  padding: "6px 12px",
+  background: "#ffffff",
+  borderRadius: "12px",
+  padding: "8px 16px",
   cursor: "pointer",
   color: "#475569",
   fontWeight: "bold",
   transition: "0.2s",
+  boxShadow: "0 2px 4px rgba(0,0,0,0.02)",
 };
 
-// تنسيقات النافذة المنبثقة (تم تكبيرها قليلاً لتستوعب تفاصيل الإدارة براحة)
+// تنسيق أزرار الفلترة الأنيقة
+const filterBtn = (active, color, bgLight) => ({
+  padding: "8px 16px",
+  borderRadius: "12px",
+  border: "none",
+  backgroundColor: active ? color : "transparent",
+  color: active ? "#fff" : "#64748b",
+  fontWeight: "bold",
+  fontSize: "0.85rem",
+  cursor: "pointer",
+  transition: "all 0.3s ease",
+  boxShadow: active ? `0 4px 10px ${color}40` : "none",
+});
+
 const modalOverlay = {
   position: "fixed",
   inset: 0,
-  backgroundColor: "rgba(0,0,0,0.6)",
+  backgroundColor: "rgba(15, 23, 42, 0.7)", // خلفية داكنة فاخرة
+  backdropFilter: "blur(4px)", // تأثير الغبش (Blur)
   display: "flex",
   justifyContent: "center",
   alignItems: "center",
   zIndex: 4000,
   padding: "20px",
 };
+
 const modalContent = {
-  backgroundColor: "#fff",
+  backgroundColor: "#f8fafc",
   padding: "25px",
-  borderRadius: "20px",
+  borderRadius: "24px",
   width: "100%",
   maxWidth: "850px",
   maxHeight: "85vh",
-  boxShadow: "0 10px 25px rgba(0,0,0,0.1)",
+  boxShadow: "0 20px 40px rgba(0,0,0,0.15)",
 };

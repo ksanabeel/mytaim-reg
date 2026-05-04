@@ -39,31 +39,6 @@ const reportCard = (color, isActive) => ({
   transform: isActive ? "scale(1.03)" : "scale(1)",
   transition: "all 0.2s ease",
 });
-const headerS = {
-  backgroundColor: "#fff",
-  padding: "15px 25px",
-  borderRadius: "20px",
-  boxShadow: "0 4px 12px rgba(0,0,0,0.05)",
-  marginBottom: "20px",
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "center",
-  flexWrap: "wrap",
-  gap: "15px",
-};
-const logoS = {
-  display: "flex",
-  alignItems: "center",
-  gap: "10px",
-  cursor: "pointer",
-};
-const avatarS = {
-  width: "50px",
-  height: "50px",
-  borderRadius: "50%",
-  border: "2px solid #7c3aed",
-  objectFit: "cover",
-};
 const addSkillBtn = {
   backgroundColor: "#7c3aed",
   color: "white",
@@ -73,36 +48,6 @@ const addSkillBtn = {
   cursor: "pointer",
   fontWeight: "bold",
 };
-const logoutB = {
-  backgroundColor: "#fee2e2",
-  color: "#ef4444",
-  border: "none",
-  padding: "8px 15px",
-  borderRadius: "10px",
-  cursor: "pointer",
-  fontWeight: "bold",
-};
-const tabsS = {
-  display: "flex",
-  gap: "5px",
-  marginBottom: "20px",
-  backgroundColor: "#f1f5f9",
-  padding: "5px",
-  borderRadius: "15px",
-  overflowX: "auto",
-};
-const tabS = (active, color) => ({
-  flex: "none",
-  minWidth: "90px",
-  padding: "10px",
-  border: "none",
-  borderRadius: "10px",
-  cursor: "pointer",
-  fontWeight: "bold",
-  fontSize: "0.75rem",
-  backgroundColor: active ? color : "transparent",
-  color: active ? "white" : "#64748b",
-});
 const cardS = {
   backgroundColor: "#fff",
   padding: "20px",
@@ -146,41 +91,6 @@ const smInput = {
   flex: "1 1 100px",
   outline: "none",
   fontFamily: "inherit",
-};
-
-// ✨ مكون التوقيت العالمي ✨
-const WorldClock = () => {
-  const [time, setTime] = useState(new Date());
-  useEffect(() => {
-    const timer = setInterval(() => setTime(new Date()), 1000);
-    return () => clearInterval(timer);
-  }, []);
-  return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        fontSize: "0.75rem",
-        color: "#64748b",
-        background: "#f8fafc",
-        padding: "5px 10px",
-        borderRadius: "10px",
-        border: "1px solid #e2e8f0",
-        minWidth: "130px",
-      }}
-    >
-      <span style={{ fontWeight: "bold", color: "#3b82f6" }}>
-        🌍 التوقيت العالمي:{" "}
-        <span dir="ltr">{time.toISOString().substring(11, 19)}</span>
-      </span>
-      <span>
-        📍 التوقيت المحلي:{" "}
-        <span dir="ltr">
-          {time.toLocaleTimeString("en-US", { hour12: false })}
-        </span>
-      </span>
-    </div>
-  );
 };
 
 // ✨ دالة الجلب الآمنة ✨
@@ -228,13 +138,17 @@ const defaultLegalDocs = {
 };
 
 const calculateFinancials = (b, commissionRate) => {
-  const basePricePerUnit = Number(b.offerings?.price) || 0;
+  const basePricePerUnit =
+    Number(b.proposed_price) || Number(b.offerings?.price) || 0;
+
   const additional = Number(b.additional_costs) || 0;
   const qty = b.quantity || 1;
   const baseTotal = basePricePerUnit * qty;
   const totalClientPrice = baseTotal + additional;
+
   const platformCommission = baseTotal * commissionRate;
   const providerNet = baseTotal - platformCommission + additional;
+
   return {
     baseTotal,
     qty,
@@ -245,7 +159,6 @@ const calculateFinancials = (b, commissionRate) => {
   };
 };
 
-// دالة لتجميع المبالغ المالية بناءً على نوع العملة (لتدعم كل الدول)
 const sumByCurrency = (
   bookingsArr,
   commissionRate,
@@ -271,6 +184,8 @@ const handlePrintInvoice = (
 ) => {
   const s = {
     pending: { text: "طلب جديد", color: "#64748b" },
+    awaiting_pricing: { text: "بانتظار التسعير", color: "#f59e0b" },
+    awaiting_client_approval: { text: "بانتظار الموافقة", color: "#f59e0b" },
     negotiating: { text: "بانتظار موافقة العميل", color: "#f59e0b" },
     confirmed: { text: "مؤكد", color: "#10b981" },
     completed: { text: "منفذ", color: "#059669" },
@@ -278,8 +193,6 @@ const handlePrintInvoice = (
   }[b.status] || { text: "طلب جديد", color: "#64748b" };
   const customerName = b.profiles?.full_name || "غير متوفر";
   const providerName = b.offerings?.profiles?.full_name || "غير متوفر";
-  const taxNumber = b.offerings?.profiles?.tax_number;
-  const licenseInfo = b.offerings?.profiles?.license_info;
   const currency = b.offerings?.currency || "USD";
   const label = {
     fixed: "مهمة",
@@ -330,114 +243,326 @@ const InvoicesView = ({
   platLogo,
 }) => {
   const { t, i18n } = useTranslation();
+  const isRTL = i18n.language === "ar";
+
+  // ألوان مخصصة لكل حالة لتبدو أنيقة في الفواتير
   const statusMap = {
-    pending: { text: "طلب جديد", color: "#64748b" },
-    negotiating: { text: "بانتظار موافقة العميل", color: "#f59e0b" },
-    confirmed: { text: "مؤكد", color: "#10b981" },
-    completed: { text: "منفذ", color: "#059669" },
-    cancelled: { text: "ملغى", color: "#ef4444" },
+    pending: { text: "طلب جديد", color: "#475569", bg: "#f1f5f9" },
+    awaiting_pricing: {
+      text: "بانتظار التسعير",
+      color: "#d97706",
+      bg: "#fffbeb",
+    },
+    awaiting_client_approval: {
+      text: "بانتظار الموافقة",
+      color: "#d97706",
+      bg: "#fffbeb",
+    },
+    negotiating: {
+      text: "بانتظار موافقة العميل",
+      color: "#d97706",
+      bg: "#fffbeb",
+    },
+    confirmed: { text: "مؤكد", color: "#059669", bg: "#ecfdf5" },
+    completed: { text: "منفذ", color: "#15803d", bg: "#dcfce7" },
+    cancelled: { text: "ملغى", color: "#ef4444", bg: "#fef2f2" },
   };
+
   if (!bookings || bookings.length === 0)
     return (
-      <div style={{ textAlign: "center", padding: "50px" }}>لا توجد فواتير</div>
+      <div
+        style={{
+          textAlign: "center",
+          padding: "60px 20px",
+          color: "#94a3b8",
+          backgroundColor: "#fff",
+          borderRadius: "24px",
+          border: "2px dashed #cbd5e1",
+        }}
+      >
+        <div style={{ fontSize: "3.5rem", marginBottom: "15px" }}>🧾</div>
+        <h3 style={{ margin: 0, color: "#475569" }}>
+          لا توجد فواتير أو حركات مالية حتى الآن
+        </h3>
+      </div>
     );
+
   return (
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
-        gap: "20px",
-        direction: i18n.language === "ar" ? "rtl" : "ltr",
-      }}
-    >
-      {bookings.map((b) => {
-        const isClient = b.customer_id === userId;
-        const s = statusMap[b.status] || statusMap["pending"];
-        const currency = b.offerings?.currency || "USD";
-        const { baseTotal, additional, totalClientPrice, providerNet } =
-          calculateFinancials(b, commissionRate);
-        return (
-          <div
-            key={b.id}
+    <div>
+      {/* ✨ عنوان الصفحة الجديد ✨ */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "12px",
+          marginBottom: "30px",
+          padding: "0 10px",
+        }}
+      >
+        <span style={{ fontSize: "2.2rem" }}>🧾</span>
+        <div>
+          <h2
             style={{
-              backgroundColor: "#fff",
-              padding: "20px",
-              borderRadius: "15px",
-              border: "2px dashed #cbd5e1",
+              margin: 0,
+              color: "#1e293b",
+              fontSize: "1.5rem",
+              fontWeight: "900",
             }}
           >
+            السجل المالي والفواتير
+          </h2>
+          <p
+            style={{
+              margin: "5px 0 0 0",
+              color: "#64748b",
+              fontSize: "0.95rem",
+            }}
+          >
+            استعرض كافة فواتير حجوزاتك كعميل أو إيراداتك كمزود خدمة.
+          </p>
+        </div>
+      </div>
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))",
+          gap: "25px",
+          direction: isRTL ? "rtl" : "ltr",
+        }}
+      >
+        {bookings.map((b) => {
+          const isClient = b.customer_id === userId;
+          const s = statusMap[b.status] || statusMap["pending"];
+          const currency = b.offerings?.currency || "SAR"; // افتراضي ريال سعودي
+          const { baseTotal, additional, totalClientPrice, providerNet } =
+            calculateFinancials(b, commissionRate);
+
+          return (
             <div
+              key={b.id}
+              className="smart-invoice-card"
               style={{
+                backgroundColor: "#fff",
+                borderRadius: "20px",
+                border: "1px solid #e2e8f0",
+                boxShadow: "0 4px 20px rgba(0,0,0,0.04)",
+                overflow: "hidden",
                 display: "flex",
-                justifyContent: "space-between",
-                margin: "0 0 10px 0",
+                flexDirection: "column",
+                transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
               }}
             >
-              <h3 style={{ margin: 0, fontSize: "1.1rem", direction: "ltr" }}>
-                #{b.id.substring(0, 6)}
-              </h3>
-              <span
+              {/* ✨ ستايل الـ Hover مدمج هنا ✨ */}
+              <style>{`
+                .smart-invoice-card:hover { transform: translateY(-4px); box-shadow: 0 12px 30px rgba(0,0,0,0.08); }
+              `}</style>
+
+              {/* 1. ترويسة الإيصال (Header) */}
+              <div
                 style={{
-                  backgroundColor: s.color,
-                  color: "#fff",
-                  padding: "3px 8px",
-                  borderRadius: "5px",
-                  fontSize: "0.7rem",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  padding: "18px 20px",
+                  borderBottom: "2px dashed #e2e8f0",
+                  backgroundColor: "#f8fafc",
                 }}
               >
-                {s.text}
-              </span>
-            </div>
-            <p style={{ fontSize: "0.85rem", margin: "5px 0" }}>
-              <strong>الخدمة:</strong> {b.offerings?.title}
-            </p>
-            <p
-              style={{ fontSize: "0.85rem", margin: "5px 0", color: "#64748b" }}
-            >
-              الأساسي: {baseTotal} | إضافي: {additional}
-            </p>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginTop: "15px",
-                borderTop: "1px solid #f1f5f9",
-                paddingTop: "10px",
-              }}
-            >
-              <span
+                <div
+                  style={{ display: "flex", alignItems: "center", gap: "6px" }}
+                >
+                  <span style={{ color: "#94a3b8", fontWeight: "bold" }}>
+                    #
+                  </span>
+                  <strong
+                    style={{
+                      fontSize: "1.1rem",
+                      color: "#334155",
+                      letterSpacing: "1px",
+                      direction: "ltr",
+                    }}
+                  >
+                    {b.id.substring(0, 6).toUpperCase()}
+                  </strong>
+                </div>
+                <span
+                  style={{
+                    backgroundColor: s.bg,
+                    color: s.color,
+                    padding: "6px 12px",
+                    borderRadius: "10px",
+                    fontSize: "0.75rem",
+                    fontWeight: "900",
+                  }}
+                >
+                  {s.text}
+                </span>
+              </div>
+
+              {/* 2. تفاصيل الخدمة والمبالغ (Body) */}
+              <div style={{ padding: "20px", flex: 1 }}>
+                <div
+                  style={{
+                    fontSize: "0.8rem",
+                    color: "#64748b",
+                    fontWeight: "bold",
+                    marginBottom: "6px",
+                  }}
+                >
+                  الخدمة المقدمة:
+                </div>
+                <h4
+                  style={{
+                    margin: "0 0 20px 0",
+                    fontSize: "1.1rem",
+                    color: "#1e293b",
+                    fontWeight: "900",
+                    lineHeight: "1.4",
+                  }}
+                >
+                  {b.offerings?.title || "غير متوفرة"}
+                </h4>
+
+                {/* الصندوق المحاسبي الداخلي */}
+                <div
+                  style={{
+                    backgroundColor: "#f8fafc",
+                    borderRadius: "12px",
+                    padding: "15px",
+                    border: "1px solid #f1f5f9",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      marginBottom: "10px",
+                      fontSize: "0.85rem",
+                      color: "#475569",
+                    }}
+                  >
+                    <span style={{ fontWeight: "bold" }}>
+                      التكلفة الأساسية:
+                    </span>
+                    <strong style={{ color: "#1e293b", direction: "ltr" }}>
+                      {baseTotal.toFixed(2)}{" "}
+                      <span style={{ fontSize: "0.7rem", color: "#94a3b8" }}>
+                        {currency}
+                      </span>
+                    </strong>
+                  </div>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      fontSize: "0.85rem",
+                      color: "#475569",
+                    }}
+                  >
+                    <span style={{ fontWeight: "bold" }}>إضافات (أخرى):</span>
+                    <strong style={{ color: "#1e293b", direction: "ltr" }}>
+                      {additional.toFixed(2)}{" "}
+                      <span style={{ fontSize: "0.7rem", color: "#94a3b8" }}>
+                        {currency}
+                      </span>
+                    </strong>
+                  </div>
+                </div>
+              </div>
+
+              {/* 3. الإجمالي وزر الطباعة (Footer) */}
+              <div
                 style={{
-                  fontWeight: "bold",
-                  color: isClient ? "#7c3aed" : "#10b981",
+                  backgroundColor: isClient ? "#eff6ff" : "#ecfdf5",
+                  padding: "20px",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  borderTop: isClient
+                    ? "1px solid #bfdbfe"
+                    : "1px solid #a7f3d0",
                 }}
               >
-                {isClient
-                  ? `الإجمالي ${totalClientPrice} ${currency}`
-                  : `الصافي ${providerNet} ${currency}`}
-              </span>
-              <button
-                onClick={() =>
-                  handlePrintInvoice(
-                    b,
-                    isClient,
-                    commissionRate,
-                    platName,
-                    platLogo,
-                  )
-                }
-                style={printBtnS}
-              >
-                طباعة الفاتورة
-              </button>
+                <div>
+                  <div
+                    style={{
+                      fontSize: "0.8rem",
+                      color: isClient ? "#2563eb" : "#059669",
+                      fontWeight: "900",
+                      marginBottom: "4px",
+                    }}
+                  >
+                    {isClient ? "الإجمالي المطلوب" : "صافي أرباحك"}
+                  </div>
+                  <strong
+                    style={{
+                      fontSize: "1.4rem",
+                      color: isClient ? "#1d4ed8" : "#047857",
+                      direction: "ltr",
+                      display: "block",
+                      fontWeight: "900",
+                    }}
+                  >
+                    {isClient
+                      ? totalClientPrice.toFixed(2)
+                      : providerNet.toFixed(2)}{" "}
+                    <span style={{ fontSize: "0.85rem" }}>{currency}</span>
+                  </strong>
+                </div>
+
+                <button
+                  onClick={() =>
+                    handlePrintInvoice(
+                      b,
+                      isClient,
+                      commissionRate,
+                      platName,
+                      platLogo,
+                    )
+                  }
+                  style={{
+                    backgroundColor: "#fff",
+                    color: isClient ? "#2563eb" : "#10b981",
+                    border: isClient
+                      ? "2px solid #bfdbfe"
+                      : "2px solid #a7f3d0",
+                    padding: "10px 16px",
+                    borderRadius: "12px",
+                    cursor: "pointer",
+                    fontWeight: "900",
+                    fontSize: "0.85rem",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    transition: "all 0.2s ease",
+                    boxShadow: "0 4px 10px rgba(0,0,0,0.03)",
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.backgroundColor = isClient
+                      ? "#2563eb"
+                      : "#10b981";
+                    e.currentTarget.style.color = "#fff";
+                    e.currentTarget.style.transform = "scale(1.05)";
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.backgroundColor = "#fff";
+                    e.currentTarget.style.color = isClient
+                      ? "#2563eb"
+                      : "#10b981";
+                    e.currentTarget.style.transform = "scale(1)";
+                  }}
+                >
+                  <span style={{ fontSize: "1.2rem" }}>🖨️</span> طباعة
+                </button>
+              </div>
             </div>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 };
-
 const AdminReports = ({ commissionRate, platName, platLogo }) => {
   const { i18n } = useTranslation();
   const [data, setData] = useState({ users: [], bookings: [], categories: [] });
@@ -551,7 +676,6 @@ const AdminReports = ({ commissionRate, platName, platLogo }) => {
     (b) => b.status === "completed",
   );
 
-  // المجاميع مفصولة بالعملات
   const totalProfitText = sumByCurrency(completedBookings, commissionRate);
   const collectedProfitText = sumByCurrency(
     completedBookings.filter((b) => b.is_commission_paid),
@@ -1430,37 +1554,97 @@ const PlatformManagement = ({
       >
         <button
           onClick={() => setActiveAdminTab("settings")}
-          style={tabS(activeAdminTab === "settings", "#ef4444")}
+          style={{
+            padding: "10px",
+            border: "none",
+            borderRadius: "10px",
+            cursor: "pointer",
+            fontWeight: "bold",
+            fontSize: "0.75rem",
+            backgroundColor:
+              activeAdminTab === "settings" ? "#ef4444" : "transparent",
+            color: activeAdminTab === "settings" ? "white" : "#64748b",
+          }}
         >
           🛠️ إعدادات المنصة
         </button>
         <button
           onClick={() => setActiveAdminTab("policies")}
-          style={tabS(activeAdminTab === "policies", "#f59e0b")}
+          style={{
+            padding: "10px",
+            border: "none",
+            borderRadius: "10px",
+            cursor: "pointer",
+            fontWeight: "bold",
+            fontSize: "0.75rem",
+            backgroundColor:
+              activeAdminTab === "policies" ? "#f59e0b" : "transparent",
+            color: activeAdminTab === "policies" ? "white" : "#64748b",
+          }}
         >
           📜 سياسات المنصة
         </button>
         <button
           onClick={() => setActiveAdminTab("categories")}
-          style={tabS(activeAdminTab === "categories", "#10b981")}
+          style={{
+            padding: "10px",
+            border: "none",
+            borderRadius: "10px",
+            cursor: "pointer",
+            fontWeight: "bold",
+            fontSize: "0.75rem",
+            backgroundColor:
+              activeAdminTab === "categories" ? "#10b981" : "transparent",
+            color: activeAdminTab === "categories" ? "white" : "#64748b",
+          }}
         >
           📁 الأقسام
         </button>
         <button
           onClick={() => setActiveAdminTab("users")}
-          style={tabS(activeAdminTab === "users", "#3b82f6")}
+          style={{
+            padding: "10px",
+            border: "none",
+            borderRadius: "10px",
+            cursor: "pointer",
+            fontWeight: "bold",
+            fontSize: "0.75rem",
+            backgroundColor:
+              activeAdminTab === "users" ? "#3b82f6" : "transparent",
+            color: activeAdminTab === "users" ? "white" : "#64748b",
+          }}
         >
           👥 المستخدمين
         </button>
         <button
           onClick={() => setActiveAdminTab("reviews")}
-          style={tabS(activeAdminTab === "reviews", "#8b5cf6")}
+          style={{
+            padding: "10px",
+            border: "none",
+            borderRadius: "10px",
+            cursor: "pointer",
+            fontWeight: "bold",
+            fontSize: "0.75rem",
+            backgroundColor:
+              activeAdminTab === "reviews" ? "#8b5cf6" : "transparent",
+            color: activeAdminTab === "reviews" ? "white" : "#64748b",
+          }}
         >
           ⭐ التقييمات والمراجعات
         </button>
         <button
           onClick={() => setActiveAdminTab("messages")}
-          style={tabS(activeAdminTab === "messages", "#d946ef")}
+          style={{
+            padding: "10px",
+            border: "none",
+            borderRadius: "10px",
+            cursor: "pointer",
+            fontWeight: "bold",
+            fontSize: "0.75rem",
+            backgroundColor:
+              activeAdminTab === "messages" ? "#d946ef" : "transparent",
+            color: activeAdminTab === "messages" ? "white" : "#64748b",
+          }}
         >
           ✉️ رسائل الزوار{" "}
           {messages.filter((m) => !m.is_read).length > 0 &&
@@ -1509,7 +1693,6 @@ const PlatformManagement = ({
               />
             </div>
 
-            {/* ✨ إضافة خيار رفع لوجو أو رابط ✨ */}
             <div
               style={{
                 flex: 2,
@@ -1537,7 +1720,7 @@ const PlatformManagement = ({
                   if (file) {
                     const reader = new FileReader();
                     reader.onloadend = () => {
-                      setInputLogo(reader.result); // تحويل للصيغة النصية لسهولة الحفظ بدون داتا بيس معقدة
+                      setInputLogo(reader.result);
                     };
                     reader.readAsDataURL(file);
                   }
@@ -2606,36 +2789,117 @@ export default function App() {
 
   const renderTable = (bookings, status, isProvider) => {
     const filtered = bookings.filter((b) => b.status === status);
+
+    // ✨ ألوان وأيقونات وتغليف مخصص لكل حالة ✨
     const titleMap = {
-      pending: "طلبات قيد الانتظار/التفاوض",
-      negotiating: "بانتظار موافقتك",
-      confirmed: "حجوزات مؤكدة",
-      completed: "حجوزات منفذة",
-      cancelled: "ملغاة",
+      awaiting_pricing: {
+        text: "طلبات بانتظار تسعيرك",
+        icon: "💰",
+        color: "#d97706",
+        bg: "#fffbeb",
+        border: "#fde68a",
+      },
+      awaiting_client_approval: {
+        text: "بانتظار موافقة العميل على السعر",
+        icon: "⏳",
+        color: "#2563eb",
+        bg: "#eff6ff",
+        border: "#bfdbfe",
+      },
+      pending: {
+        text: "طلبات قيد الانتظار",
+        icon: "🆕",
+        color: "#d97706",
+        bg: "#fef3c7",
+        border: "#fde68a",
+      },
+      negotiating: {
+        text: "بانتظار موافقتك",
+        icon: "🤝",
+        color: "#d97706",
+        bg: "#fef3c7",
+        border: "#fde68a",
+      },
+      confirmed: {
+        text: "حجوزات مؤكدة",
+        icon: "👍",
+        color: "#059669",
+        bg: "#ecfdf5",
+        border: "#a7f3d0",
+      },
+      completed: {
+        text: "حجوزات منفذة",
+        icon: "✅",
+        color: "#15803d",
+        bg: "#f0fdf4",
+        border: "#bbf7d0",
+      },
+      cancelled: {
+        text: "ملغاة",
+        icon: "❌",
+        color: "#ef4444",
+        bg: "#fef2f2",
+        border: "#fecaca",
+      },
     };
+
     if (filtered.length === 0) return null;
+    const currentTitle = titleMap[status] || {
+      text: status,
+      icon: "📌",
+      color: "#475569",
+      bg: "#f1f5f9",
+      border: "#cbd5e1",
+    };
+
     return (
-      <div key={status} style={{ marginBottom: "15px" }}>
-        <h4
+      <div key={status} style={{ marginBottom: "35px" }}>
+        {/* ✨ التغليف الجديد للعناوين الفرعية (حالة الطلبات) ✨ */}
+        <div
           style={{
-            fontSize: "0.85rem",
-            color: "#2563eb",
-            marginBottom: "8px",
-            borderBottom: "1px solid #e2e8f0",
-            paddingBottom: "5px",
-            textAlign: i18n.language === "ar" ? "right" : "left",
+            display: "flex",
+            alignItems: "center",
+            marginBottom: "15px",
           }}
         >
-          {titleMap[status]}
-        </h4>
-        <div style={{ overflowX: "auto" }}>
+          <h4
+            style={{
+              fontSize: "0.9rem",
+              color: currentTitle.color,
+              backgroundColor: currentTitle.bg,
+              border: `1px solid ${currentTitle.border}`,
+              padding: "8px 18px",
+              borderRadius: "25px",
+              margin: "0",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              fontWeight: "bold",
+              boxShadow: "0 2px 4px rgba(0,0,0,0.02)",
+            }}
+          >
+            <span style={{ fontSize: "1.1rem" }}>{currentTitle.icon}</span>{" "}
+            {currentTitle.text}
+          </h4>
+          {/* خط أفقي تجميلي يمتد لنهاية الشاشة */}
+          <div
+            style={{
+              flex: 1,
+              height: "1px",
+              backgroundColor: currentTitle.border,
+              margin: "0 15px",
+              opacity: 0.6,
+            }}
+          ></div>
+        </div>
+
+        <div style={{ overflowX: "auto", paddingBottom: "10px" }}>
           <table
             style={{
               width: "100%",
-              borderCollapse: "collapse",
+              borderCollapse: "separate",
+              borderSpacing: "0 15px", // مسافة بين البطاقات
               fontSize: "0.8rem",
-              backgroundColor: "#fff",
-              borderRadius: "10px",
             }}
           >
             <tbody style={{ textAlign: "center" }}>
@@ -2789,7 +3053,6 @@ export default function App() {
   ];
   const defaultAvatar = `https://ui-avatars.com/api/?name=${userProfile?.full_name || "User"}&background=7c3aed&color=fff`;
 
-  // مجاميع المزود المالية حسب العملة
   const myPaidCommissionText = sumByCurrency(
     providerBookings.filter(
       (b) => b.status === "completed" && b.is_commission_paid,
@@ -2818,9 +3081,7 @@ export default function App() {
         flexDirection: "column",
       }}
     >
-      {/* ✨ النوافذ المنبثقة (المودلز) - تمت إعادتها هنا ✨ */}
-
-      {/* ✨ نافذة الشروط والأحكام المضافة حديثاً ✨ */}
+      {/* ✨ النوافذ المنبثقة (المودلز) ✨ */}
       {mustAcceptTerms && (
         <div style={{ ...modalOverlay, zIndex: 9999 }}>
           <div
@@ -2842,7 +3103,6 @@ export default function App() {
               الشروط والأحكام أدناه:
             </p>
 
-            {/* صندوق النص القابل للتمرير */}
             <div
               style={{
                 maxHeight: "250px",
@@ -3314,7 +3574,6 @@ export default function App() {
         </div>
       )}
 
-      {/* ✨ نافذة الإشعارات المطورة مع زر الرد ✨ */}
       {showNotifModal && (
         <div
           style={{
@@ -3390,7 +3649,6 @@ export default function App() {
                       {n.message}
                     </div>
 
-                    {/* ✨ زر الرد المباشر للإدارة ✨ */}
                     <div
                       style={{
                         display: "flex",
@@ -3449,110 +3707,90 @@ export default function App() {
           pointerEvents: mustAcceptTerms ? "none" : "auto",
         }}
       >
-        <div style={headerS}>
-          <div style={logoS} onClick={() => setActiveTab("market")}>
-            {platformLogo?.includes("http") ||
-            platformLogo?.startsWith("data:image") ? (
-              <img
-                src={platformLogo}
-                style={{ height: "45px", borderRadius: "10px" }}
-                alt="logo"
-              />
-            ) : (
-              <span style={{ fontSize: "2.2rem" }}>{platformLogo}</span>
-            )}
-            <h1
-              style={{
-                fontSize: "1.4rem",
-                margin: 0,
-                color: "#7c3aed",
-                fontWeight: "900",
-              }}
-            >
-              {platformName}
-            </h1>
-          </div>
+        {/* ✨ شريط التنقل الذكي العائم (Smart Sticky Navbar) ✨ */}
+        <div
+          style={{
+            position: "sticky",
+            top: "15px",
+            zIndex: 2000,
+            backgroundColor: "rgba(255, 255, 255, 0.85)",
+            backdropFilter: "blur(16px) saturate(180%)",
+            WebkitBackdropFilter: "blur(16px) saturate(180%)",
+            border: "1px solid rgba(255, 255, 255, 0.6)",
+            padding: "15px 25px",
+            borderRadius: "24px",
+            boxShadow: "0 10px 40px rgba(0, 0, 0, 0.06)",
+            marginBottom: "30px",
+            display: "flex",
+            flexDirection: "column",
+            gap: "20px",
+          }}
+        >
+          {/* الصف العلوي: الشعار والإجراءات السريعة */}
           <div
             style={{
               display: "flex",
-              gap: "15px",
+              justifyContent: "space-between",
               alignItems: "center",
               flexWrap: "wrap",
-              justifyContent: "flex-end",
+              gap: "15px",
             }}
           >
-            {/* ✨ التوقيت العالمي مضاف هنا ✨ */}
-            <WorldClock />
-
-            {/* ✨ زر الإشعارات المدمج ✨ */}
+            {/* الشعار واسم المنصة */}
             <div
+              onClick={() => setActiveTab("market")}
               style={{
-                position: "relative",
+                display: "flex",
+                alignItems: "center",
+                gap: "12px",
                 cursor: "pointer",
-                marginLeft: "15px",
               }}
-              onClick={() => setShowNotifModal(true)}
             >
-              <span style={{ fontSize: "1.6rem" }}>🔔</span>
-              {unreadNotifsCount > 0 && (
+              {platformLogo?.includes("http") ||
+              platformLogo?.startsWith("data:image") ? (
+                <img
+                  src={platformLogo}
+                  style={{
+                    height: "45px",
+                    borderRadius: "12px",
+                    boxShadow: "0 4px 10px rgba(0,0,0,0.05)",
+                  }}
+                  alt="logo"
+                />
+              ) : (
                 <span
                   style={{
-                    position: "absolute",
-                    top: -5,
-                    right: -5,
-                    background: "#ef4444",
-                    color: "white",
-                    borderRadius: "50%",
-                    padding: "2px 6px",
-                    fontSize: "0.7rem",
-                    fontWeight: "bold",
+                    fontSize: "2.4rem",
+                    textShadow: "0 4px 10px rgba(0,0,0,0.1)",
                   }}
                 >
-                  {unreadNotifsCount}
+                  {platformLogo}
                 </span>
               )}
-            </div>
-
-            <div
-              style={{ textAlign: i18n.language === "ar" ? "left" : "right" }}
-            >
-              <div
+              <h1
                 style={{
-                  fontWeight: "bold",
+                  fontSize: "1.6rem",
+                  margin: 0,
                   color: "#1e293b",
-                  fontSize: "0.9rem",
+                  fontWeight: "900",
+                  letterSpacing: "-0.5px",
                 }}
               >
-                {userProfile?.full_name}
-                {isSuperAdmin && (
-                  <span
-                    style={{
-                      fontSize: "0.6rem",
-                      color: "#fff",
-                      backgroundColor: "#ef4444",
-                      padding: "2px 5px",
-                      borderRadius: "5px",
-                      margin: "0 5px",
-                    }}
-                  >
-                    👑 مدير
-                  </span>
-                )}
-                {isSupervisor && (
-                  <span
-                    style={{
-                      fontSize: "0.6rem",
-                      color: "#fff",
-                      backgroundColor: "#3b82f6",
-                      padding: "2px 5px",
-                      borderRadius: "5px",
-                      margin: "0 5px",
-                    }}
-                  >
-                    🛡️ مشرف
-                  </span>
-                )}
-              </div>
+                {platformName}
+              </h1>
+            </div>
+
+            {/* الإجراءات وبيانات المستخدم */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "15px",
+                flexWrap: "wrap",
+                justifyContent: "flex-end",
+              }}
+            >
+              {/* زر إضافة خدمة بارز */}
               <button
                 onClick={() => {
                   if (checkProfileCompletion()) {
@@ -3561,81 +3799,264 @@ export default function App() {
                   }
                 }}
                 style={{
-                  ...addSkillBtn,
-                  padding: "4px 10px",
-                  fontSize: "0.7rem",
-                  marginTop: "5px",
+                  background:
+                    "linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%)",
+                  color: "white",
+                  border: "none",
+                  padding: "10px 20px",
+                  borderRadius: "14px",
+                  cursor: "pointer",
+                  fontWeight: "900",
+                  fontSize: "0.9rem",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  boxShadow: "0 6px 15px rgba(124, 58, 237, 0.25)",
+                  transition: "all 0.3s ease",
                 }}
               >
-                إضافة خدمة
+                <span style={{ fontSize: "1.1rem" }}>✨</span> إضافة خدمة
+              </button>
+
+              {/* زر الإشعارات */}
+              <div
+                style={{
+                  position: "relative",
+                  cursor: "pointer",
+                  backgroundColor: "rgba(241, 245, 249, 0.7)",
+                  padding: "10px",
+                  borderRadius: "14px",
+                  border: "1px solid rgba(226, 232, 240, 0.8)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  transition: "all 0.2s ease",
+                }}
+                onClick={() => setShowNotifModal(true)}
+              >
+                <span style={{ fontSize: "1.4rem" }}>🔔</span>
+                {unreadNotifsCount > 0 && (
+                  <span
+                    style={{
+                      position: "absolute",
+                      top: -6,
+                      right: -6,
+                      background: "#ef4444",
+                      color: "white",
+                      borderRadius: "50%",
+                      padding: "2px 6px",
+                      fontSize: "0.75rem",
+                      fontWeight: "bold",
+                      border: "2px solid #fff",
+                    }}
+                  >
+                    {unreadNotifsCount}
+                  </span>
+                )}
+              </div>
+
+              {/* خط فاصل */}
+              <div
+                style={{
+                  width: "2px",
+                  height: "30px",
+                  background: "rgba(226, 232, 240, 0.8)",
+                  margin: "0 5px",
+                }}
+              ></div>
+
+              {/* بطاقة المستخدم */}
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "12px",
+                  backgroundColor: "rgba(248, 250, 252, 0.6)",
+                  padding: "6px 15px 6px 6px",
+                  borderRadius: "30px",
+                  border: "1px solid rgba(226, 232, 240, 0.8)",
+                }}
+              >
+                <div
+                  style={{
+                    textAlign: i18n.language === "ar" ? "left" : "right",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontWeight: "900",
+                      color: "#1e293b",
+                      fontSize: "0.95rem",
+                    }}
+                  >
+                    {userProfile?.full_name}
+                  </div>
+                  {(isSuperAdmin || isSupervisor) && (
+                    <div style={{ marginTop: "2px" }}>
+                      {isSuperAdmin && (
+                        <span
+                          style={{
+                            fontSize: "0.65rem",
+                            color: "#fff",
+                            backgroundColor: "#ef4444",
+                            padding: "2px 6px",
+                            borderRadius: "8px",
+                            fontWeight: "bold",
+                          }}
+                        >
+                          👑 مدير
+                        </span>
+                      )}
+                      {isSupervisor && (
+                        <span
+                          style={{
+                            fontSize: "0.65rem",
+                            color: "#fff",
+                            backgroundColor: "#3b82f6",
+                            padding: "2px 6px",
+                            borderRadius: "8px",
+                            fontWeight: "bold",
+                          }}
+                        >
+                          🛡️ مشرف
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+                <img
+                  src={userProfile?.avatar_url || defaultAvatar}
+                  style={{
+                    width: "42px",
+                    height: "42px",
+                    borderRadius: "50%",
+                    border: "2px solid #fff",
+                    objectFit: "cover",
+                    boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+                  }}
+                  alt="avatar"
+                />
+              </div>
+
+              {/* زر الخروج الأنيق */}
+              <button
+                onClick={handleLogout}
+                title="تسجيل الخروج"
+                style={{
+                  backgroundColor: "#fef2f2",
+                  color: "#ef4444",
+                  border: "none",
+                  width: "45px",
+                  height: "45px",
+                  borderRadius: "14px",
+                  cursor: "pointer",
+                  display: "flex",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  fontSize: "1.4rem",
+                  transition: "all 0.2s ease",
+                }}
+              >
+                🚪
               </button>
             </div>
-            <img
-              src={userProfile?.avatar_url || defaultAvatar}
-              style={avatarS}
-              alt="p"
-            />
-            <button onClick={handleLogout} style={logoutB}>
-              خروج
-            </button>
+          </div>
+
+          {/* الصف السفلي: شريط التنقل (Tabs) */}
+          <div
+            className="hide-scrollbar"
+            style={{
+              display: "flex",
+              gap: "10px",
+              overflowX: "auto",
+              paddingBottom: "5px",
+              WebkitOverflowScrolling: "touch",
+            }}
+          >
+            <style>{`
+              .hide-scrollbar::-webkit-scrollbar { display: none; }
+              .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+              .nav-tab { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); flex-shrink: 0; }
+              .nav-tab:hover { transform: translateY(-2px); opacity: 0.9; }
+            `}</style>
+
+            {[
+              {
+                id: "market",
+                label: "دليل الخدمات",
+                icon: "🔍",
+                color: "#7c3aed",
+              },
+              { id: "provider", label: "أعمالي", icon: "💼", color: "#059669" },
+              {
+                id: "my_services",
+                label: "خدماتي",
+                icon: "⚙️",
+                color: "#f59e0b",
+              },
+              {
+                id: "calendar",
+                label: "التقويم",
+                icon: "📅",
+                color: "#3b82f6",
+              },
+              {
+                id: "invoices",
+                label: "الفواتير",
+                icon: "🧾",
+                color: "#8b5cf6",
+              },
+              ...(canViewReports
+                ? [
+                    {
+                      id: "reports",
+                      label: "التقارير",
+                      icon: "📊",
+                      color: "#d946ef",
+                    },
+                  ]
+                : []),
+              ...(canManagePlatform
+                ? [
+                    {
+                      id: "admin",
+                      label: "الإدارة",
+                      icon: "⚙️",
+                      color: "#ef4444",
+                    },
+                  ]
+                : []),
+              { id: "profile", label: "حسابي", icon: "👤", color: "#1e293b" },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                className="nav-tab"
+                onClick={() => setActiveTab(tab.id)}
+                style={{
+                  padding: "10px 20px",
+                  border: "none",
+                  borderRadius: "16px",
+                  cursor: "pointer",
+                  fontWeight: "900",
+                  fontSize: "0.9rem",
+                  backgroundColor:
+                    activeTab === tab.id ? tab.color : "transparent",
+                  color: activeTab === tab.id ? "white" : "#64748b",
+                  boxShadow:
+                    activeTab === tab.id ? `0 6px 15px ${tab.color}40` : "none",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                }}
+              >
+                <span style={{ fontSize: "1.15rem" }}>{tab.icon}</span>
+                {tab.label}
+              </button>
+            ))}
           </div>
         </div>
 
-        <div style={tabsS}>
-          <button
-            onClick={() => setActiveTab("market")}
-            style={tabS(activeTab === "market", "#7c3aed")}
-          >
-            🔍 دليل الخدمات
-          </button>
-          <button
-            onClick={() => setActiveTab("provider")}
-            style={tabS(activeTab === "provider", "#059669")}
-          >
-            💼 أعمالي
-          </button>
-          <button
-            onClick={() => setActiveTab("my_services")}
-            style={tabS(activeTab === "my_services", "#f59e0b")}
-          >
-            ⚙️ خدماتي
-          </button>
-          <button
-            onClick={() => setActiveTab("calendar")}
-            style={tabS(activeTab === "calendar", "#3b82f6")}
-          >
-            📅 التقويم
-          </button>
-          <button
-            onClick={() => setActiveTab("invoices")}
-            style={tabS(activeTab === "invoices", "#8b5cf6")}
-          >
-            🧾 الفواتير
-          </button>
-          {canViewReports && (
-            <button
-              onClick={() => setActiveTab("reports")}
-              style={tabS(activeTab === "reports", "#d946ef")}
-            >
-              📊 التقارير
-            </button>
-          )}
-          {canManagePlatform && (
-            <button
-              onClick={() => setActiveTab("admin")}
-              style={tabS(activeTab === "admin", "#ef4444")}
-            >
-              ⚙️ الإدارة
-            </button>
-          )}
-          <button
-            onClick={() => setActiveTab("profile")}
-            style={tabS(activeTab === "profile", "#1e293b")}
-          >
-            👤 حسابي
-          </button>
-        </div>
-
+        {/* محتوى الصفحات */}
         {activeTab === "market" && (
           <ClientMarketplace
             session={session}
@@ -3706,7 +4127,7 @@ export default function App() {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+              gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
               gap: "20px",
             }}
           >
@@ -3755,10 +4176,13 @@ export default function App() {
                     borderRadius: "20px",
                     border: "1px solid #e2e8f0",
                     overflow: "hidden",
-                    boxShadow: "0 4px 10px rgba(0,0,0,0.03)",
+                    boxShadow: "0 4px 15px rgba(0,0,0,0.03)",
+                    display: "flex",
+                    flexDirection: "column",
                     position: "relative",
                   }}
                 >
+                  {/* الشريط الملون العلوي */}
                   <div
                     style={{
                       height: "6px",
@@ -3768,62 +4192,72 @@ export default function App() {
                           : "linear-gradient(90deg, #7c3aed, #a855f7)",
                     }}
                   ></div>
-                  <div style={{ padding: "20px" }}>
-                    <div
+
+                  <div
+                    style={{
+                      padding: "20px",
+                      display: "flex",
+                      flexDirection: "column",
+                      flex: 1,
+                    }}
+                  >
+                    {/* العنوان */}
+                    <h3
                       style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "flex-start",
-                        marginBottom: "8px",
+                        margin: "0 0 10px 0",
+                        fontSize: "1.15rem",
+                        color: "#1e293b",
+                        fontWeight: "900",
+                        lineHeight: "1.4",
                       }}
                     >
-                      <h3
-                        style={{
-                          margin: 0,
-                          fontSize: "1.1rem",
-                          color: "#1e293b",
-                          fontWeight: "bold",
-                        }}
-                      >
-                        {off.title}
-                      </h3>
-                    </div>
+                      {off.title}
+                    </h3>
+
+                    {/* الوصف المنسق (يظهر 3 أسطر كحد أقصى) */}
                     <p
                       style={{
-                        fontSize: "0.8rem",
+                        fontSize: "0.85rem",
                         color: "#64748b",
                         marginBottom: "15px",
                         lineHeight: "1.6",
-                        height: "38px",
+                        display: "-webkit-box",
+                        WebkitLineClamp: 3,
+                        WebkitBoxOrient: "vertical",
                         overflow: "hidden",
-                        textOverflow: "ellipsis",
+                        flex: 1,
                       }}
+                      title={off.description}
                     >
                       {off.description}
                     </p>
+
+                    {/* وقت الدوام */}
                     <div
                       style={{
                         display: "flex",
                         gap: "8px",
-                        marginBottom: "15px",
+                        marginBottom: "20px",
                       }}
                     >
                       <div
                         style={{
-                          fontSize: "0.7rem",
+                          fontSize: "0.75rem",
                           backgroundColor: "#f8fafc",
-                          padding: "4px 8px",
-                          borderRadius: "6px",
+                          padding: "6px 12px",
+                          borderRadius: "8px",
                           border: "1px solid #f1f5f9",
                           color: "#475569",
                           fontWeight: "bold",
                         }}
                       >
                         {off.is_24_7
-                          ? `🟢 24 ساعة`
+                          ? `🟢 متاح 24 ساعة`
                           : `🕒 ${off.work_start_time?.substring(0, 5)} - ${off.work_end_time?.substring(0, 5)}`}
                       </div>
                     </div>
+
+                    {/* الفوتر: السعر والأزرار */}
                     <div
                       style={{
                         display: "flex",
@@ -3831,6 +4265,7 @@ export default function App() {
                         alignItems: "center",
                         borderTop: "1px solid #f1f5f9",
                         paddingTop: "15px",
+                        marginTop: "auto",
                       }}
                     >
                       <div style={{ display: "flex", flexDirection: "column" }}>
@@ -3841,45 +4276,66 @@ export default function App() {
                               off.pricing_model === "free"
                                 ? "#10b981"
                                 : "#7c3aed",
-                            fontSize: "1.15rem",
+                            fontSize: "1.2rem",
                           }}
                         >
-                          {off.pricing_model === "free"
-                            ? `💚 تطوع`
-                            : `${off.price} ${curr}`}
+                          {off.price_upon_agreement
+                            ? "حسب الاتفاق 🤝"
+                            : off.pricing_model === "free"
+                              ? `💚 تطوع`
+                              : `${off.price} ${curr}`}
                         </span>
-                        <span style={{ fontSize: "0.65rem", color: "#94a3b8" }}>
-                          لكل {modelLabels[off.pricing_model] || "مهمة"}
-                        </span>
+                        {!off.price_upon_agreement && (
+                          <span
+                            style={{
+                              fontSize: "0.7rem",
+                              color: "#94a3b8",
+                              marginTop: "2px",
+                            }}
+                          >
+                            لكل {modelLabels[off.pricing_model] || "مهمة"}
+                          </span>
+                        )}
                       </div>
+
                       <div style={{ display: "flex", gap: "8px" }}>
                         <button
                           onClick={() => openEditModal(off)}
                           style={{
-                            border: "none",
+                            border: "1px solid #bfdbfe",
                             background: "#eff6ff",
                             color: "#2563eb",
-                            padding: "8px",
+                            padding: "6px 12px",
                             borderRadius: "8px",
                             cursor: "pointer",
+                            fontWeight: "bold",
+                            fontSize: "0.8rem",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "4px",
                           }}
                           title="تعديل"
                         >
-                          ✏️
+                          ✏️ تعديل
                         </button>
                         <button
                           onClick={() => handleDeleteOffering(off.id)}
                           style={{
-                            border: "none",
+                            border: "1px solid #fecaca",
                             background: "#fef2f2",
                             color: "#ef4444",
-                            padding: "8px",
+                            padding: "6px 12px",
                             borderRadius: "8px",
                             cursor: "pointer",
+                            fontWeight: "bold",
+                            fontSize: "0.8rem",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "4px",
                           }}
                           title="حذف"
                         >
-                          🗑️
+                          🗑️ حذف
                         </button>
                       </div>
                     </div>
@@ -3892,86 +4348,322 @@ export default function App() {
 
         {activeTab === "provider" && (
           <div
-            style={{ display: "flex", flexDirection: "column", gap: "20px" }}
+            style={{ display: "flex", flexDirection: "column", gap: "30px" }}
           >
+            {/* 💰 1. لوحة المؤشرات المالية للمزود 💰 */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
+                gap: "20px",
+              }}
+            >
+              {/* بطاقة إجمالي الأرباح */}
+              <div
+                style={{
+                  background:
+                    "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                  padding: "25px",
+                  borderRadius: "20px",
+                  color: "white",
+                  boxShadow: "0 10px 25px rgba(16, 185, 129, 0.2)",
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "center",
+                  transition: "0.3s",
+                }}
+                onMouseOver={(e) =>
+                  (e.currentTarget.style.transform = "translateY(-5px)")
+                }
+                onMouseOut={(e) =>
+                  (e.currentTarget.style.transform = "translateY(0)")
+                }
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "10px",
+                    marginBottom: "10px",
+                    opacity: 0.9,
+                  }}
+                >
+                  <span style={{ fontSize: "1.6rem" }}>💰</span>
+                  <h3
+                    style={{
+                      margin: 0,
+                      fontSize: "1.1rem",
+                      fontWeight: "bold",
+                    }}
+                  >
+                    صافي الأرباح المحققة
+                  </h3>
+                </div>
+                <div
+                  style={{
+                    fontSize: "2.2rem",
+                    fontWeight: "900",
+                    direction: "ltr",
+                    textAlign: "right",
+                    textShadow: "0 2px 4px rgba(0,0,0,0.1)",
+                  }}
+                >
+                  {sumByCurrency(
+                    providerBookings.filter((b) => b.status === "completed"),
+                    commissionRate,
+                    "providerNet",
+                  )}
+                </div>
+              </div>
+
+              {/* بطاقة الطلبات المنفذة */}
+              <div
+                style={{
+                  background: "#fff",
+                  padding: "25px",
+                  borderRadius: "20px",
+                  border: "1px solid #e2e8f0",
+                  boxShadow: "0 4px 15px rgba(0,0,0,0.03)",
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "center",
+                  transition: "0.3s",
+                }}
+                onMouseOver={(e) =>
+                  (e.currentTarget.style.transform = "translateY(-5px)")
+                }
+                onMouseOut={(e) =>
+                  (e.currentTarget.style.transform = "translateY(0)")
+                }
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "10px",
+                    marginBottom: "10px",
+                    color: "#64748b",
+                  }}
+                >
+                  <span style={{ fontSize: "1.6rem" }}>✅</span>
+                  <h3
+                    style={{
+                      margin: 0,
+                      fontSize: "1.1rem",
+                      fontWeight: "bold",
+                    }}
+                  >
+                    الخدمات المنفذة
+                  </h3>
+                </div>
+                <div
+                  style={{
+                    fontSize: "2.2rem",
+                    fontWeight: "900",
+                    color: "#1e293b",
+                    textAlign: "left",
+                  }}
+                >
+                  {
+                    providerBookings.filter((b) => b.status === "completed")
+                      .length
+                  }{" "}
+                  <span style={{ fontSize: "1.1rem", color: "#94a3b8" }}>
+                    خدمة
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* 🔴 2. العمولات المستحقة للمنصة (بتصميم ملموم وأنيق) */}
             {myUnpaidCommissionText !== "0.00" && (
               <div
                 style={{
                   backgroundColor: "#fef2f2",
-                  border: "1px solid #ef4444",
-                  padding: "20px",
-                  borderRadius: "15px",
+                  border: "1px solid #fca5a5",
+                  padding: "20px 25px",
+                  borderRadius: "16px",
                   display: "flex",
                   justifyContent: "space-between",
                   alignItems: "center",
                   flexWrap: "wrap",
-                  gap: "10px",
+                  gap: "15px",
+                  boxShadow: "0 4px 15px rgba(239, 68, 68, 0.05)",
                 }}
               >
-                <div>
-                  <h3
-                    style={{ margin: 0, color: "#ef4444", fontSize: "1.1rem" }}
-                  >
-                    العمولات المستحقة للمنصة
-                  </h3>
-                  <p
-                    style={{
-                      margin: "5px 0 0 0",
-                      color: "#7f1d1d",
-                      fontWeight: "bold",
-                      fontSize: "1.3rem",
-                      direction: "ltr",
-                    }}
-                  >
-                    {myUnpaidCommissionText}
-                  </p>
+                <div
+                  style={{ display: "flex", alignItems: "center", gap: "15px" }}
+                >
+                  <span style={{ fontSize: "2rem" }}>🔔</span>
+                  <div>
+                    <h3
+                      style={{
+                        margin: 0,
+                        color: "#ef4444",
+                        fontSize: "1.1rem",
+                        fontWeight: "900",
+                      }}
+                    >
+                      العمولات المستحقة للمنصة
+                    </h3>
+                    <p
+                      style={{
+                        margin: "5px 0 0 0",
+                        color: "#7f1d1d",
+                        fontWeight: "bold",
+                        fontSize: "1.1rem",
+                        direction: "ltr",
+                        textAlign: "right",
+                      }}
+                    >
+                      {myUnpaidCommissionText}
+                    </p>
+                  </div>
                 </div>
                 <button
                   onClick={() => setShowPaymentModal(true)}
                   style={{
-                    ...admBtn("#ef4444"),
-                    padding: "12px 20px",
+                    backgroundColor: "#ef4444",
+                    color: "white",
+                    border: "none",
+                    borderRadius: "12px",
+                    fontWeight: "bold",
+                    cursor: "pointer",
+                    padding: "12px 25px",
                     fontSize: "1rem",
+                    transition: "0.2s",
+                    boxShadow: "0 4px 10px rgba(239, 68, 68, 0.3)",
                   }}
+                  onMouseOver={(e) =>
+                    (e.currentTarget.style.transform = "scale(1.05)")
+                  }
+                  onMouseOut={(e) =>
+                    (e.currentTarget.style.transform = "scale(1)")
+                  }
                 >
                   💳 سداد العمولات
                 </button>
               </div>
             )}
 
-            <section style={cardS}>
-              <h2
+            {/* 💼 3. حجوزات خدماتي كمزود (تم رفعها للأعلى لتناسب السياق) */}
+            <section
+              style={{
+                ...cardS,
+                padding: "25px",
+                border: "none",
+                boxShadow: "0 4px 20px rgba(0,0,0,0.03)",
+              }}
+            >
+              <div
                 style={{
-                  fontSize: "1rem",
-                  textAlign: i18n.language === "ar" ? "right" : "left",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "12px",
+                  backgroundColor: "#f8fafc",
+                  padding: "15px 20px",
+                  borderRadius: "15px",
+                  borderRight:
+                    i18n.language === "ar" ? "5px solid #7c3aed" : "none",
+                  borderLeft:
+                    i18n.language === "en" ? "5px solid #7c3aed" : "none",
+                  marginBottom: "30px",
+                  border: "1px solid #e2e8f0",
                 }}
               >
-                طلباتي كعميل
-              </h2>
+                <span style={{ fontSize: "1.8rem" }}>💼</span>
+                <div>
+                  <h2
+                    style={{
+                      fontSize: "1.3rem",
+                      margin: 0,
+                      color: "#1e293b",
+                      fontWeight: "900",
+                    }}
+                  >
+                    حجوزات خدماتي كمزود
+                  </h2>
+                  <p
+                    style={{
+                      margin: "5px 0 0 0",
+                      color: "#64748b",
+                      fontSize: "0.85rem",
+                    }}
+                  >
+                    إدارة الطلبات التي وردت لخدماتك
+                  </p>
+                </div>
+              </div>
+
               {[
                 "pending",
-                "negotiating",
-                "confirmed",
-                "completed",
-                "cancelled",
-              ].map((s) => renderTable(clientBookings, s, false))}
-            </section>
-            <section style={cardS}>
-              <h2
-                style={{
-                  fontSize: "1rem",
-                  textAlign: i18n.language === "ar" ? "right" : "left",
-                }}
-              >
-                حجوزات خدماتي كمزود
-              </h2>
-              {[
-                "pending",
+                "awaiting_pricing",
+                "awaiting_client_approval",
                 "negotiating",
                 "confirmed",
                 "completed",
                 "cancelled",
               ].map((s) => renderTable(providerBookings, s, true))}
+            </section>
+
+            {/* 🛍️ 4. طلباتي كعميل (تم إنزالها للأسفل) */}
+            <section
+              style={{
+                ...cardS,
+                padding: "25px",
+                border: "none",
+                boxShadow: "0 4px 20px rgba(0,0,0,0.03)",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "12px",
+                  backgroundColor: "#f8fafc",
+                  padding: "15px 20px",
+                  borderRadius: "15px",
+                  borderRight:
+                    i18n.language === "ar" ? "5px solid #059669" : "none",
+                  borderLeft:
+                    i18n.language === "en" ? "5px solid #059669" : "none",
+                  marginBottom: "30px",
+                  border: "1px solid #e2e8f0",
+                }}
+              >
+                <span style={{ fontSize: "1.8rem" }}>🛍️</span>
+                <div>
+                  <h2
+                    style={{
+                      fontSize: "1.3rem",
+                      margin: 0,
+                      color: "#1e293b",
+                      fontWeight: "900",
+                    }}
+                  >
+                    طلباتي كعميل
+                  </h2>
+                  <p
+                    style={{
+                      margin: "5px 0 0 0",
+                      color: "#64748b",
+                      fontSize: "0.85rem",
+                    }}
+                  >
+                    الخدمات التي قمت بطلبها من مزودين آخرين
+                  </p>
+                </div>
+              </div>
+
+              {[
+                "pending",
+                "awaiting_pricing",
+                "awaiting_client_approval",
+                "negotiating",
+                "confirmed",
+                "completed",
+                "cancelled",
+              ].map((s) => renderTable(clientBookings, s, false))}
             </section>
           </div>
         )}

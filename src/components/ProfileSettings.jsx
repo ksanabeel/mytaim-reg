@@ -9,6 +9,9 @@ export default function ProfileSettings({ session, onUpdate }) {
   const [maxCapacity, setMaxCapacity] = useState(1);
   const [phone, setPhone] = useState("");
 
+  // ✨ اللون المخصص لهوية المزود ✨
+  const [themeColor, setThemeColor] = useState("#7c3aed");
+
   // 📱 روابط السوشيال ميديا
   const [instagramUrl, setInstagramUrl] = useState("");
   const [youtubeUrl, setYoutubeUrl] = useState("");
@@ -33,6 +36,22 @@ export default function ProfileSettings({ session, onUpdate }) {
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef(null);
 
+  // 🎨 قائمة الألوان المتاحة للمزودين (موسعة)
+  const availableColors = [
+    "#7c3aed", // بنفسجي (الافتراضي)
+    "#2563eb", // أزرق أساسي
+    "#0ea5e9", // أزرق سماوي (Cyan)
+    "#059669", // أخضر زمردي
+    "#84cc16", // أخضر ليموني (Lime)
+    "#eab308", // أصفر مشرق 💛
+    "#f97316", // برتقالي (Orange)
+    "#dc2626", // أحمر
+    "#db2777", // وردي
+    "#d946ef", // فوشيا
+    "#57534e", // بني/رمادي دافئ (Stone)
+    "#1e293b", // كحلي داكن/أسود
+  ];
+
   useEffect(() => {
     async function loadProfile() {
       const { data } = await supabase
@@ -43,6 +62,7 @@ export default function ProfileSettings({ session, onUpdate }) {
       if (data) {
         setFullName(data.full_name || "");
         setAvatarUrl(data.avatar_url || "");
+        setThemeColor(data.theme_color || "#7c3aed"); // جلب اللون
         setProviderType(data.provider_type || "individual");
         setMaxCapacity(data.max_concurrent_bookings || 1);
         setPhone(data.phone || "");
@@ -61,7 +81,6 @@ export default function ProfileSettings({ session, onUpdate }) {
         setAdminNote(data.admin_note || "");
         setProviderNote(data.provider_note || "");
 
-        // استرجاع بيانات التوثيق
         setNationalId(data.national_id || "");
         setBankIban(data.bank_iban || "");
         setVerificationStatus(data.verification_status || "unverified");
@@ -106,7 +125,6 @@ export default function ProfileSettings({ session, onUpdate }) {
     else alert("خطأ في إرسال الرد: " + error.message);
   };
 
-  // 🛡️ دالة إرسال طلب التوثيق للإدارة
   const handleVerificationRequest = async () => {
     if (!nationalId || !bankIban)
       return alert("الرجاء إدخال رقم الهوية ورقم الآيبان البنكي لتقديم الطلب.");
@@ -122,7 +140,7 @@ export default function ProfileSettings({ session, onUpdate }) {
         .update({
           national_id: nationalId,
           bank_iban: bankIban,
-          verification_status: "pending", // تغيير الحالة إلى "قيد المراجعة"
+          verification_status: "pending",
         })
         .eq("id", session.user.id);
 
@@ -145,6 +163,7 @@ export default function ProfileSettings({ session, onUpdate }) {
       .update({
         full_name: fullName,
         avatar_url: avatarUrl,
+        theme_color: themeColor, // حفظ اللون
         provider_type: providerType,
         max_concurrent_bookings:
           providerType === "individual" ? 1 : Number(maxCapacity),
@@ -177,7 +196,7 @@ export default function ProfileSettings({ session, onUpdate }) {
       </div>
     );
 
-  const defaultAvatar = `https://ui-avatars.com/api/?name=${fullName || "User"}&background=7c3aed&color=fff&size=100`;
+  const defaultAvatar = `https://ui-avatars.com/api/?name=${fullName || "User"}&background=${themeColor.replace("#", "")}&color=fff&size=100`;
 
   return (
     <div
@@ -186,47 +205,79 @@ export default function ProfileSettings({ session, onUpdate }) {
         padding: "30px",
         borderRadius: "20px",
         border: "1px solid #f1f5f9",
-        maxWidth: "700px",
+        maxWidth: "800px",
         margin: "0 auto",
         direction: "rtl",
       }}
     >
       <h2
         style={{
-          color: "#7c3aed",
-          marginBottom: "20px",
-          borderBottom: "2px solid #f1f5f9",
-          paddingBottom: "10px",
+          color: "#1e293b",
+          marginBottom: "30px",
+          display: "flex",
+          alignItems: "center",
+          gap: "10px",
+          fontSize: "1.5rem",
+          fontWeight: "900",
         }}
       >
-        👤 إعدادات الحساب الشخصي
+        <span style={{ fontSize: "2rem" }}>👤</span> إعدادات الحساب الشخصي
       </h2>
 
+      {/* ✨ بطاقة الهوية الذكية وتخصيص اللون ✨ */}
       <div
         style={{
           display: "flex",
+          flexDirection: "column",
           alignItems: "center",
-          gap: "20px",
-          marginBottom: "25px",
+          marginBottom: "30px",
           backgroundColor: "#f8fafc",
-          padding: "20px",
-          borderRadius: "15px",
-          border: "1px dashed #cbd5e1",
+          padding: "30px",
+          borderRadius: "20px",
+          border: `2px solid ${themeColor}30`, // ظل إطار خفيف بناءً على اللون المختار
+          boxShadow: `0 4px 20px ${themeColor}15`,
+          transition: "all 0.3s ease",
         }}
       >
-        <img
-          src={avatarUrl || defaultAvatar}
-          alt="Avatar"
-          style={{
-            width: "85px",
-            height: "85px",
-            borderRadius: "50%",
-            objectFit: "cover",
-            border: "3px solid #7c3aed",
-          }}
-        />
-        <div style={{ flex: 1 }}>
-          <label style={lblS}>الصورة الشخصية:</label>
+        <div style={{ position: "relative", marginBottom: "15px" }}>
+          <img
+            src={avatarUrl || defaultAvatar}
+            alt="Avatar"
+            style={{
+              width: "120px",
+              height: "120px",
+              borderRadius: "50%",
+              objectFit: "cover",
+              border: `4px solid ${themeColor}`, // يتغير لون الإطار حسب اللون المختار
+              boxShadow: "0 4px 10px rgba(0,0,0,0.1)",
+              transition: "all 0.3s ease",
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => fileInputRef.current.click()}
+            disabled={isUploading}
+            style={{
+              position: "absolute",
+              bottom: "0",
+              right: "0",
+              backgroundColor: themeColor,
+              color: "#fff",
+              border: "none",
+              borderRadius: "50%",
+              width: "35px",
+              height: "35px",
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              cursor: isUploading ? "not-allowed" : "pointer",
+              boxShadow: "0 2px 5px rgba(0,0,0,0.2)",
+              transition: "all 0.3s ease",
+            }}
+            title="تغيير الصورة"
+          >
+            {isUploading ? "⏳" : "📷"}
+          </button>
           <input
             type="file"
             accept="image/*"
@@ -235,29 +286,90 @@ export default function ProfileSettings({ session, onUpdate }) {
             ref={fileInputRef}
             style={{ display: "none" }}
           />
-          <button
-            type="button"
-            onClick={() => fileInputRef.current.click()}
-            disabled={isUploading}
-            style={uploadBtn(isUploading)}
+        </div>
+        <h3
+          style={{
+            margin: "0 0 5px 0",
+            color: "#1e293b",
+            fontSize: "1.2rem",
+            fontWeight: "900",
+          }}
+        >
+          {fullName || "بدون اسم"}
+        </h3>
+        <p
+          style={{ margin: "0 0 20px 0", color: "#64748b", fontSize: "0.9rem" }}
+        >
+          {providerType === "institution" ? "مؤسسة / شركة" : "فرد (مستقل)"}
+        </p>
+
+        {/* 🎨 شريط اختيار لون الهوية */}
+        <div
+          style={{
+            width: "100%",
+            borderTop: "1px dashed #cbd5e1",
+            paddingTop: "20px",
+            textAlign: "center",
+          }}
+        >
+          <h4
+            style={{
+              margin: "0 0 15px 0",
+              color: "#475569",
+              fontSize: "0.95rem",
+            }}
           >
-            {isUploading ? "⏳ جاري الرفع..." : "📂 اختر صورة من الجهاز"}
-          </button>
+            🎨 اختر لون هويتك (سيظهر للعملاء في خدماتك)
+          </h4>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "center",
+              gap: "12px",
+              flexWrap: "wrap",
+            }}
+          >
+            {availableColors.map((color) => (
+              <button
+                key={color}
+                type="button"
+                onClick={() => setThemeColor(color)}
+                style={{
+                  width: "35px",
+                  height: "35px",
+                  borderRadius: "50%",
+                  backgroundColor: color,
+                  border: themeColor === color ? `3px solid #fff` : "none",
+                  boxShadow:
+                    themeColor === color
+                      ? `0 0 0 3px ${color}`
+                      : "0 2px 5px rgba(0,0,0,0.1)",
+                  cursor: "pointer",
+                  transition: "all 0.2s ease",
+                  transform: themeColor === color ? "scale(1.15)" : "scale(1)",
+                }}
+                title={color}
+              />
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* 🛡️ قسم التوثيق الجديد (محفز وجذاب) 🛡️ */}
+      {/* 🛡️ قسم التوثيق الذكي 🛡️ */}
       <div
         style={{
-          backgroundColor:
-            verificationStatus === "verified" ? "#ecfdf5" : "#fffbeb",
-          padding: "20px",
-          borderRadius: "15px",
+          background:
+            verificationStatus === "verified"
+              ? "linear-gradient(135deg, #ecfdf5, #d1fae5)"
+              : "linear-gradient(135deg, #f0f9ff, #e0f2fe)",
+          padding: "25px",
+          borderRadius: "20px",
           border:
             verificationStatus === "verified"
-              ? "2px solid #10b981"
-              : "1px solid #fcd34d",
-          marginBottom: "25px",
+              ? "1px solid #10b981"
+              : "1px solid #3b82f6",
+          marginBottom: "30px",
+          boxShadow: "0 4px 15px rgba(0,0,0,0.03)",
         }}
       >
         <div
@@ -271,13 +383,16 @@ export default function ProfileSettings({ session, onUpdate }) {
           <h3
             style={{
               margin: 0,
-              color: verificationStatus === "verified" ? "#059669" : "#d97706",
+              color: verificationStatus === "verified" ? "#065f46" : "#1e40af",
               display: "flex",
               alignItems: "center",
-              gap: "5px",
+              gap: "8px",
+              fontWeight: "900",
+              fontSize: "1.2rem",
             }}
           >
-            🛡️ توثيق الحساب (Nafath)
+            <span style={{ fontSize: "1.5rem" }}>🛡️</span> التوثيق المالي
+            (Nafath)
           </h3>
           {/* شارات الحالة */}
           {verificationStatus === "verified" && (
@@ -285,13 +400,14 @@ export default function ProfileSettings({ session, onUpdate }) {
               style={{
                 backgroundColor: "#10b981",
                 color: "#fff",
-                padding: "4px 10px",
-                borderRadius: "8px",
-                fontSize: "0.75rem",
+                padding: "6px 12px",
+                borderRadius: "10px",
+                fontSize: "0.8rem",
                 fontWeight: "bold",
+                boxShadow: "0 2px 5px rgba(16,185,129,0.3)",
               }}
             >
-              ✅ حساب موثق
+              ✅ موثق رسمياً
             </span>
           )}
           {verificationStatus === "pending" && (
@@ -299,13 +415,14 @@ export default function ProfileSettings({ session, onUpdate }) {
               style={{
                 backgroundColor: "#f59e0b",
                 color: "#fff",
-                padding: "4px 10px",
-                borderRadius: "8px",
-                fontSize: "0.75rem",
+                padding: "6px 12px",
+                borderRadius: "10px",
+                fontSize: "0.8rem",
                 fontWeight: "bold",
+                boxShadow: "0 2px 5px rgba(245,158,11,0.3)",
               }}
             >
-              ⏳ قيد المراجعة الإدارية
+              ⏳ قيد المراجعة
             </span>
           )}
           {verificationStatus === "rejected" && (
@@ -313,13 +430,14 @@ export default function ProfileSettings({ session, onUpdate }) {
               style={{
                 backgroundColor: "#ef4444",
                 color: "#fff",
-                padding: "4px 10px",
-                borderRadius: "8px",
-                fontSize: "0.75rem",
+                padding: "6px 12px",
+                borderRadius: "10px",
+                fontSize: "0.8rem",
                 fontWeight: "bold",
+                boxShadow: "0 2px 5px rgba(239,68,68,0.3)",
               }}
             >
-              ❌ مرفوض (راجع البيانات)
+              ❌ مرفوض
             </span>
           )}
           {verificationStatus === "unverified" && (
@@ -327,9 +445,9 @@ export default function ProfileSettings({ session, onUpdate }) {
               style={{
                 backgroundColor: "#94a3b8",
                 color: "#fff",
-                padding: "4px 10px",
-                borderRadius: "8px",
-                fontSize: "0.75rem",
+                padding: "6px 12px",
+                borderRadius: "10px",
+                fontSize: "0.8rem",
                 fontWeight: "bold",
               }}
             >
@@ -341,97 +459,111 @@ export default function ProfileSettings({ session, onUpdate }) {
         {verificationStatus === "verified" ? (
           <p
             style={{
-              fontSize: "0.85rem",
+              fontSize: "0.9rem",
               color: "#065f46",
               margin: 0,
               fontWeight: "bold",
+              lineHeight: "1.6",
             }}
           >
-            تهانينا! حسابك موثق رسمياً. ستظهر علامة التوثيق الخضراء للعملاء
-            بجانب اسمك مما يزيد من المبيعات والثقة.
+            تهانينا! حسابك موثق ومؤهل لاستقبال الحوالات المالية. ستظهر شارة
+            التوثيق في صفحتك لزيادة ثقة العملاء.
           </p>
         ) : (
           <div>
             <p
               style={{
-                fontSize: "0.8rem",
-                color: "#92400e",
-                marginBottom: "15px",
-                lineHeight: "1.5",
+                fontSize: "0.85rem",
+                color: "#1e40af",
+                marginBottom: "20px",
+                lineHeight: "1.6",
+                fontWeight: "bold",
               }}
             >
-              احصل على شارة التوثيق الخضراء لزيادة ثقة العملاء بك ومضاعفة
-              حجوزاتك! 🚀
-              <br />
-              يرجى إدخال بياناتك الرسمية لمطابقتها من قبل الإدارة. (هذه البيانات
-              سرية ولن تظهر للعامة).
+              ارفع مستوى ثقة عملائك! أكمل بيانات التوثيق لضمان سلاسة التحويلات
+              المالية عند تنفيذ الخدمات. (البيانات مشفرة وآمنة تماماً).
             </p>
             <div
-              style={{ display: "flex", gap: "10px", flexDirection: "column" }}
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+                gap: "15px",
+                marginBottom: verificationStatus !== "pending" ? "15px" : "0",
+              }}
             >
-              <div style={{ display: "flex", gap: "10px" }}>
-                <div style={{ flex: 1 }}>
-                  <label style={{ ...lblS, color: "#92400e" }}>
-                    رقم الهوية الوطنية / الإقامة:
-                  </label>
-                  <input
-                    type="text"
-                    style={inpS}
-                    value={nationalId}
-                    onChange={(e) => setNationalId(e.target.value)}
-                    disabled={verificationStatus === "pending"}
-                    placeholder="مثال: 10xxxxxxxxx"
-                  />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <label style={{ ...lblS, color: "#92400e" }}>
-                    رقم الحساب البنكي (IBAN):
-                  </label>
-                  <input
-                    type="text"
-                    dir="ltr"
-                    style={{ ...inpS, textAlign: "left" }}
-                    value={bankIban}
-                    onChange={(e) => setBankIban(e.target.value)}
-                    disabled={verificationStatus === "pending"}
-                    placeholder="SAxxxxxxxxxxxxxxxxxxxxxx"
-                  />
-                </div>
-              </div>
-              {verificationStatus !== "pending" && (
-                <button
-                  type="button"
-                  onClick={handleVerificationRequest}
-                  disabled={isSubmitting}
+              <div>
+                <label style={{ ...lblS, color: "#1e40af" }}>
+                  رقم الهوية الوطنية / الإقامة:
+                </label>
+                <input
+                  type="text"
                   style={{
-                    backgroundColor: "#d97706",
-                    color: "#fff",
-                    border: "none",
-                    padding: "10px",
-                    borderRadius: "8px",
-                    fontWeight: "bold",
-                    cursor: "pointer",
-                    marginTop: "5px",
+                    ...inpS,
+                    borderColor: "#bfdbfe",
+                    backgroundColor: "#fff",
                   }}
-                >
-                  {isSubmitting
-                    ? "⏳ جاري الإرسال..."
-                    : "إرسال طلب التوثيق الآن 🚀"}
-                </button>
-              )}
+                  value={nationalId}
+                  onChange={(e) => setNationalId(e.target.value)}
+                  disabled={verificationStatus === "pending"}
+                  placeholder="مثال: 10xxxxxxxxx"
+                />
+              </div>
+              <div>
+                <label style={{ ...lblS, color: "#1e40af" }}>
+                  رقم الحساب البنكي (IBAN):
+                </label>
+                <input
+                  type="text"
+                  dir="ltr"
+                  style={{
+                    ...inpS,
+                    textAlign: "left",
+                    borderColor: "#bfdbfe",
+                    backgroundColor: "#fff",
+                  }}
+                  value={bankIban}
+                  onChange={(e) => setBankIban(e.target.value)}
+                  disabled={verificationStatus === "pending"}
+                  placeholder="SAxxxxxxxxxxxxxxxxxxxxxx"
+                />
+              </div>
             </div>
+            {verificationStatus !== "pending" && (
+              <button
+                type="button"
+                onClick={handleVerificationRequest}
+                disabled={isSubmitting}
+                style={{
+                  backgroundColor: "#2563eb",
+                  color: "#fff",
+                  border: "none",
+                  padding: "12px 20px",
+                  borderRadius: "10px",
+                  fontWeight: "900",
+                  cursor: "pointer",
+                  fontSize: "0.9rem",
+                  boxShadow: "0 4px 10px rgba(37,99,235,0.3)",
+                  transition: "0.2s",
+                }}
+              >
+                {isSubmitting
+                  ? "⏳ جاري الإرسال..."
+                  : "إرسال طلب التوثيق الآن 🚀"}
+              </button>
+            )}
           </div>
         )}
       </div>
 
       <form
         onSubmit={handleUpdate}
-        style={{ display: "flex", flexDirection: "column", gap: "20px" }}
+        style={{ display: "flex", flexDirection: "column", gap: "25px" }}
       >
+        {/* 📩 قسم الرسائل الإدارية */}
         <div
           style={{
             ...sectionS,
-            borderColor: adminNote ? "#ef4444" : "#e2e8f0",
+            borderColor: adminNote ? "#fca5a5" : "#e2e8f0",
             backgroundColor: adminNote ? "#fef2f2" : "#f8fafc",
           }}
         >
@@ -443,20 +575,28 @@ export default function ProfileSettings({ session, onUpdate }) {
               style={{
                 backgroundColor: "#fff",
                 padding: "15px",
-                borderRadius: "10px",
+                borderRadius: "12px",
                 border: "1px solid #fecaca",
                 marginBottom: "15px",
               }}
             >
-              <strong style={{ color: "#dc2626", fontSize: "0.85rem" }}>
+              <strong
+                style={{
+                  color: "#dc2626",
+                  fontSize: "0.85rem",
+                  display: "block",
+                  marginBottom: "5px",
+                }}
+              >
                 رسالة من الإدارة:
               </strong>
               <p
                 style={{
-                  margin: "5px 0 0 0",
-                  fontSize: "0.9rem",
+                  margin: 0,
+                  fontSize: "0.95rem",
                   color: "#7f1d1d",
                   fontWeight: "bold",
+                  lineHeight: "1.5",
                 }}
               >
                 {adminNote}
@@ -466,7 +606,12 @@ export default function ProfileSettings({ session, onUpdate }) {
           <div>
             <label style={lblS}>ردك / رسالتك للإدارة (اختياري):</label>
             <textarea
-              style={{ ...inpS, height: "60px", marginBottom: "10px" }}
+              style={{
+                ...inpS,
+                height: "80px",
+                marginBottom: "10px",
+                resize: "vertical",
+              }}
               value={providerNote}
               onChange={(e) => setProviderNote(e.target.value)}
               placeholder="اكتب ملاحظاتك أو ردك للإدارة هنا..."
@@ -480,10 +625,11 @@ export default function ProfileSettings({ session, onUpdate }) {
                 backgroundColor: "#3b82f6",
                 color: "#fff",
                 border: "none",
-                padding: "10px",
-                borderRadius: "8px",
-                fontWeight: "bold",
+                padding: "12px",
+                borderRadius: "10px",
+                fontWeight: "900",
                 cursor: "pointer",
+                transition: "0.2s",
               }}
             >
               {isSubmitting ? "⏳ جاري الإرسال..." : "📤 إرسال الرد للإدارة"}
@@ -491,10 +637,17 @@ export default function ProfileSettings({ session, onUpdate }) {
           </div>
         </div>
 
+        {/* 📝 البيانات الأساسية */}
         <div style={sectionS}>
           <h3 style={secTitle}>البيانات الأساسية والتواصل</h3>
-          <div style={{ display: "flex", gap: "10px" }}>
-            <div style={{ flex: 2 }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
+              gap: "15px",
+            }}
+          >
+            <div>
               <label style={lblS}>الاسم الكامل:</label>
               <input
                 type="text"
@@ -502,9 +655,10 @@ export default function ProfileSettings({ session, onUpdate }) {
                 style={inpS}
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
+                placeholder="الاسم ثلاثي أو اسم المؤسسة"
               />
             </div>
-            <div style={{ flex: 1 }}>
+            <div>
               <label style={lblS}>رقم الجوال:</label>
               <input
                 type="tel"
@@ -516,11 +670,13 @@ export default function ProfileSettings({ session, onUpdate }) {
               />
             </div>
           </div>
+
           <h4
             style={{
-              margin: "15px 0 10px 0",
-              fontSize: "0.9rem",
+              margin: "20px 0 10px 0",
+              fontSize: "0.95rem",
               color: "#3b82f6",
+              fontWeight: "900",
             }}
           >
             روابط السوشيال ميديا (اختياري):
@@ -528,8 +684,8 @@ export default function ProfileSettings({ session, onUpdate }) {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: "10px",
+              gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+              gap: "15px",
             }}
           >
             <div>
@@ -579,129 +735,167 @@ export default function ProfileSettings({ session, onUpdate }) {
           </div>
         </div>
 
-        <div style={sectionS}>
-          <h3 style={secTitle}>الوثائق الرسمية والضرائب (اختياري)</h3>
-          <div style={{ display: "flex", gap: "10px" }}>
-            <div style={{ flex: 1 }}>
-              <label style={lblS}>الرقم الضريبي (يظهر بالفواتير):</label>
-              <input
-                type="text"
-                style={inpS}
-                value={taxNumber}
-                onChange={(e) => setTaxNumber(e.target.value)}
-                placeholder="مثال: 300012345600003"
-              />
-            </div>
-            <div style={{ flex: 1 }}>
-              <label style={lblS}>رقم الترخيص / وثيقة العمل الحر:</label>
-              <input
-                type="text"
-                style={inpS}
-                value={licenseInfo}
-                onChange={(e) => setLicenseInfo(e.target.value)}
-                placeholder="رقم الترخيص يظهر للعملاء.."
-              />
-            </div>
-          </div>
-        </div>
-
-        <div style={sectionS}>
-          <h3 style={secTitle}>نوع الحساب والسعة</h3>
-          <div>
-            <label style={lblS}>النوع:</label>
-            <select
-              style={inpS}
-              value={providerType}
-              onChange={(e) => setProviderType(e.target.value)}
-            >
-              <option value="individual">👤 فرد (مستقل)</option>
-              <option value="institution">
-                🏢 مؤسسة / شركة (حجوزات متزامنة)
-              </option>
-            </select>
-          </div>
-          {providerType === "institution" && (
-            <div
-              style={{
-                marginTop: "10px",
-                backgroundColor: "#ecfdf5",
-                padding: "15px",
-                borderRadius: "10px",
-                border: "1px dashed #10b981",
-              }}
-            >
-              <label style={lblS}>السعة المتزامنة:</label>
-              <input
-                type="number"
-                min="1"
-                required
-                style={inpS}
-                value={maxCapacity}
-                onChange={(e) => setMaxCapacity(e.target.value)}
-              />
-            </div>
-          )}
-        </div>
-
-        <button
-          type="submit"
-          disabled={isSubmitting || isUploading}
+        {/* 📜 الوثائق الرسمية والنوع */}
+        <div
           style={{
-            width: "100%",
-            backgroundColor:
-              isSubmitting || isUploading ? "#94a3b8" : "#10b981",
-            color: "white",
-            border: "none",
-            padding: "15px",
-            borderRadius: "12px",
-            fontWeight: "bold",
-            fontSize: "1rem",
-            cursor: isSubmitting || isUploading ? "not-allowed" : "pointer",
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+            gap: "25px",
           }}
         >
-          {isSubmitting ? "⏳ جاري الحفظ..." : "حفظ التعديلات الشاملة ✅"}
-        </button>
+          <div style={sectionS}>
+            <h3 style={secTitle}>نوع الحساب</h3>
+            <div style={{ marginBottom: "15px" }}>
+              <label style={lblS}>تصنيف الحساب:</label>
+              <select
+                style={{ ...inpS, cursor: "pointer" }}
+                value={providerType}
+                onChange={(e) => setProviderType(e.target.value)}
+              >
+                <option value="individual">👤 فرد (مستقل)</option>
+                <option value="institution">🏢 مؤسسة / شركة</option>
+              </select>
+            </div>
+            {providerType === "institution" && (
+              <div
+                style={{
+                  backgroundColor: "#eff6ff",
+                  padding: "15px",
+                  borderRadius: "12px",
+                  border: "1px dashed #3b82f6",
+                }}
+              >
+                <label style={{ ...lblS, color: "#1e40af" }}>
+                  الطاقة الاستيعابية (حجوزات متزامنة):
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  required
+                  style={{ ...inpS, borderColor: "#bfdbfe" }}
+                  value={maxCapacity}
+                  onChange={(e) => setMaxCapacity(e.target.value)}
+                />
+                <p
+                  style={{
+                    margin: "5px 0 0 0",
+                    fontSize: "0.75rem",
+                    color: "#64748b",
+                  }}
+                >
+                  * لتتمكن من استقبال أكثر من حجز في نفس الوقت.
+                </p>
+              </div>
+            )}
+          </div>
+
+          <div style={sectionS}>
+            <h3 style={secTitle}>الضرائب والتراخيص</h3>
+            <div
+              style={{ display: "flex", flexDirection: "column", gap: "15px" }}
+            >
+              <div>
+                <label style={lblS}>الرقم الضريبي (إن وجد):</label>
+                <input
+                  type="text"
+                  style={inpS}
+                  value={taxNumber}
+                  onChange={(e) => setTaxNumber(e.target.value)}
+                  placeholder="مثال: 300012345600003"
+                />
+              </div>
+              <div>
+                <label style={lblS}>رقم الترخيص / وثيقة العمل الحر:</label>
+                <input
+                  type="text"
+                  style={inpS}
+                  value={licenseInfo}
+                  onChange={(e) => setLicenseInfo(e.target.value)}
+                  placeholder="سيظهر للعملاء لزيادة الثقة.."
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* زر الحفظ العائم (يتغير لونه ليتناسب مع لون المزود!) */}
+        <div
+          style={{
+            position: "sticky",
+            bottom: "20px",
+            zIndex: 1000,
+            backgroundColor: "rgba(255,255,255,0.9)",
+            backdropFilter: "blur(10px)",
+            padding: "15px",
+            borderRadius: "20px",
+            border: "1px solid #e2e8f0",
+            boxShadow: "0 -4px 20px rgba(0,0,0,0.05)",
+          }}
+        >
+          <button
+            type="submit"
+            disabled={isSubmitting || isUploading}
+            style={{
+              width: "100%",
+              backgroundColor:
+                isSubmitting || isUploading ? "#94a3b8" : themeColor, // يتغير مع اختيار المزود
+              color: "white",
+              border: "none",
+              padding: "16px",
+              borderRadius: "14px",
+              fontWeight: "900",
+              fontSize: "1.1rem",
+              cursor: isSubmitting || isUploading ? "not-allowed" : "pointer",
+              transition: "0.3s",
+              boxShadow:
+                isSubmitting || isUploading
+                  ? "none"
+                  : `0 4px 15px ${themeColor}50`,
+            }}
+          >
+            {isSubmitting
+              ? "⏳ جاري الحفظ والتحديث..."
+              : "حفظ التعديلات الشاملة ✅"}
+          </button>
+        </div>
       </form>
     </div>
   );
 }
 
+// ✨ التنسيقات العصرية ✨
 const sectionS = {
-  backgroundColor: "#f8fafc",
-  padding: "20px",
-  borderRadius: "15px",
+  backgroundColor: "#fff",
+  padding: "25px",
+  borderRadius: "20px",
   border: "1px solid #e2e8f0",
+  boxShadow: "0 4px 15px rgba(0,0,0,0.02)",
+  flex: 1,
 };
 const secTitle = {
-  margin: "0 0 15px 0",
-  fontSize: "1rem",
+  margin: "0 0 20px 0",
+  fontSize: "1.1rem",
   color: "#1e293b",
-  borderBottom: "2px solid #cbd5e1",
-  paddingBottom: "5px",
+  borderBottom: "2px solid #f1f5f9",
+  paddingBottom: "10px",
+  fontWeight: "900",
 };
 const lblS = {
   display: "block",
-  marginBottom: "5px",
+  marginBottom: "8px",
   fontWeight: "bold",
   fontSize: "0.85rem",
   color: "#475569",
 };
 const inpS = {
   width: "100%",
-  padding: "10px",
-  borderRadius: "10px",
+  padding: "12px 15px",
+  borderRadius: "12px",
   border: "1px solid #cbd5e1",
   outline: "none",
   boxSizing: "border-box",
   fontFamily: "inherit",
+  fontSize: "0.95rem",
+  transition: "all 0.2s ease",
+  backgroundColor: "#f8fafc",
 };
-const uploadBtn = (disabled) => ({
-  width: "100%",
-  backgroundColor: disabled ? "#cbd5e1" : "#3b82f6",
-  color: "white",
-  border: "none",
-  padding: "10px",
-  borderRadius: "8px",
-  fontWeight: "bold",
-  cursor: disabled ? "not-allowed" : "pointer",
-});
