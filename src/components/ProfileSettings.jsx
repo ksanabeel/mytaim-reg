@@ -9,10 +9,15 @@ export default function ProfileSettings({ session, onUpdate }) {
   const [maxCapacity, setMaxCapacity] = useState(1);
   const [phone, setPhone] = useState("");
 
-  // ✨ اللون المخصص لهوية المزود ✨
+  // ✨ المتغيرات الجديدة الخاصة باسم المستخدم والتسويق ✨
+  const [username, setUsername] = useState("");
+  const [originalUsername, setOriginalUsername] = useState(""); // لمعرفة اسم المستخدم الحالي وتجاهله في الفحص
+  const [usernameStatus, setUsernameStatus] = useState("idle"); // idle, checking, available, taken, invalid
+  const [marketingSource, setMarketingSource] = useState("");
+  const [referredBy, setReferredBy] = useState("");
+
   const [themeColor, setThemeColor] = useState("#7c3aed");
 
-  // 📱 روابط السوشيال ميديا
   const [instagramUrl, setInstagramUrl] = useState("");
   const [youtubeUrl, setYoutubeUrl] = useState("");
   const [twitterUrl, setTwitterUrl] = useState("");
@@ -27,7 +32,6 @@ export default function ProfileSettings({ session, onUpdate }) {
   const [adminNote, setAdminNote] = useState("");
   const [providerNote, setProviderNote] = useState("");
 
-  // 🛡️ حالات نظام التوثيق الجديد
   const [nationalId, setNationalId] = useState("");
   const [bankIban, setBankIban] = useState("");
   const [verificationStatus, setVerificationStatus] = useState("unverified");
@@ -36,20 +40,22 @@ export default function ProfileSettings({ session, onUpdate }) {
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef(null);
 
-  // 🎨 قائمة الألوان المتاحة للمزودين (موسعة)
+  // مؤقت للتحقق من اسم المستخدم (Debounce)
+  const typingTimeoutRef = useRef(null);
+
   const availableColors = [
-    "#7c3aed", // بنفسجي (الافتراضي)
-    "#2563eb", // أزرق أساسي
-    "#0ea5e9", // أزرق سماوي (Cyan)
-    "#059669", // أخضر زمردي
-    "#84cc16", // أخضر ليموني (Lime)
-    "#eab308", // أصفر مشرق 💛
-    "#f97316", // برتقالي (Orange)
-    "#dc2626", // أحمر
-    "#db2777", // وردي
-    "#d946ef", // فوشيا
-    "#57534e", // بني/رمادي دافئ (Stone)
-    "#1e293b", // كحلي داكن/أسود
+    "#7c3aed",
+    "#2563eb",
+    "#0ea5e9",
+    "#059669",
+    "#84cc16",
+    "#eab308",
+    "#f97316",
+    "#dc2626",
+    "#db2777",
+    "#d946ef",
+    "#57534e",
+    "#1e293b",
   ];
 
   useEffect(() => {
@@ -62,10 +68,16 @@ export default function ProfileSettings({ session, onUpdate }) {
       if (data) {
         setFullName(data.full_name || "");
         setAvatarUrl(data.avatar_url || "");
-        setThemeColor(data.theme_color || "#7c3aed"); // جلب اللون
+        setThemeColor(data.theme_color || "#7c3aed");
         setProviderType(data.provider_type || "individual");
         setMaxCapacity(data.max_concurrent_bookings || 1);
         setPhone(data.phone || "");
+
+        // تحميل بيانات التسويق واسم المستخدم
+        setUsername(data.username || "");
+        setOriginalUsername(data.username || "");
+        setMarketingSource(data.marketing_source || "");
+        setReferredBy(data.referred_by || "");
 
         setInstagramUrl(data.instagram_url || "");
         setYoutubeUrl(data.youtube_url || "");
@@ -89,6 +101,47 @@ export default function ProfileSettings({ session, onUpdate }) {
     }
     loadProfile();
   }, [session]);
+
+  // ✨ دالة التحقق من توفر اسم المستخدم (تعمل تلقائياً عند الكتابة) ✨
+  const handleUsernameChange = (e) => {
+    const val = e.target.value.toLowerCase().trim();
+    setUsername(val);
+
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+
+    if (!val) {
+      setUsernameStatus("idle");
+      return;
+    }
+
+    // التحقق من الصيغة (حروف إنجليزية وأرقام فقط بدون مسافات)
+    const isValidFormat = /^[a-z0-9_]+$/.test(val);
+    if (!isValidFormat) {
+      setUsernameStatus("invalid");
+      return;
+    }
+
+    // إذا كان هو نفس اسمه القديم، لا داعي للتحقق من قاعدة البيانات
+    if (val === originalUsername) {
+      setUsernameStatus("available");
+      return;
+    }
+
+    setUsernameStatus("checking");
+    typingTimeoutRef.current = setTimeout(async () => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("username", val)
+        .neq("id", session.user.id);
+
+      if (data && data.length > 0) {
+        setUsernameStatus("taken");
+      } else {
+        setUsernameStatus("available");
+      }
+    }, 800); // ينتظر 800 جزء من الثانية بعد التوقف عن الكتابة ليفحص
+  };
 
   const uploadAvatar = async (event) => {
     try {
@@ -157,13 +210,25 @@ export default function ProfileSettings({ session, onUpdate }) {
 
   const handleUpdate = async (e) => {
     e.preventDefault();
+    if (
+      usernameStatus === "taken" ||
+      usernameStatus === "checking" ||
+      usernameStatus === "invalid"
+    ) {
+      alert("يرجى اختيار اسم مستخدم (Username) صحيح ومتاح قبل الحفظ 🛑");
+      return;
+    }
+
     setIsSubmitting(true);
     const { error } = await supabase
       .from("profiles")
       .update({
         full_name: fullName,
+        username: username || null, // لتجنب الأخطاء إذا كان فارغاً
+        marketing_source: marketingSource,
+        referred_by: referredBy,
         avatar_url: avatarUrl,
-        theme_color: themeColor, // حفظ اللون
+        theme_color: themeColor,
         provider_type: providerType,
         max_concurrent_bookings:
           providerType === "individual" ? 1 : Number(maxCapacity),
@@ -180,12 +245,23 @@ export default function ProfileSettings({ session, onUpdate }) {
         provider_note: providerNote,
       })
       .eq("id", session.user.id);
+
     setIsSubmitting(false);
+
     if (!error) {
+      setOriginalUsername(username); // تحديث الاسم الأصلي بعد الحفظ الناجح
       alert("تم التحديث بنجاح ✅");
       if (onUpdate) onUpdate();
     } else {
-      alert("خطأ: " + error.message);
+      if (error.code === "23505") {
+        // كود الخطأ الخاص بتكرار البيانات الفريدة في قاعدة البيانات
+        alert(
+          "عذراً! اسم المستخدم هذا تم حجزه في هذه اللحظة، الرجاء اختيار اسم آخر.",
+        );
+        setUsernameStatus("taken");
+      } else {
+        alert("خطأ: " + error.message);
+      }
     }
   };
 
@@ -224,7 +300,7 @@ export default function ProfileSettings({ session, onUpdate }) {
         <span style={{ fontSize: "2rem" }}>👤</span> إعدادات الحساب الشخصي
       </h2>
 
-      {/* ✨ بطاقة الهوية الذكية وتخصيص اللون ✨ */}
+      {/* ✨ بطاقة الهوية الذكية ✨ */}
       <div
         style={{
           display: "flex",
@@ -234,7 +310,7 @@ export default function ProfileSettings({ session, onUpdate }) {
           backgroundColor: "#f8fafc",
           padding: "30px",
           borderRadius: "20px",
-          border: `2px solid ${themeColor}30`, // ظل إطار خفيف بناءً على اللون المختار
+          border: `2px solid ${themeColor}30`,
           boxShadow: `0 4px 20px ${themeColor}15`,
           transition: "all 0.3s ease",
         }}
@@ -248,7 +324,7 @@ export default function ProfileSettings({ session, onUpdate }) {
               height: "120px",
               borderRadius: "50%",
               objectFit: "cover",
-              border: `4px solid ${themeColor}`, // يتغير لون الإطار حسب اللون المختار
+              border: `4px solid ${themeColor}`,
               boxShadow: "0 4px 10px rgba(0,0,0,0.1)",
               transition: "all 0.3s ease",
             }}
@@ -297,13 +373,30 @@ export default function ProfileSettings({ session, onUpdate }) {
         >
           {fullName || "بدون اسم"}
         </h3>
+        {username &&
+          usernameStatus !== "taken" &&
+          usernameStatus !== "invalid" && (
+            <div
+              style={{
+                color: themeColor,
+                fontWeight: "bold",
+                direction: "ltr",
+                backgroundColor: `${themeColor}15`,
+                padding: "4px 12px",
+                borderRadius: "15px",
+                fontSize: "0.9rem",
+                marginBottom: "10px",
+              }}
+            >
+              @{username}
+            </div>
+          )}
         <p
           style={{ margin: "0 0 20px 0", color: "#64748b", fontSize: "0.9rem" }}
         >
           {providerType === "institution" ? "مؤسسة / شركة" : "فرد (مستقل)"}
         </p>
 
-        {/* 🎨 شريط اختيار لون الهوية */}
         <div
           style={{
             width: "100%",
@@ -319,7 +412,7 @@ export default function ProfileSettings({ session, onUpdate }) {
               fontSize: "0.95rem",
             }}
           >
-            🎨 اختر لون هويتك (سيظهر للعملاء في خدماتك)
+            🎨 اختر لون هويتك البصرية
           </h4>
           <div
             style={{
@@ -355,285 +448,168 @@ export default function ProfileSettings({ session, onUpdate }) {
         </div>
       </div>
 
-      {/* 🛡️ قسم التوثيق الذكي 🛡️ */}
-      <div
-        style={{
-          background:
-            verificationStatus === "verified"
-              ? "linear-gradient(135deg, #ecfdf5, #d1fae5)"
-              : "linear-gradient(135deg, #f0f9ff, #e0f2fe)",
-          padding: "25px",
-          borderRadius: "20px",
-          border:
-            verificationStatus === "verified"
-              ? "1px solid #10b981"
-              : "1px solid #3b82f6",
-          marginBottom: "30px",
-          boxShadow: "0 4px 15px rgba(0,0,0,0.03)",
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: "15px",
-          }}
-        >
-          <h3
-            style={{
-              margin: 0,
-              color: verificationStatus === "verified" ? "#065f46" : "#1e40af",
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-              fontWeight: "900",
-              fontSize: "1.2rem",
-            }}
-          >
-            <span style={{ fontSize: "1.5rem" }}>🛡️</span> التوثيق المالي
-            (Nafath)
-          </h3>
-          {/* شارات الحالة */}
-          {verificationStatus === "verified" && (
-            <span
-              style={{
-                backgroundColor: "#10b981",
-                color: "#fff",
-                padding: "6px 12px",
-                borderRadius: "10px",
-                fontSize: "0.8rem",
-                fontWeight: "bold",
-                boxShadow: "0 2px 5px rgba(16,185,129,0.3)",
-              }}
-            >
-              ✅ موثق رسمياً
-            </span>
-          )}
-          {verificationStatus === "pending" && (
-            <span
-              style={{
-                backgroundColor: "#f59e0b",
-                color: "#fff",
-                padding: "6px 12px",
-                borderRadius: "10px",
-                fontSize: "0.8rem",
-                fontWeight: "bold",
-                boxShadow: "0 2px 5px rgba(245,158,11,0.3)",
-              }}
-            >
-              ⏳ قيد المراجعة
-            </span>
-          )}
-          {verificationStatus === "rejected" && (
-            <span
-              style={{
-                backgroundColor: "#ef4444",
-                color: "#fff",
-                padding: "6px 12px",
-                borderRadius: "10px",
-                fontSize: "0.8rem",
-                fontWeight: "bold",
-                boxShadow: "0 2px 5px rgba(239,68,68,0.3)",
-              }}
-            >
-              ❌ مرفوض
-            </span>
-          )}
-          {verificationStatus === "unverified" && (
-            <span
-              style={{
-                backgroundColor: "#94a3b8",
-                color: "#fff",
-                padding: "6px 12px",
-                borderRadius: "10px",
-                fontSize: "0.8rem",
-                fontWeight: "bold",
-              }}
-            >
-              غير موثق
-            </span>
-          )}
-        </div>
-
-        {verificationStatus === "verified" ? (
-          <p
-            style={{
-              fontSize: "0.9rem",
-              color: "#065f46",
-              margin: 0,
-              fontWeight: "bold",
-              lineHeight: "1.6",
-            }}
-          >
-            تهانينا! حسابك موثق ومؤهل لاستقبال الحوالات المالية. ستظهر شارة
-            التوثيق في صفحتك لزيادة ثقة العملاء.
-          </p>
-        ) : (
-          <div>
-            <p
-              style={{
-                fontSize: "0.85rem",
-                color: "#1e40af",
-                marginBottom: "20px",
-                lineHeight: "1.6",
-                fontWeight: "bold",
-              }}
-            >
-              ارفع مستوى ثقة عملائك! أكمل بيانات التوثيق لضمان سلاسة التحويلات
-              المالية عند تنفيذ الخدمات. (البيانات مشفرة وآمنة تماماً).
-            </p>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-                gap: "15px",
-                marginBottom: verificationStatus !== "pending" ? "15px" : "0",
-              }}
-            >
-              <div>
-                <label style={{ ...lblS, color: "#1e40af" }}>
-                  رقم الهوية الوطنية / الإقامة:
-                </label>
-                <input
-                  type="text"
-                  style={{
-                    ...inpS,
-                    borderColor: "#bfdbfe",
-                    backgroundColor: "#fff",
-                  }}
-                  value={nationalId}
-                  onChange={(e) => setNationalId(e.target.value)}
-                  disabled={verificationStatus === "pending"}
-                  placeholder="مثال: 10xxxxxxxxx"
-                />
-              </div>
-              <div>
-                <label style={{ ...lblS, color: "#1e40af" }}>
-                  رقم الحساب البنكي (IBAN):
-                </label>
-                <input
-                  type="text"
-                  dir="ltr"
-                  style={{
-                    ...inpS,
-                    textAlign: "left",
-                    borderColor: "#bfdbfe",
-                    backgroundColor: "#fff",
-                  }}
-                  value={bankIban}
-                  onChange={(e) => setBankIban(e.target.value)}
-                  disabled={verificationStatus === "pending"}
-                  placeholder="SAxxxxxxxxxxxxxxxxxxxxxx"
-                />
-              </div>
-            </div>
-            {verificationStatus !== "pending" && (
-              <button
-                type="button"
-                onClick={handleVerificationRequest}
-                disabled={isSubmitting}
-                style={{
-                  backgroundColor: "#2563eb",
-                  color: "#fff",
-                  border: "none",
-                  padding: "12px 20px",
-                  borderRadius: "10px",
-                  fontWeight: "900",
-                  cursor: "pointer",
-                  fontSize: "0.9rem",
-                  boxShadow: "0 4px 10px rgba(37,99,235,0.3)",
-                  transition: "0.2s",
-                }}
-              >
-                {isSubmitting
-                  ? "⏳ جاري الإرسال..."
-                  : "إرسال طلب التوثيق الآن 🚀"}
-              </button>
-            )}
-          </div>
-        )}
-      </div>
-
       <form
         onSubmit={handleUpdate}
         style={{ display: "flex", flexDirection: "column", gap: "25px" }}
       >
-        {/* 📩 قسم الرسائل الإدارية */}
+        {/* 🚀 قسم الهوية الرقمية والتسويق 🚀 */}
         <div
           style={{
             ...sectionS,
-            borderColor: adminNote ? "#fca5a5" : "#e2e8f0",
-            backgroundColor: adminNote ? "#fef2f2" : "#f8fafc",
+            border: `1px solid ${themeColor}40`,
+            backgroundColor: `${themeColor}05`,
           }}
         >
-          <h3 style={{ ...secTitle, color: adminNote ? "#ef4444" : "#1e293b" }}>
-            📩 تواصل مع إدارة المنصة
+          <h3
+            style={{
+              ...secTitle,
+              color: themeColor,
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+            }}
+          >
+            <span style={{ fontSize: "1.3rem" }}>🔗</span> الهوية الرقمية
+            والانضمام
           </h3>
-          {adminNote && (
-            <div
-              style={{
-                backgroundColor: "#fff",
-                padding: "15px",
-                borderRadius: "12px",
-                border: "1px solid #fecaca",
-                marginBottom: "15px",
-              }}
-            >
-              <strong
+
+          <div style={{ marginBottom: "20px" }}>
+            <label style={{ ...lblS, color: "#1e293b" }}>
+              اسم المستخدم (Username):
+            </label>
+            <div style={{ position: "relative" }}>
+              <span
                 style={{
-                  color: "#dc2626",
-                  fontSize: "0.85rem",
-                  display: "block",
-                  marginBottom: "5px",
-                }}
-              >
-                رسالة من الإدارة:
-              </strong>
-              <p
-                style={{
-                  margin: 0,
-                  fontSize: "0.95rem",
-                  color: "#7f1d1d",
+                  position: "absolute",
+                  left: "12px",
+                  top: "12px",
+                  color: "#94a3b8",
                   fontWeight: "bold",
-                  lineHeight: "1.5",
                 }}
               >
-                {adminNote}
-              </p>
+                @
+              </span>
+              <input
+                type="text"
+                dir="ltr"
+                style={{
+                  ...inpS,
+                  paddingLeft: "35px",
+                  borderColor:
+                    usernameStatus === "taken" || usernameStatus === "invalid"
+                      ? "#ef4444"
+                      : usernameStatus === "available"
+                        ? "#10b981"
+                        : "#cbd5e1",
+                }}
+                value={username}
+                onChange={handleUsernameChange}
+                placeholder="nabeel88"
+              />
+              {usernameStatus === "checking" && (
+                <span
+                  style={{
+                    position: "absolute",
+                    right: "12px",
+                    top: "12px",
+                    fontSize: "0.9rem",
+                  }}
+                >
+                  ⏳ جاري الفحص...
+                </span>
+              )}
+              {usernameStatus === "available" && (
+                <span
+                  style={{
+                    position: "absolute",
+                    right: "12px",
+                    top: "12px",
+                    color: "#10b981",
+                    fontSize: "0.9rem",
+                    fontWeight: "bold",
+                  }}
+                >
+                  ✅ متاح
+                </span>
+              )}
+              {usernameStatus === "taken" && (
+                <span
+                  style={{
+                    position: "absolute",
+                    right: "12px",
+                    top: "12px",
+                    color: "#ef4444",
+                    fontSize: "0.9rem",
+                    fontWeight: "bold",
+                  }}
+                >
+                  ❌ مستخدم مسبقاً
+                </span>
+              )}
+              {usernameStatus === "invalid" && (
+                <span
+                  style={{
+                    position: "absolute",
+                    right: "12px",
+                    top: "12px",
+                    color: "#ef4444",
+                    fontSize: "0.9rem",
+                    fontWeight: "bold",
+                  }}
+                >
+                  ⚠️ حروف إنجليزية وأرقام فقط
+                </span>
+              )}
             </div>
-          )}
-          <div>
-            <label style={lblS}>ردك / رسالتك للإدارة (اختياري):</label>
-            <textarea
+            <p
               style={{
-                ...inpS,
-                height: "80px",
-                marginBottom: "10px",
-                resize: "vertical",
-              }}
-              value={providerNote}
-              onChange={(e) => setProviderNote(e.target.value)}
-              placeholder="اكتب ملاحظاتك أو ردك للإدارة هنا..."
-            />
-            <button
-              type="button"
-              onClick={handleSendReply}
-              disabled={isSubmitting}
-              style={{
-                width: "100%",
-                backgroundColor: "#3b82f6",
-                color: "#fff",
-                border: "none",
-                padding: "12px",
-                borderRadius: "10px",
-                fontWeight: "900",
-                cursor: "pointer",
-                transition: "0.2s",
+                margin: "5px 0 0 0",
+                fontSize: "0.75rem",
+                color: "#64748b",
               }}
             >
-              {isSubmitting ? "⏳ جاري الإرسال..." : "📤 إرسال الرد للإدارة"}
-            </button>
+              * سيتم استخدامه كرابط مباشر لملفك الشخصي.
+            </p>
+          </div>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
+              gap: "15px",
+            }}
+          >
+            <div>
+              <label style={lblS}>كيف تعرفت علينا؟</label>
+              <select
+                style={{ ...inpS, cursor: "pointer" }}
+                value={marketingSource}
+                onChange={(e) => setMarketingSource(e.target.value)}
+              >
+                <option value="">اختر من القائمة...</option>
+                <option value="twitter">تويتر (X)</option>
+                <option value="snapchat">سناب شات</option>
+                <option value="friend">صديق / شخص مسوق</option>
+                <option value="search">محرك بحث (جوجل)</option>
+                <option value="other">أخرى</option>
+              </select>
+            </div>
+            <div>
+              <label style={lblS}>كود المسوق (إذا دعاك شخص للمنصة):</label>
+              <input
+                type="text"
+                dir="ltr"
+                style={{
+                  ...inpS,
+                  textAlign: "left",
+                  backgroundColor:
+                    marketingSource === "friend" ? "#fff" : "#f8fafc",
+                }}
+                value={referredBy}
+                onChange={(e) => setReferredBy(e.target.value)}
+                placeholder="أدخل Username الخاص بالمسوق"
+              />
+            </div>
           </div>
         </div>
 
@@ -648,14 +624,14 @@ export default function ProfileSettings({ session, onUpdate }) {
             }}
           >
             <div>
-              <label style={lblS}>الاسم الكامل:</label>
+              <label style={lblS}>الاسم الكامل (أو اسم المؤسسة):</label>
               <input
                 type="text"
                 required
                 style={inpS}
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                placeholder="الاسم ثلاثي أو اسم المؤسسة"
+                placeholder="الاسم الذي يظهر للعملاء"
               />
             </div>
             <div>
@@ -735,6 +711,146 @@ export default function ProfileSettings({ session, onUpdate }) {
           </div>
         </div>
 
+        {/* 🛡️ التوثيق المالي */}
+        <div
+          style={{
+            background:
+              verificationStatus === "verified"
+                ? "linear-gradient(135deg, #ecfdf5, #d1fae5)"
+                : "linear-gradient(135deg, #f0f9ff, #e0f2fe)",
+            padding: "25px",
+            borderRadius: "20px",
+            border:
+              verificationStatus === "verified"
+                ? "1px solid #10b981"
+                : "1px solid #3b82f6",
+            boxShadow: "0 4px 15px rgba(0,0,0,0.03)",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: "15px",
+            }}
+          >
+            <h3
+              style={{
+                margin: 0,
+                color:
+                  verificationStatus === "verified" ? "#065f46" : "#1e40af",
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                fontWeight: "900",
+                fontSize: "1.2rem",
+              }}
+            >
+              <span style={{ fontSize: "1.5rem" }}>🛡️</span> التوثيق المالي
+            </h3>
+            {verificationStatus === "verified" && (
+              <span style={badgeS("#10b981")}>✅ موثق رسمياً</span>
+            )}
+            {verificationStatus === "pending" && (
+              <span style={badgeS("#f59e0b")}>⏳ قيد المراجعة</span>
+            )}
+            {verificationStatus === "rejected" && (
+              <span style={badgeS("#ef4444")}>❌ مرفوض</span>
+            )}
+            {verificationStatus === "unverified" && (
+              <span style={badgeS("#94a3b8")}>غير موثق</span>
+            )}
+          </div>
+
+          {verificationStatus === "verified" ? (
+            <p
+              style={{
+                fontSize: "0.9rem",
+                color: "#065f46",
+                margin: 0,
+                fontWeight: "bold",
+              }}
+            >
+              حسابك موثق ومؤهل لاستقبال الحوالات المالية. ستظهر شارة التوثيق في
+              صفحتك.
+            </p>
+          ) : (
+            <div>
+              <p
+                style={{
+                  fontSize: "0.85rem",
+                  color: "#1e40af",
+                  marginBottom: "20px",
+                  fontWeight: "bold",
+                }}
+              >
+                أكمل بيانات التوثيق لضمان سلاسة التحويلات المالية عند تنفيذ
+                الخدمات.
+              </p>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+                  gap: "15px",
+                  marginBottom: verificationStatus !== "pending" ? "15px" : "0",
+                }}
+              >
+                <div>
+                  <label style={{ ...lblS, color: "#1e40af" }}>
+                    رقم الهوية / الإقامة:
+                  </label>
+                  <input
+                    type="text"
+                    style={{ ...inpS, borderColor: "#bfdbfe" }}
+                    value={nationalId}
+                    onChange={(e) => setNationalId(e.target.value)}
+                    disabled={verificationStatus === "pending"}
+                    placeholder="مثال: 10xxxxxxxxx"
+                  />
+                </div>
+                <div>
+                  <label style={{ ...lblS, color: "#1e40af" }}>
+                    الآيبان (IBAN):
+                  </label>
+                  <input
+                    type="text"
+                    dir="ltr"
+                    style={{
+                      ...inpS,
+                      textAlign: "left",
+                      borderColor: "#bfdbfe",
+                    }}
+                    value={bankIban}
+                    onChange={(e) => setBankIban(e.target.value)}
+                    disabled={verificationStatus === "pending"}
+                    placeholder="SAxxxxxxxxxxxxxxxxxxxxxx"
+                  />
+                </div>
+              </div>
+              {verificationStatus !== "pending" && (
+                <button
+                  type="button"
+                  onClick={handleVerificationRequest}
+                  disabled={isSubmitting}
+                  style={{
+                    backgroundColor: "#2563eb",
+                    color: "#fff",
+                    border: "none",
+                    padding: "12px 20px",
+                    borderRadius: "10px",
+                    fontWeight: "900",
+                    cursor: "pointer",
+                    transition: "0.2s",
+                  }}
+                >
+                  {isSubmitting ? "⏳ جاري..." : "إرسال طلب التوثيق الآن 🚀"}
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
         {/* 📜 الوثائق الرسمية والنوع */}
         <div
           style={{
@@ -766,7 +882,7 @@ export default function ProfileSettings({ session, onUpdate }) {
                 }}
               >
                 <label style={{ ...lblS, color: "#1e40af" }}>
-                  الطاقة الاستيعابية (حجوزات متزامنة):
+                  الطاقة الاستيعابية (حجوزات מתزامنة):
                 </label>
                 <input
                   type="number"
@@ -776,15 +892,6 @@ export default function ProfileSettings({ session, onUpdate }) {
                   value={maxCapacity}
                   onChange={(e) => setMaxCapacity(e.target.value)}
                 />
-                <p
-                  style={{
-                    margin: "5px 0 0 0",
-                    fontSize: "0.75rem",
-                    color: "#64748b",
-                  }}
-                >
-                  * لتتمكن من استقبال أكثر من حجز في نفس الوقت.
-                </p>
               </div>
             )}
           </div>
@@ -805,7 +912,9 @@ export default function ProfileSettings({ session, onUpdate }) {
                 />
               </div>
               <div>
-                <label style={lblS}>رقم الترخيص / وثيقة العمل الحر:</label>
+                <label style={lblS}>
+                  رقم الترخيص / وثيقة العمل الحر (إن وجد):
+                </label>
                 <input
                   type="text"
                   style={inpS}
@@ -818,7 +927,7 @@ export default function ProfileSettings({ session, onUpdate }) {
           </div>
         </div>
 
-        {/* زر الحفظ العائم (يتغير لونه ليتناسب مع لون المزود!) */}
+        {/* زر الحفظ العائم */}
         <div
           style={{
             position: "sticky",
@@ -834,18 +943,25 @@ export default function ProfileSettings({ session, onUpdate }) {
         >
           <button
             type="submit"
-            disabled={isSubmitting || isUploading}
+            disabled={
+              isSubmitting || isUploading || usernameStatus === "checking"
+            }
             style={{
               width: "100%",
               backgroundColor:
-                isSubmitting || isUploading ? "#94a3b8" : themeColor, // يتغير مع اختيار المزود
+                isSubmitting || isUploading || usernameStatus === "checking"
+                  ? "#94a3b8"
+                  : themeColor,
               color: "white",
               border: "none",
               padding: "16px",
               borderRadius: "14px",
               fontWeight: "900",
               fontSize: "1.1rem",
-              cursor: isSubmitting || isUploading ? "not-allowed" : "pointer",
+              cursor:
+                isSubmitting || isUploading || usernameStatus === "checking"
+                  ? "not-allowed"
+                  : "pointer",
               transition: "0.3s",
               boxShadow:
                 isSubmitting || isUploading
@@ -853,9 +969,7 @@ export default function ProfileSettings({ session, onUpdate }) {
                   : `0 4px 15px ${themeColor}50`,
             }}
           >
-            {isSubmitting
-              ? "⏳ جاري الحفظ والتحديث..."
-              : "حفظ التعديلات الشاملة ✅"}
+            {isSubmitting ? "⏳ جاري الحفظ..." : "حفظ التعديلات الشاملة ✅"}
           </button>
         </div>
       </form>
@@ -863,7 +977,7 @@ export default function ProfileSettings({ session, onUpdate }) {
   );
 }
 
-// ✨ التنسيقات العصرية ✨
+// التنسيقات
 const sectionS = {
   backgroundColor: "#fff",
   padding: "25px",
@@ -899,3 +1013,12 @@ const inpS = {
   transition: "all 0.2s ease",
   backgroundColor: "#f8fafc",
 };
+const badgeS = (bgColor) => ({
+  backgroundColor: bgColor,
+  color: "#fff",
+  padding: "6px 12px",
+  borderRadius: "10px",
+  fontSize: "0.8rem",
+  fontWeight: "bold",
+  boxShadow: `0 2px 5px ${bgColor}40`,
+});

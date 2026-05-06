@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 import { useTranslation } from "react-i18next";
+import { useParams } from "react-router-dom"; // ✨ استيراد قارئ الروابط ✨
 
 export default function ClientMarketplace({
   session,
@@ -9,10 +10,16 @@ export default function ClientMarketplace({
   heroSubtitle = "",
 }) {
   const { t, i18n } = useTranslation();
+  const { storeUsername } = useParams();
+  const username = storeUsername ? storeUsername.replace("@", "") : null; // إزالة الـ @ للبحث الصافي في قاعدة البيانات
+
   const [offerings, setOfferings] = useState([]);
   const [dbCategories, setDbCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
+
+  // ✨ حالة جديدة لحفظ بيانات المزود صاحب المتجر (إذا دخلنا من رابطه)
+  const [storeProfile, setStoreProfile] = useState(null);
 
   // فلاتر البحث
   const [localSearch, setLocalSearch] = useState("");
@@ -56,21 +63,44 @@ export default function ClientMarketplace({
 
   useEffect(() => {
     const fetchData = async () => {
+      // 1. جلب الأقسام
       const { data: cats } = await supabase
         .from("categories")
         .select("*")
         .order("created_at");
       if (cats) setDbCategories(cats);
-      const { data: offs } = await supabase
+
+      // 2. إذا كنا في وضع "المتجر الشخصي" (يوجد يوزر في الرابط)، نجلب بيانات هذا المزود أولاً
+      if (username) {
+        const { data: prof } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("username", username)
+          .single();
+        if (prof) setStoreProfile(prof);
+      }
+
+      // 3. جلب الخدمات (مع الفلترة إذا كنا في متجر شخصي)
+      let query = supabase
         .from("offerings")
         .select("*, profiles!inner(*)")
-        .eq("profiles.is_active", true)
-        .order("rating", { foreignTable: "profiles", ascending: false });
+        .eq("profiles.is_active", true);
+
+      // ✨ السحر هنا: إذا كان هناك يوزر في الرابط، اجلب خدماته هو فقط! ✨
+      if (username) {
+        query = query.eq("profiles.username", username);
+      }
+
+      const { data: offs } = await query.order("rating", {
+        foreignTable: "profiles",
+        ascending: false,
+      });
       if (offs) setOfferings(offs);
+
       setLoading(false);
     };
     fetchData();
-  }, []);
+  }, [username]); // إعادة التحديث إذا تغير الرابط
 
   const displayCategories = [
     { id: "all", label: t("cat_all", "الكل"), icon: "🌟" },
@@ -102,6 +132,7 @@ export default function ClientMarketplace({
       (item.nickname || "").toLowerCase().includes(s) ||
       (item.provider_name || "").toLowerCase().includes(s) ||
       (item.profiles?.full_name || "").toLowerCase().includes(s) ||
+      (item.profiles?.username || "").toLowerCase().includes(s) ||
       (item.description || "").toLowerCase().includes(s);
     const itemCat = item.category || "other";
     const matchesCategory =
@@ -119,9 +150,7 @@ export default function ClientMarketplace({
         Array.isArray(item.available_days) && item.available_days.length > 0
           ? item.available_days
           : dayMap;
-      if (!activeDays.includes(dayId)) {
-        matchesDate = false;
-      }
+      if (!activeDays.includes(dayId)) matchesDate = false;
     }
 
     let matchesTime = true;
@@ -136,21 +165,15 @@ export default function ClientMarketplace({
         const [h, m] = tStr.split(":").map(Number);
         return h * 60 + m;
       };
-
       const pStart = toMins(item.work_start_time.substring(0, 5));
       let pEnd = toMins(item.work_end_time.substring(0, 5));
       if (pEnd <= pStart) pEnd += 24 * 60;
-
       let fStart = filterStartTime ? toMins(filterStartTime) : pStart;
       let fEnd = filterEndTime ? toMins(filterEndTime) : pEnd;
-
       if (fEnd <= fStart && filterStartTime && filterEndTime) fEnd += 24 * 60;
       if (fStart < pStart && pEnd > 24 * 60) fStart += 24 * 60;
       if (fEnd < pStart && pEnd > 24 * 60) fEnd += 24 * 60;
-
-      if (fStart < pStart || fEnd > pEnd) {
-        matchesTime = false;
-      }
+      if (fStart < pStart || fEnd > pEnd) matchesTime = false;
     }
 
     return (
@@ -235,13 +258,12 @@ export default function ClientMarketplace({
           : "Your device doesn't support geolocation.",
       );
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
+      (pos) =>
         setBookingData({
           ...bookingData,
           gpsLocation: `https://www.google.com/maps?q=${pos.coords.latitude},${pos.coords.longitude}`,
           manualLocation: "",
-        });
-      },
+        }),
       () =>
         alert(
           i18n.language === "ar"
@@ -256,17 +278,14 @@ export default function ClientMarketplace({
       setBookingData({ ...bookingData, [field]: value });
       return;
     }
-
     const selectedDate = new Date(value);
     const dayMap = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
     const dayId = dayMap[selectedDate.getDay()];
-
     const activeDays =
       Array.isArray(selected.available_days) &&
       selected.available_days.length > 0
         ? selected.available_days
         : dayMap;
-
     if (!activeDays.includes(dayId)) {
       alert(
         i18n.language === "ar"
@@ -276,20 +295,16 @@ export default function ClientMarketplace({
       setBookingData({ ...bookingData, [field]: "" });
       return;
     }
-
     setBookingData({ ...bookingData, [field]: value });
   };
 
   const handleSuggestNextSlot = () => {
     if (!selected) return;
-
     const now = new Date();
     let proposedStart = new Date(now.getTime() + 60 * 60 * 1000);
-
     const mins = proposedStart.getMinutes();
-    if (mins > 0 && mins <= 30) {
-      proposedStart.setMinutes(30, 0, 0);
-    } else if (mins > 30) {
+    if (mins > 0 && mins <= 30) proposedStart.setMinutes(30, 0, 0);
+    else if (mins > 30) {
       proposedStart.setHours(proposedStart.getHours() + 1);
       proposedStart.setMinutes(0, 0, 0);
     }
@@ -300,38 +315,35 @@ export default function ClientMarketplace({
       selected.available_days.length > 0
         ? selected.available_days
         : dayMap;
-
     let foundDate = null;
 
     for (let i = 0; i < 7; i++) {
       const checkDate = new Date(proposedStart);
       checkDate.setDate(checkDate.getDate() + i);
       const dayId = dayMap[checkDate.getDay()];
-
       if (activeDays.includes(dayId)) {
         if (selected.is_24_7) {
-          if (i === 0) {
-            foundDate = checkDate;
-          } else {
+          if (i === 0) foundDate = checkDate;
+          else {
             checkDate.setHours(8, 0, 0, 0);
             foundDate = checkDate;
           }
           break;
         } else {
-          const pStartStr = selected.work_start_time || "08:00";
-          const pEndStr = selected.work_end_time || "22:00";
-          const startH = parseInt(pStartStr.split(":")[0]);
-          const startM = parseInt(pStartStr.split(":")[1]);
-
+          const startH = parseInt(
+            (selected.work_start_time || "08:00").split(":")[0],
+          );
+          const startM = parseInt(
+            (selected.work_start_time || "08:00").split(":")[1],
+          );
           if (i === 0) {
             const currentMins =
               checkDate.getHours() * 60 + checkDate.getMinutes();
             const pStartMins = startH * 60 + startM;
             let pEndMins =
-              parseInt(pEndStr.split(":")[0]) * 60 +
-              parseInt(pEndStr.split(":")[1]);
+              parseInt((selected.work_end_time || "22:00").split(":")[0]) * 60 +
+              parseInt((selected.work_end_time || "22:00").split(":")[1]);
             if (pEndMins <= pStartMins) pEndMins += 24 * 60;
-
             if (currentMins >= pStartMins && currentMins < pEndMins - 60) {
               foundDate = checkDate;
               break;
@@ -351,23 +363,12 @@ export default function ClientMarketplace({
 
     if (foundDate) {
       const pad = (num) => String(num).padStart(2, "0");
-      const fmtDate = (d) =>
-        `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-      const fmtTime = (d) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
-
-      const startDateStr = fmtDate(foundDate);
-      const startTimeStr = fmtTime(foundDate);
-
-      const endDateObj = new Date(foundDate.getTime() + 60 * 60 * 1000);
-      const endDateStr = fmtDate(endDateObj);
-      const endTimeStr = fmtTime(endDateObj);
-
       setBookingData({
         ...bookingData,
-        startDate: startDateStr,
-        startTime: startTimeStr,
-        endDate: endDateStr,
-        endTime: endTimeStr,
+        startDate: `${foundDate.getFullYear()}-${pad(foundDate.getMonth() + 1)}-${pad(foundDate.getDate())}`,
+        startTime: `${pad(foundDate.getHours())}:${pad(foundDate.getMinutes())}`,
+        endDate: `${new Date(foundDate.getTime() + 60 * 60 * 1000).getFullYear()}-${pad(new Date(foundDate.getTime() + 60 * 60 * 1000).getMonth() + 1)}-${pad(new Date(foundDate.getTime() + 60 * 60 * 1000).getDate())}`,
+        endTime: `${pad(new Date(foundDate.getTime() + 60 * 60 * 1000).getHours())}:${pad(new Date(foundDate.getTime() + 60 * 60 * 1000).getMinutes())}`,
       });
     } else {
       alert(
@@ -379,10 +380,23 @@ export default function ClientMarketplace({
   };
 
   const handleBook = async () => {
+    // ✨ التعديل السحري: إذا كان زائراً، نفتح نافذة تسجيل الدخول ✨
+    if (!session) {
+      if (typeof onRequireLogin === "function") {
+        onRequireLogin();
+      } else {
+        alert(
+          i18n.language === "ar"
+            ? "يرجى تسجيل الدخول أو إنشاء حساب أولاً 🔐"
+            : "Please login first 🔐",
+        );
+      }
+      return;
+    }
+
     const isTimeOptional =
       ["fixed", "daily"].includes(selected?.pricing_model) ||
       selected?.price_upon_agreement;
-
     const finalLocation = bookingData.manualLocation || bookingData.gpsLocation;
 
     if (
@@ -413,7 +427,6 @@ export default function ClientMarketplace({
           ? "⛔ لا يمكن الحجز في الماضي."
           : "⛔ Cannot book in the past.",
       );
-
     if (requestedEnd <= requestedStart)
       return alert(
         i18n.language === "ar"
@@ -421,30 +434,27 @@ export default function ClientMarketplace({
           : "⛔ End time must be after start time.",
       );
 
-    const hasTime = bookingData.startTime && bookingData.endTime;
     if (
       selected.is_24_7 === false &&
       selected.work_start_time &&
       selected.work_end_time &&
-      hasTime
+      bookingData.startTime &&
+      bookingData.endTime
     ) {
       const getMins = (dateObj) =>
         dateObj.getHours() * 60 + dateObj.getMinutes();
       const rStartMins = getMins(requestedStart);
-
       const pStartMins =
         parseInt(selected.work_start_time.split(":")[0]) * 60 +
         parseInt(selected.work_start_time.split(":")[1]);
       let pEndMins =
         parseInt(selected.work_end_time.split(":")[0]) * 60 +
         parseInt(selected.work_end_time.split(":")[1]);
-
       if (pEndMins <= pStartMins) pEndMins += 24 * 60;
       const normRStart =
         rStartMins < pStartMins && pEndMins > 24 * 60
           ? rStartMins + 24 * 60
           : rStartMins;
-
       if (normRStart < pStartMins || normRStart > pEndMins) {
         return alert(
           i18n.language === "ar"
@@ -467,17 +477,12 @@ export default function ClientMarketplace({
       )
         overlaps++;
     });
-    if (overlaps >= (selected.profiles?.max_concurrent_bookings || 1)) {
+    if (overlaps >= (selected.profiles?.max_concurrent_bookings || 1))
       return alert(
         i18n.language === "ar"
           ? "⚠️ هذا الوقت محجوز مسبقاً، لا توجد سعة."
           : "⚠️ This time is already booked.",
       );
-    }
-
-    const payloadStatus = selected.price_upon_agreement
-      ? "awaiting_pricing"
-      : "pending";
 
     const { error } = await supabase.from("bookings").insert([
       {
@@ -487,7 +492,7 @@ export default function ClientMarketplace({
         end_time: requestedEnd.toISOString(),
         location: finalLocation,
         quantity: calculatedData.quantity,
-        status: payloadStatus,
+        status: selected.price_upon_agreement ? "awaiting_pricing" : "pending",
         client_contact: bookingData.clientContact,
       },
     ]);
@@ -501,9 +506,7 @@ export default function ClientMarketplace({
           : "Request sent successfully ✅",
       );
       setSelected(null);
-    } else {
-      alert("Error: " + error.message);
-    }
+    } else alert("Error: " + error.message);
   };
 
   const modelLabels = {
@@ -516,11 +519,8 @@ export default function ClientMarketplace({
     free: t("volunteer"),
   };
   const renderStars = (rating) => "⭐ " + (rating ? rating.toFixed(1) : "5.0");
-
-  const defaultAvatar = (name, hexColor = "#7c3aed") => {
-    const cleanHex = hexColor.replace("#", "");
-    return `https://ui-avatars.com/api/?name=${name || "User"}&background=${cleanHex}20&color=${cleanHex}&bold=true`;
-  };
+  const defaultAvatar = (name, hexColor = "#7c3aed") =>
+    `https://ui-avatars.com/api/?name=${name || "User"}&background=${hexColor.replace("#", "")}20&color=${hexColor.replace("#", "")}&bold=true`;
 
   if (loading)
     return (
@@ -542,12 +542,12 @@ export default function ClientMarketplace({
       selected.price_upon_agreement);
   const isRTL = i18n.language === "ar";
 
-  // ✨ استخراج لون الهوية الخاص بالمزود بمجرد الضغط على بطاقته ✨
-  const themeColor = selected?.profiles?.theme_color || "#7c3aed";
+  // ✨ المتغيرات الخاصة بمتجر المزود (الرابط المباشر) ✨
+  const isStoreMode = !!username;
+  const storeTheme = storeProfile?.theme_color || "#7c3aed";
 
   return (
     <div style={{ direction: isRTL ? "rtl" : "ltr" }}>
-      {/* ✨ أكواد CSS المدمجة لتأثيرات الـ Hover وإخفاء شريط التمرير ✨ */}
       <style>{`
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
@@ -556,13 +556,76 @@ export default function ClientMarketplace({
         .search-container { position: relative; z-index: 10; margin-top: -35px; margin-bottom: 30px; }
       `}</style>
 
-      {/* 1. البانر الترحيبي (Hero Section) */}
-      <div style={heroSectionS}>
-        <h1 style={heroTitleS}>{welcomeMsg}</h1>
-        <p style={heroSubTitleS}>{heroSubtitle}</p>
+      {/* ✨ البانر الذكي: يتغير شكله بالكامل إذا دخلنا رابط مزود معين ✨ */}
+      <div
+        style={{
+          ...heroSectionS,
+          background: isStoreMode
+            ? storeTheme
+            : "linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)",
+          padding: isStoreMode ? "40px 20px 85px" : "55px 20px 85px", // تقليل المساحة العلوية في المتجر
+        }}
+      >
+        {isStoreMode && storeProfile ? (
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: "10px",
+            }}
+          >
+            <img
+              src={
+                storeProfile.avatar_url ||
+                defaultAvatar(storeProfile.full_name, storeTheme)
+              }
+              alt="Store Avatar"
+              style={{
+                width: "90px",
+                height: "90px",
+                borderRadius: "50%",
+                border: "4px solid white",
+                boxShadow: "0 4px 15px rgba(0,0,0,0.2)",
+                objectFit: "cover",
+              }}
+            />
+            <h1 style={{ ...heroTitleS, margin: "0" }}>
+              {storeProfile.full_name || storeProfile.username}
+            </h1>
+            <span
+              style={{
+                backgroundColor: "rgba(255,255,255,0.2)",
+                padding: "4px 15px",
+                borderRadius: "20px",
+                fontSize: "1rem",
+                fontWeight: "bold",
+                letterSpacing: "1px",
+              }}
+            >
+              @{storeProfile.username}
+            </span>
+            {storeProfile.provider_note && (
+              <p
+                style={{
+                  maxWidth: "600px",
+                  margin: "10px auto 0",
+                  opacity: "0.9",
+                  lineHeight: "1.5",
+                }}
+              >
+                {storeProfile.provider_note}
+              </p>
+            )}
+          </div>
+        ) : (
+          <>
+            <h1 style={heroTitleS}>{welcomeMsg}</h1>
+            <p style={heroSubTitleS}>{heroSubtitle}</p>
+          </>
+        )}
       </div>
 
-      {/* 2. شريط البحث العائم (Floating Search Bar) */}
       <div className="search-container" style={{ padding: "0 15px" }}>
         <div
           style={{
@@ -575,7 +638,6 @@ export default function ClientMarketplace({
             overflow: "hidden",
           }}
         >
-          {/* حقل البحث الرئيسي */}
           <div
             style={{
               flex: "2 1 250px",
@@ -590,7 +652,7 @@ export default function ClientMarketplace({
               style={{
                 fontSize: "1.2rem",
                 margin: isRTL ? "0 0 0 10px" : "0 10px 0 0",
-                color: "#7c3aed",
+                color: isStoreMode ? storeTheme : "#7c3aed",
               }}
             >
               🔍
@@ -598,53 +660,67 @@ export default function ClientMarketplace({
             <input
               type="text"
               placeholder={
-                isRTL ? "ابحث عن خدمة، مزود، أو تخصص..." : "Search..."
+                isStoreMode
+                  ? `ابحث في خدمات ${storeProfile?.full_name || "المزود"}...`
+                  : isRTL
+                    ? "ابحث بالاسم، الخدمة، أو @يوزر المزود..."
+                    : "Search..."
               }
               style={searchField}
               value={localSearch}
               onChange={(e) => setLocalSearch(e.target.value)}
             />
           </div>
-
-          {/* فلاتر الدول والمدن */}
-          <div
-            style={{ flex: "1 1 120px", display: "flex", alignItems: "center" }}
-          >
-            <select
-              value={filterCountry}
-              onChange={(e) => {
-                setFilterCountry(e.target.value);
-                setFilterCity("all");
+          {!isStoreMode && (
+            <div
+              style={{
+                flex: "1 1 120px",
+                display: "flex",
+                alignItems: "center",
               }}
-              style={floatingSelectS(isRTL)}
             >
-              <option value="all">🌍 {t("filter_country", "كل الدول")}</option>
-              {availableCountries.map((c) => (
-                <option key={c} value={c}>
-                  {c}
+              <select
+                value={filterCountry}
+                onChange={(e) => {
+                  setFilterCountry(e.target.value);
+                  setFilterCity("all");
+                }}
+                style={floatingSelectS(isRTL)}
+              >
+                <option value="all">
+                  🌍 {t("filter_country", "كل الدول")}
                 </option>
-              ))}
-            </select>
-          </div>
-
-          <div
-            style={{ flex: "1 1 120px", display: "flex", alignItems: "center" }}
-          >
-            <select
-              value={filterCity}
-              onChange={(e) => setFilterCity(e.target.value)}
-              style={floatingSelectS(isRTL)}
+                {availableCountries.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+          {!isStoreMode && (
+            <div
+              style={{
+                flex: "1 1 120px",
+                display: "flex",
+                alignItems: "center",
+              }}
             >
-              <option value="all">🏙️ {t("filter_city", "كل المدن")}</option>
-              {availableCities.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-          </div>
+              <select
+                value={filterCity}
+                onChange={(e) => setFilterCity(e.target.value)}
+                style={floatingSelectS(isRTL)}
+              >
+                <option value="all">🏙️ {t("filter_city", "كل المدن")}</option>
+                {availableCities.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
-          {/* فلتر التاريخ والوقت */}
           <div
             style={{
               flex: "1.5 1 150px",
@@ -663,7 +739,6 @@ export default function ClientMarketplace({
             />
           </div>
 
-          {/* زر تفريغ الفلاتر */}
           {(filterDate ||
             filterStartTime ||
             filterEndTime ||
@@ -696,41 +771,42 @@ export default function ClientMarketplace({
         </div>
       </div>
 
-      {/* 3. شريط الأقسام الأفقي (Horizontal Scrollable Categories) */}
-      <div className="hide-scrollbar" style={categoryScrollWrapperS}>
-        {displayCategories.map((cat) => {
-          const isActive = activeCategory === cat.id;
-          return (
-            <button
-              key={cat.id}
-              onClick={() => setActiveCategory(cat.id)}
-              style={{
-                ...catBtnS,
-                backgroundColor: isActive ? "#1e293b" : "#f8fafc",
-                color: isActive ? "#fff" : "#475569",
-                border: isActive ? "1px solid #1e293b" : "1px solid #e2e8f0",
-                boxShadow: isActive
-                  ? "0 4px 10px rgba(30, 41, 59, 0.2)"
-                  : "none",
-              }}
-            >
-              <span style={{ fontSize: "1.1rem" }}>{cat.icon}</span> {cat.label}
-            </button>
-          );
-        })}
-      </div>
+      {/* إخفاء الأقسام إذا كنا في متجر شخصي (لأنها قد لا تكون ضرورية لمتجر واحد) */}
+      {!isStoreMode && (
+        <div className="hide-scrollbar" style={categoryScrollWrapperS}>
+          {displayCategories.map((cat) => {
+            const isActive = activeCategory === cat.id;
+            return (
+              <button
+                key={cat.id}
+                onClick={() => setActiveCategory(cat.id)}
+                style={{
+                  ...catBtnS,
+                  backgroundColor: isActive ? "#1e293b" : "#f8fafc",
+                  color: isActive ? "#fff" : "#475569",
+                  border: isActive ? "1px solid #1e293b" : "1px solid #e2e8f0",
+                  boxShadow: isActive
+                    ? "0 4px 10px rgba(30, 41, 59, 0.2)"
+                    : "none",
+                }}
+              >
+                <span style={{ fontSize: "1.1rem" }}>{cat.icon}</span>{" "}
+                {cat.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
-      {/* تنبيه نتيجة البحث */}
       {(filterDate || filterStartTime || filterEndTime) && (
         <div style={searchAlertS}>
           ✅{" "}
           {i18n.language === "ar"
-            ? `نعرض لك فقط المزودين المتاحين للعمل ${filterDate ? `يوم (${filterDate})` : ""} ${filterStartTime ? `من (${filterStartTime})` : ""} ${filterEndTime ? `إلى (${filterEndTime})` : ""}`
+            ? `نعرض لك فقط الخدمات المتاحة ${filterDate ? `يوم (${filterDate})` : ""} ${filterStartTime ? `من (${filterStartTime})` : ""} ${filterEndTime ? `إلى (${filterEndTime})` : ""}`
             : "Showing available providers for selected date/time."}
         </div>
       )}
 
-      {/* 4. شبكة البطاقات الذكية (Smart Cards Grid) */}
       <div
         style={{
           display: "grid",
@@ -743,12 +819,11 @@ export default function ClientMarketplace({
           filtered.map((item) => {
             const isFree = item.pricing_model === "free";
             const isAgreement = item.price_upon_agreement;
-            const itemThemeColor = item.profiles?.theme_color || "#7c3aed"; // لون خاص بكل بطاقة لو أردنا
+            const itemThemeColor = item.profiles?.theme_color || "#7c3aed";
 
             return (
               <div key={item.id} className="smart-card" style={smartCardS}>
-                {/* الجزء العلوي: الغطاء (Cover) والأوسمة */}
-                <div style={cardCoverS(isFree)}>
+                <div style={cardCoverS(isFree, itemThemeColor)}>
                   <div
                     style={{
                       display: "flex",
@@ -770,9 +845,7 @@ export default function ClientMarketplace({
                   </div>
                 </div>
 
-                {/* الجزء الأوسط: البيانات */}
                 <div style={cardBodyS}>
-                  {/* الصورة والتقييم */}
                   <div
                     style={{
                       display: "flex",
@@ -789,7 +862,7 @@ export default function ClientMarketplace({
                         item.profiles?.avatar_url ||
                         defaultAvatar(item.profiles?.full_name, itemThemeColor)
                       }
-                      style={cardAvatarS}
+                      style={{ ...cardAvatarS, borderColor: itemThemeColor }}
                       alt="avatar"
                     />
                     <div
@@ -807,21 +880,45 @@ export default function ClientMarketplace({
                     </div>
                   </div>
 
-                  {/* اسم المزود */}
-                  <div
-                    style={{
-                      fontSize: "0.8rem",
-                      color: "#64748b",
-                      fontWeight: "bold",
-                      marginBottom: "4px",
-                    }}
-                  >
-                    {item.nickname ||
-                      item.provider_name ||
-                      item.profiles?.full_name}
-                  </div>
+                  {!isStoreMode && (
+                    <div
+                      style={{
+                        marginBottom: "8px",
+                        display: "flex",
+                        alignItems: "center",
+                        flexWrap: "wrap",
+                        gap: "6px",
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: "0.85rem",
+                          color: "#475569",
+                          fontWeight: "bold",
+                        }}
+                      >
+                        {item.nickname ||
+                          item.provider_name ||
+                          item.profiles?.full_name}
+                      </span>
+                      {item.profiles?.username && (
+                        <span
+                          style={{
+                            fontSize: "0.75rem",
+                            color: itemThemeColor,
+                            backgroundColor: `${itemThemeColor}15`,
+                            padding: "2px 8px",
+                            borderRadius: "10px",
+                            direction: "ltr",
+                            fontWeight: "bold",
+                          }}
+                        >
+                          @{item.profiles.username}
+                        </span>
+                      )}
+                    </div>
+                  )}
 
-                  {/* اسم الخدمة */}
                   <h3
                     style={{
                       margin: "0 0 8px 0",
@@ -833,13 +930,9 @@ export default function ClientMarketplace({
                   >
                     {item.title}
                   </h3>
-
-                  {/* الوصف (محدود بـ 3 أسطر) */}
                   <p style={cardDescriptionS} title={item.description}>
                     {item.description}
                   </p>
-
-                  {/* الموقع الجغرافي */}
                   <div
                     style={{
                       fontSize: "0.75rem",
@@ -852,7 +945,6 @@ export default function ClientMarketplace({
                     📍 {item.country || "-"}, {item.city || "-"}
                   </div>
 
-                  {/* الجزء السفلي: السعر وزر الحجز */}
                   <div style={cardFooterS}>
                     <div style={{ display: "flex", flexDirection: "column" }}>
                       <span
@@ -863,7 +955,7 @@ export default function ClientMarketplace({
                             ? "#3b82f6"
                             : isFree
                               ? "#10b981"
-                              : "#7c3aed",
+                              : itemThemeColor,
                         }}
                       >
                         {isAgreement
@@ -885,10 +977,12 @@ export default function ClientMarketplace({
                         </span>
                       )}
                     </div>
-
                     <button
                       onClick={() => setSelected(item)}
-                      style={smartBookBtnS}
+                      style={{
+                        ...smartBookBtnS,
+                        backgroundColor: itemThemeColor,
+                      }}
                     >
                       {t("view_book", "احجز الآن")}
                     </button>
@@ -899,15 +993,19 @@ export default function ClientMarketplace({
           })
         ) : (
           <div style={noResultsS}>
-            <div style={{ fontSize: "3rem", marginBottom: "15px" }}>🕵️‍♂️</div>
+            <div style={{ fontSize: "3rem", marginBottom: "15px" }}>
+              {isStoreMode ? "🛒" : "🕵️‍♂️"}
+            </div>
             {i18n.language === "ar"
-              ? "لم نجد خدمات تطابق بحثك حالياً.."
-              : "No services match your search.."}
+              ? isStoreMode
+                ? "لا توجد خدمات متاحة حالياً في هذا المتجر.."
+                : "لم نجد خدمات تطابق بحثك حالياً.."
+              : "No services found.."}
           </div>
         )}
       </div>
 
-      {/* النافذة المنبثقة الذكية المتفاعلة مع لون المزود 🎨 */}
+      {/* النافذة المنبثقة الذكية المتفاعلة مع لون المزود */}
       {selected && (
         <div style={modalOverlay}>
           <div style={modalContent}>
@@ -928,8 +1026,6 @@ export default function ClientMarketplace({
                   color: "#94a3b8",
                   transition: "0.2s",
                 }}
-                onMouseOver={(e) => (e.target.style.color = "#ef4444")}
-                onMouseOut={(e) => (e.target.style.color = "#94a3b8")}
               >
                 ✖
               </button>
@@ -948,14 +1044,17 @@ export default function ClientMarketplace({
               <img
                 src={
                   selected.profiles?.avatar_url ||
-                  defaultAvatar(selected.profiles?.full_name, themeColor)
+                  defaultAvatar(
+                    selected.profiles?.full_name,
+                    selected.profiles?.theme_color || "#7c3aed",
+                  )
                 }
                 style={{
                   width: "70px",
                   height: "70px",
                   borderRadius: "50%",
                   objectFit: "cover",
-                  border: `2px solid ${themeColor}`, // ✨ إطار صورة المزود بلونه ✨
+                  border: `2px solid ${selected.profiles?.theme_color || "#7c3aed"}`,
                 }}
                 alt="avatar"
               />
@@ -972,6 +1071,23 @@ export default function ClientMarketplace({
                     selected.provider_name ||
                     selected.profiles?.full_name}
                 </h3>
+                {selected.profiles?.username && (
+                  <div
+                    style={{
+                      fontSize: "0.85rem",
+                      color: selected.profiles?.theme_color || "#7c3aed",
+                      fontWeight: "bold",
+                      direction: "ltr",
+                      display: "inline-block",
+                      backgroundColor: `${selected.profiles?.theme_color || "#7c3aed"}15`,
+                      padding: "2px 8px",
+                      borderRadius: "10px",
+                      marginBottom: "8px",
+                    }}
+                  >
+                    @{selected.profiles.username}
+                  </div>
+                )}
                 <div
                   style={{
                     fontSize: "0.85rem",
@@ -981,7 +1097,6 @@ export default function ClientMarketplace({
                 >
                   {renderStars(selected.profiles?.rating)}
                 </div>
-
                 <div
                   style={{
                     display: "flex",
@@ -1051,7 +1166,7 @@ export default function ClientMarketplace({
               <h4
                 style={{
                   margin: "0 0 8px 0",
-                  color: themeColor, // ✨ عنوان الخدمة بلون المزود ✨
+                  color: selected.profiles?.theme_color || "#7c3aed",
                   fontSize: "1.1rem",
                   fontWeight: "900",
                 }}
@@ -1068,7 +1183,6 @@ export default function ClientMarketplace({
               >
                 {selected.description}
               </p>
-
               <div
                 style={{ borderTop: "1px dashed #cbd5e1", paddingTop: "12px" }}
               >
@@ -1152,7 +1266,6 @@ export default function ClientMarketplace({
             >
               📝 نموذج الحجز المباشر:
             </h4>
-
             <div
               style={{
                 display: "flex",
@@ -1184,7 +1297,6 @@ export default function ClientMarketplace({
                   }
                 />
               </div>
-
               <div style={{ textAlign: isRTL ? "right" : "left" }}>
                 <label style={labelS}>
                   {isRTL ? "الموقع (كتابة أو GPS):" : "Location:"}
@@ -1249,7 +1361,8 @@ export default function ClientMarketplace({
                     type="button"
                     onClick={handleSuggestNextSlot}
                     style={{
-                      backgroundColor: themeColor, // ✨ زر اقتراح موعد بلون المزود ✨
+                      backgroundColor:
+                        selected.profiles?.theme_color || "#7c3aed",
                       color: "#fff",
                       border: "none",
                       padding: "6px 12px",
@@ -1258,7 +1371,7 @@ export default function ClientMarketplace({
                       fontWeight: "bold",
                       cursor: "pointer",
                       transition: "0.2s",
-                      boxShadow: `0 2px 8px ${themeColor}40`,
+                      boxShadow: `0 2px 8px ${selected.profiles?.theme_color || "#7c3aed"}40`,
                     }}
                   >
                     ✨ اقتراح موعد
@@ -1313,7 +1426,6 @@ export default function ClientMarketplace({
                   </div>
                 </div>
               </div>
-
               <div style={dateTimeCard}>
                 <label
                   style={{
@@ -1383,7 +1495,7 @@ export default function ClientMarketplace({
                   : "#f8fafc",
                 padding: "18px",
                 borderRadius: "16px",
-                border: `1px dashed ${selected.price_upon_agreement ? "#10b981" : themeColor}`, // ✨ إطار الصندوق بلون المزود ✨
+                border: `1px dashed ${selected.price_upon_agreement ? "#10b981" : selected.profiles?.theme_color || "#7c3aed"}`,
                 marginBottom: "20px",
                 textAlign: "center",
               }}
@@ -1417,7 +1529,7 @@ export default function ClientMarketplace({
                       color:
                         selected.pricing_model === "free"
                           ? "#10b981"
-                          : themeColor, // ✨ السعر يظهر بلون المزود ✨
+                          : selected.profiles?.theme_color || "#7c3aed",
                     }}
                   >
                     {selected.pricing_model === "free"
@@ -1432,8 +1544,8 @@ export default function ClientMarketplace({
               onClick={handleBook}
               style={{
                 ...confirmBtn,
-                backgroundColor: themeColor, // ✨ الزر الرئيسي بلون المزود ✨
-                boxShadow: `0 4px 15px ${themeColor}40`,
+                backgroundColor: selected.profiles?.theme_color || "#7c3aed",
+                boxShadow: `0 4px 15px ${selected.profiles?.theme_color || "#7c3aed"}40`,
               }}
             >
               {selected.price_upon_agreement
@@ -1449,32 +1561,30 @@ export default function ClientMarketplace({
   );
 }
 
-// ✨ التنسيقات العصرية الجديدة ✨
+// التنسيقات
 const heroSectionS = {
-  background: "linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)", // تدرج بنفسجي متناسق ومشرق 100%
-  padding: "55px 20px 85px", // زدنا المساحة السفلية ليتنفس شريط البحث
+  background: "linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)",
+  padding: "55px 20px 85px",
   borderRadius: "24px",
   textAlign: "center",
   color: "#ffffff",
-  boxShadow: "0 10px 30px rgba(109, 40, 217, 0.25)", // ظل بنفسجي ناعم
+  boxShadow: "0 10px 30px rgba(109, 40, 217, 0.25)",
   marginTop: "25px",
 };
-
 const heroTitleS = {
-  fontSize: "2.4rem", // تكبير الخط قليلاً ليكون أفخم
-  color: "#ffffff", // إجبار النص على اللون الأبيض الناصع (بدل الأسود)
-  margin: "0 0 18px 0", // زيادة المسافة السفلية لتباعد الأسطر
+  fontSize: "2.4rem",
+  color: "#ffffff",
+  margin: "0 0 18px 0",
   fontWeight: "900",
   lineHeight: "1.4",
-  textShadow: "0 2px 10px rgba(0,0,0,0.15)", // ظل خفيف جداً للنص ليفصل عن الخلفية
+  textShadow: "0 2px 10px rgba(0,0,0,0.15)",
 };
-
 const heroSubTitleS = {
   fontSize: "1.15rem",
-  color: "#f1f5f9", // أبيض مائل للرمادي الفاتح ليعطي تبايناً مع العنوان الرئيسي
+  color: "#f1f5f9",
   opacity: "0.95",
   margin: 0,
-  lineHeight: "1.6", // إعطاء مساحة تنفس للسطر نفسه
+  lineHeight: "1.6",
   fontWeight: "500",
 };
 const searchField = {
@@ -1500,7 +1610,6 @@ const floatingSelectS = (isRTL) => ({
   borderLeft: isRTL ? "1px solid #f1f5f9" : "none",
   cursor: "pointer",
 });
-
 const categoryScrollWrapperS = {
   display: "flex",
   flexWrap: "wrap",
@@ -1521,7 +1630,6 @@ const catBtnS = {
   whiteSpace: "nowrap",
   transition: "all 0.2s ease",
 };
-
 const smartCardS = {
   display: "flex",
   flexDirection: "column",
@@ -1531,11 +1639,11 @@ const smartCardS = {
   backgroundColor: "#fff",
   border: "1px solid #f1f5f9",
 };
-const cardCoverS = (isFree) => ({
+const cardCoverS = (isFree, themeColor) => ({
   height: "90px",
   background: isFree
     ? "linear-gradient(135deg, #a7f3d0, #10b981)"
-    : "linear-gradient(135deg, #ddd6fe, #8b5cf6)",
+    : `linear-gradient(135deg, ${themeColor}aa, ${themeColor})`,
   position: "relative",
 });
 const coverBadgeS = (bg, color) => ({
@@ -1590,8 +1698,6 @@ const smartBookBtnS = {
   fontWeight: "bold",
   transition: "0.2s",
 };
-smartBookBtnS[":hover"] = { backgroundColor: "#0f172a" };
-
 const searchAlertS = {
   marginBottom: "20px",
   fontSize: "0.9rem",
@@ -1612,7 +1718,6 @@ const noResultsS = {
   border: "2px dashed #cbd5e1",
   fontWeight: "bold",
 };
-
 const modalOverlay = {
   position: "fixed",
   inset: 0,

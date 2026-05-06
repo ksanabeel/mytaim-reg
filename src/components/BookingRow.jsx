@@ -148,9 +148,6 @@ export default function BookingRow({
     });
   };
 
-  const isRTL = i18n.language === "ar";
-
-  // تصميم الحالات الملون
   const getStatusBadge = (status) => {
     const badges = {
       pending: {
@@ -192,637 +189,533 @@ export default function BookingRow({
   const badge = getStatusBadge(booking.status);
 
   return (
-    <tr>
-      {/* نستخدم colSpan لكي نلغي شكل أعمدة الجدول ونجعله بطاقة كاملة العرض */}
-      <td
-        colSpan="5"
-        style={{ padding: "10px", border: "none", backgroundColor: "#f8fafc" }}
-      >
-        <div style={styles.card}>
-          {/* ✨ الهيدر: الحالة واسم الخدمة ✨ */}
-          <div style={styles.header}>
-            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-              <span
-                style={{
-                  ...styles.statusBadge,
-                  backgroundColor: badge.bg,
-                  color: badge.color,
-                }}
-              >
-                {badge.icon} {badge.text}
-              </span>
-              <span
-                style={{
-                  fontSize: "0.8rem",
-                  color: "#94a3b8",
-                  fontWeight: "bold",
-                }}
-              >
-                #{booking.id.substring(0, 6)}
-              </span>
-            </div>
+    <div style={styles.card}>
+      {/* ✨ الهيدر: الحالة واسم الخدمة ✨ */}
+      <div style={styles.header}>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <span
+            style={{
+              ...styles.statusBadge,
+              backgroundColor: badge.bg,
+              color: badge.color,
+            }}
+          >
+            {badge.icon} {badge.text}
+          </span>
+          <span
+            style={{
+              fontSize: "0.8rem",
+              color: "#94a3b8",
+              fontWeight: "bold",
+            }}
+          >
+            #{booking.id.substring(0, 6)}
+          </span>
+        </div>
 
-            <h3 style={{ margin: 0, fontSize: "1.1rem", color: "#1e293b" }}>
-              {booking.offerings?.title}
-            </h3>
-          </div>
+        <h3 style={{ margin: 0, fontSize: "1.1rem", color: "#1e293b" }}>
+          {booking.offerings?.title}
+        </h3>
+      </div>
 
-          {/* ✨ جسم البطاقة: 3 أقسام للمعلومات ✨ */}
-          <div style={styles.bodyGrid}>
-            {/* القسم الأول: معلومات المستخدم */}
-            <div style={styles.infoSection}>
-              <span style={styles.infoLabel}>
-                {isProviderView ? "العميل" : "مزود الخدمة"}
-              </span>
-              <strong style={{ fontSize: "0.95rem", color: "#334155" }}>
-                {isProviderView
-                  ? booking.profiles?.full_name
-                  : booking.offerings?.profiles?.full_name}
-              </strong>
+      {/* ✨ جسم البطاقة: 3 أقسام للمعلومات ✨ */}
+      <div style={styles.bodyGrid}>
+        {/* القسم الأول: معلومات المستخدم */}
+        <div style={styles.infoSection}>
+          <span style={styles.infoLabel}>
+            {isProviderView ? "العميل" : "مزود الخدمة"}
+          </span>
+          <strong style={{ fontSize: "0.95rem", color: "#334155" }}>
+            {isProviderView
+              ? booking.profiles?.full_name
+              : booking.offerings?.profiles?.full_name}
+          </strong>
 
-              {isProviderView && booking.client_contact && (
+          {isProviderView && booking.client_contact && (
+            <a
+              href={`https://wa.me/${booking.client_contact.replace(/\D/g, "")}`}
+              target="_blank"
+              rel="noreferrer"
+              style={styles.whatsappBtn}
+            >
+              تواصل {booking.client_contact}
+            </a>
+          )}
+
+          {booking.location && (
+            <div style={{ marginTop: "10px" }}>
+              <span style={styles.infoLabel}>الموقع</span>
+              {booking.location.includes("http") ? (
                 <a
-                  href={`https://wa.me/${booking.client_contact.replace(/\D/g, "")}`}
+                  href={booking.location}
                   target="_blank"
                   rel="noreferrer"
-                  style={styles.whatsappBtn}
+                  style={styles.mapBtn}
                 >
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="currentColor"
-                  >
-                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.405-.883-.735-1.479-1.642-1.653-1.94-.173-.296-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z" />
-                  </svg>
-                  تواصل {booking.client_contact}
+                  📍 عرض الخريطة
                 </a>
-              )}
-
-              {booking.location && (
-                <div style={{ marginTop: "10px" }}>
-                  <span style={styles.infoLabel}>الموقع</span>
-                  {booking.location.includes("http") ? (
-                    <a
-                      href={booking.location}
-                      target="_blank"
-                      rel="noreferrer"
-                      style={styles.mapBtn}
-                    >
-                      📍 عرض الخريطة
-                    </a>
-                  ) : (
-                    <span style={{ fontSize: "0.85rem", color: "#64748b" }}>
-                      📍 {booking.location}
-                    </span>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* القسم الثاني: التواريخ */}
-            <div
-              style={{
-                ...styles.infoSection,
-                borderRight: "1px solid #f1f5f9",
-                borderLeft: "1px solid #f1f5f9",
-                padding: "0 15px",
-              }}
-            >
-              <span style={styles.infoLabel}>جدول العمل</span>
-              <div style={styles.dateBox}>
-                <span style={{ color: "#10b981" }}>🟢 البدء:</span>
-                <span style={{ direction: "ltr" }}>
-                  {formatDate(booking.appointment_date)}
+              ) : (
+                <span style={{ fontSize: "0.85rem", color: "#64748b" }}>
+                  📍 {booking.location}
                 </span>
-              </div>
-              {booking.end_time && (
-                <div style={{ ...styles.dateBox, marginTop: "8px" }}>
-                  <span style={{ color: "#ef4444" }}>🔴 الانتهاء:</span>
-                  <span style={{ direction: "ltr" }}>
-                    {formatDate(booking.end_time)}
-                  </span>
-                </div>
               )}
             </div>
+          )}
+        </div>
 
-            {/* القسم الثالث: المالية */}
-            <div style={{ ...styles.infoSection, alignItems: "flex-end" }}>
-              <span style={styles.infoLabel}>الإجمالي</span>
-              <div style={styles.priceBig}>
-                {booking.offerings?.pricing_model === "free" ? (
-                  t("free", "مجاني")
-                ) : (
-                  <>
-                    {subTotal}{" "}
-                    <span style={{ fontSize: "0.9rem" }}>
-                      {t("currency_sar", "ر.س")}
-                    </span>
-                  </>
-                )}
-              </div>
-              <div
+        {/* القسم الثاني: التواريخ */}
+        <div
+          style={{
+            ...styles.infoSection,
+            borderRight: "1px solid #f1f5f9",
+            borderLeft: "1px solid #f1f5f9",
+            padding: "0 15px",
+          }}
+        >
+          <span style={styles.infoLabel}>جدول العمل</span>
+          <div style={styles.dateBox}>
+            <span style={{ color: "#10b981" }}>🟢 البدء:</span>
+            <span style={{ direction: "ltr" }}>
+              {formatDate(booking.appointment_date)}
+            </span>
+          </div>
+          {booking.end_time && (
+            <div style={{ ...styles.dateBox, marginTop: "8px" }}>
+              <span style={{ color: "#ef4444" }}>🔴 الانتهاء:</span>
+              <span style={{ direction: "ltr" }}>
+                {formatDate(booking.end_time)}
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* القسم الثالث: المالية */}
+        <div style={{ ...styles.infoSection, alignItems: "flex-end" }}>
+          <span style={styles.infoLabel}>الإجمالي</span>
+          <div style={styles.priceBig}>
+            {booking.offerings?.pricing_model === "free" ? (
+              t("free", "مجاني")
+            ) : (
+              <>
+                {subTotal}{" "}
+                <span style={{ fontSize: "0.9rem" }}>
+                  {t("currency_sar", "ر.س")}
+                </span>
+              </>
+            )}
+          </div>
+          <div
+            style={{
+              fontSize: "0.75rem",
+              color: "#64748b",
+              marginTop: "4px",
+            }}
+          >
+            {qty} {label} × {basePrice}
+          </div>
+          {booking.additional_costs > 0 && (
+            <div style={styles.extraCostBadge}>
+              + {booking.additional_costs} {t("extra_cost_label", "إضافي")}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ✨ شريط الإجراءات السفلي (الأزرار) ✨ */}
+      <div style={styles.actionBar}>
+        {isCanceling ? (
+          <div style={styles.cancelBox}>
+            <input
+              type="text"
+              placeholder={t(
+                "type_reason_placeholder",
+                "اكتب سبب الإلغاء هنا..",
+              )}
+              style={styles.input}
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+            />
+            <div style={{ display: "flex", gap: "8px" }}>
+              <button
+                onClick={handleCancelSubmit}
                 style={{
-                  fontSize: "0.75rem",
-                  color: "#64748b",
-                  marginTop: "4px",
+                  ...styles.btn,
+                  backgroundColor: "#ef4444",
+                  color: "#fff",
                 }}
               >
-                {qty} {label} × {basePrice}
-              </div>
-              {booking.additional_costs > 0 && (
-                <div style={styles.extraCostBadge}>
-                  + {booking.additional_costs} {t("extra_cost_label", "إضافي")}
-                </div>
-              )}
+                تأكيد الإلغاء
+              </button>
+              <button
+                onClick={() => setIsCanceling(false)}
+                style={{
+                  ...styles.btn,
+                  backgroundColor: "#e2e8f0",
+                  color: "#475569",
+                }}
+              >
+                تراجع
+              </button>
             </div>
           </div>
+        ) : (
+          <div
+            style={{
+              display: "flex",
+              gap: "10px",
+              width: "100%",
+              justifyContent: "flex-end",
+              flexWrap: "wrap",
+            }}
+          >
+            {/* --- أزرار العميل --- */}
+            {!isProviderView && (
+              <>
+                {booking.status === "awaiting_client_approval" && (
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "10px",
+                      backgroundColor: "#ecfdf5",
+                      padding: "8px 15px",
+                      borderRadius: "10px",
+                      width: "100%",
+                      border: "1px solid #a7f3d0",
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: "0.85rem",
+                        color: "#059669",
+                        fontWeight: "bold",
+                      }}
+                    >
+                      سعر المزود المعتمد: {booking.proposed_price} ر.س
+                    </span>
+                    <button
+                      onClick={() => updateStatus("confirmed")}
+                      style={{
+                        ...styles.btn,
+                        backgroundColor: "#10b981",
+                        color: "#fff",
+                        marginLeft: "auto",
+                      }}
+                    >
+                      موافقة وتأكيد الحجز ✅
+                    </button>
+                  </div>
+                )}
+                {booking.status === "negotiating" && (
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "10px",
+                      backgroundColor: "#ecfdf5",
+                      padding: "8px 15px",
+                      borderRadius: "10px",
+                      width: "100%",
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: "0.85rem",
+                        color: "#059669",
+                        fontWeight: "bold",
+                      }}
+                    >
+                      الإجمالي: {subTotal + booking.additional_costs} ر.س
+                    </span>
+                    <button
+                      onClick={() => updateStatus("confirmed")}
+                      style={{
+                        ...styles.btn,
+                        backgroundColor: "#10b981",
+                        color: "#fff",
+                        marginLeft: "auto",
+                      }}
+                    >
+                      موافق وتأكيد
+                    </button>
+                  </div>
+                )}
+                {booking.status === "pending" && (
+                  <span
+                    style={{
+                      fontSize: "0.85rem",
+                      color: "#94a3b8",
+                      alignSelf: "center",
+                      marginLeft: "auto",
+                    }}
+                  >
+                    بانتظار موافقة المزود...
+                  </span>
+                )}
+              </>
+            )}
 
-          {/* ✨ شريط الإجراءات السفلي (الأزرار) ✨ */}
-          <div style={styles.actionBar}>
-            {isCanceling ? (
-              <div style={styles.cancelBox}>
-                <input
-                  type="text"
-                  placeholder={t(
-                    "type_reason_placeholder",
-                    "اكتب سبب الإلغاء هنا..",
-                  )}
-                  style={styles.input}
-                  value={cancelReason}
-                  onChange={(e) => setCancelReason(e.target.value)}
-                />
-                <div style={{ display: "flex", gap: "8px" }}>
+            {/* --- أزرار المزود --- */}
+            {isProviderView && (
+              <>
+                {booking.status === "awaiting_pricing" && (
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      width: "100%",
+                      backgroundColor: "#fffbeb",
+                      padding: "8px",
+                      borderRadius: "10px",
+                      border: "1px solid #fde68a",
+                    }}
+                  >
+                    <input
+                      type="number"
+                      placeholder="أدخل السعر (ر.س)"
+                      style={{ ...styles.input, width: "150px", margin: 0 }}
+                      value={proposedPrice}
+                      onChange={(e) => setProposedPrice(e.target.value)}
+                    />
+                    <button
+                      onClick={handleSendProposedPrice}
+                      disabled={isSendingPrice}
+                      style={{
+                        ...styles.btn,
+                        backgroundColor: "#f59e0b",
+                        color: "#fff",
+                      }}
+                    >
+                      {isSendingPrice ? "جاري الإرسال..." : "إرسال السعر 📨"}
+                    </button>
+                  </div>
+                )}
+                {booking.status === "pending" && (
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: "8px",
+                      width: "100%",
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <button
+                      onClick={() => updateStatus("confirmed", 0)}
+                      style={{
+                        ...styles.btn,
+                        backgroundColor: "#10b981",
+                        color: "#fff",
+                        flex: 1,
+                      }}
+                    >
+                      قبول الطلب
+                    </button>
+                    <div style={{ display: "flex", gap: "5px", flex: 2 }}>
+                      <input
+                        type="number"
+                        placeholder="سعر إضافي (تذاكر، مواصلات، سكن، أدوات..)"
+                        style={{
+                          ...styles.input,
+                          margin: 0,
+                          minWidth: "220px",
+                        }}
+                        value={extraCosts}
+                        onChange={(e) => setExtraCosts(e.target.value)}
+                        title="أدخل هنا أي تكاليف إضافية مثل التذاكر أو المواصلات أو السكن"
+                      />
+                      <button
+                        onClick={() => updateStatus("negotiating", extraCosts)}
+                        style={{
+                          ...styles.btn,
+                          backgroundColor: "#f59e0b",
+                          color: "#fff",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        التفاوض
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {booking.status === "confirmed" && (
                   <button
-                    onClick={handleCancelSubmit}
+                    onClick={() => updateStatus("completed")}
                     style={{
                       ...styles.btn,
-                      backgroundColor: "#ef4444",
+                      backgroundColor: "#3b82f6",
                       color: "#fff",
                     }}
                   >
-                    تأكيد الإلغاء
+                    تأكيد التنفيذ 🏁
+                  </button>
+                )}
+              </>
+            )}
+
+            {/* زر الإلغاء المشترك */}
+            {canCancel && booking.status !== "awaiting_pricing" && (
+              <button
+                onClick={() => setIsCanceling(true)}
+                style={{
+                  ...styles.btn,
+                  backgroundColor: "transparent",
+                  color: "#ef4444",
+                  border: "1px solid #fca5a5",
+                }}
+              >
+                {isProviderView && booking.status === "pending"
+                  ? "رفض الطلب ✖"
+                  : "إلغاء الطلب ✖"}
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ✨ التقييمات والعمولات (Footer Extensions) ✨ */}
+      {booking.status === "cancelled" && booking.cancellation_reason && (
+        <div style={styles.alertBox}>
+          <strong>سبب الإلغاء:</strong> {booking.cancellation_reason}
+        </div>
+      )}
+
+      {booking.status === "completed" && (
+        <div style={styles.footerSection}>
+          {/* التقييم */}
+          {booking.rating ? (
+            <div style={styles.reviewBox}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "flex-start",
+                  width: "100%",
+                }}
+              >
+                <div>
+                  <span
+                    style={{
+                      fontSize: "0.8rem",
+                      color: "#92400e",
+                      fontWeight: "bold",
+                    }}
+                  >
+                    التقييم:
+                  </span>
+                  <div
+                    style={{
+                      color: "#f59e0b",
+                      fontSize: "1.1rem",
+                      marginTop: "3px",
+                    }}
+                  >
+                    {"⭐".repeat(booking.rating)}
+                  </div>
+                </div>
+              </div>
+              {booking.review && allowTextReviews && (
+                <div
+                  style={{
+                    color: "#78350f",
+                    fontSize: "0.85rem",
+                    marginTop: "8px",
+                    fontStyle: "italic",
+                    padding: "8px",
+                    backgroundColor: "rgba(255,255,255,0.5)",
+                    borderRadius: "8px",
+                    width: "100%",
+                    boxSizing: "border-box",
+                  }}
+                >
+                  {booking.is_comment_hidden
+                    ? "🚫 تم إخفاء التعليق بواسطة المزود."
+                    : `"${booking.review}"`}
+                </div>
+              )}
+            </div>
+          ) : (
+            !isProviderView &&
+            (isRatingMode ? (
+              <div style={styles.reviewBox}>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: "8px",
+                    marginBottom: "10px",
+                    direction: "ltr",
+                    justifyContent: "center",
+                  }}
+                >
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <span
+                      key={star}
+                      onClick={() => setRatingValue(star)}
+                      style={{
+                        cursor: "pointer",
+                        fontSize: "1.8rem",
+                        color: star <= ratingValue ? "#f59e0b" : "#cbd5e1",
+                        transition: "0.2s",
+                      }}
+                    >
+                      ★
+                    </span>
+                  ))}
+                </div>
+                {allowTextReviews && (
+                  <textarea
+                    placeholder="اكتب تجربتك (اختياري).."
+                    style={{
+                      ...styles.input,
+                      height: "60px",
+                      width: "100%",
+                      boxSizing: "border-box",
+                    }}
+                    value={reviewText}
+                    onChange={(e) => setReviewText(e.target.value)}
+                  />
+                )}
+                <div style={{ display: "flex", gap: "8px", marginTop: "10px" }}>
+                  <button
+                    onClick={submitRating}
+                    style={{
+                      ...styles.btn,
+                      backgroundColor: "#f59e0b",
+                      color: "#fff",
+                    }}
+                  >
+                    حفظ التقييم
                   </button>
                   <button
-                    onClick={() => setIsCanceling(false)}
+                    onClick={() => setIsRatingMode(false)}
                     style={{
                       ...styles.btn,
                       backgroundColor: "#e2e8f0",
                       color: "#475569",
                     }}
                   >
-                    تراجع
+                    إلغاء
                   </button>
                 </div>
               </div>
             ) : (
-              <div
+              <button
+                onClick={() => setIsRatingMode(true)}
                 style={{
-                  display: "flex",
-                  gap: "10px",
+                  ...styles.btn,
+                  backgroundColor: "#fffbeb",
+                  color: "#f59e0b",
+                  border: "1px dashed #f59e0b",
                   width: "100%",
-                  justifyContent: "flex-end",
-                  flexWrap: "wrap",
                 }}
               >
-                {/* --- أزرار العميل --- */}
-                {!isProviderView && (
-                  <>
-                    {booking.status === "awaiting_client_approval" && (
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "10px",
-                          backgroundColor: "#ecfdf5",
-                          padding: "8px 15px",
-                          borderRadius: "10px",
-                          width: "100%",
-                          border: "1px solid #a7f3d0",
-                        }}
-                      >
-                        <span
-                          style={{
-                            fontSize: "0.85rem",
-                            color: "#059669",
-                            fontWeight: "bold",
-                          }}
-                        >
-                          سعر المزود المعتمد: {booking.proposed_price} ر.س
-                        </span>
-                        <button
-                          onClick={() => updateStatus("confirmed")}
-                          style={{
-                            ...styles.btn,
-                            backgroundColor: "#10b981",
-                            color: "#fff",
-                            marginLeft: "auto",
-                          }}
-                        >
-                          موافقة وتأكيد الحجز ✅
-                        </button>
-                      </div>
-                    )}
-                    {booking.status === "negotiating" && (
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "10px",
-                          backgroundColor: "#ecfdf5",
-                          padding: "8px 15px",
-                          borderRadius: "10px",
-                          width: "100%",
-                        }}
-                      >
-                        <span
-                          style={{
-                            fontSize: "0.85rem",
-                            color: "#059669",
-                            fontWeight: "bold",
-                          }}
-                        >
-                          الإجمالي: {subTotal + booking.additional_costs} ر.س
-                        </span>
-                        <button
-                          onClick={() => updateStatus("confirmed")}
-                          style={{
-                            ...styles.btn,
-                            backgroundColor: "#10b981",
-                            color: "#fff",
-                            marginLeft: "auto",
-                          }}
-                        >
-                          موافق وتأكيد
-                        </button>
-                      </div>
-                    )}
-                    {booking.status === "pending" && (
-                      <span
-                        style={{
-                          fontSize: "0.85rem",
-                          color: "#94a3b8",
-                          alignSelf: "center",
-                          marginLeft: "auto",
-                        }}
-                      >
-                        بانتظار موافقة المزود...
-                      </span>
-                    )}
-                  </>
-                )}
-
-                {/* --- أزرار المزود --- */}
-                {isProviderView && (
-                  <>
-                    {booking.status === "awaiting_pricing" && (
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "8px",
-                          width: "100%",
-                          backgroundColor: "#fffbeb",
-                          padding: "8px",
-                          borderRadius: "10px",
-                          border: "1px solid #fde68a",
-                        }}
-                      >
-                        <input
-                          type="number"
-                          placeholder="أدخل السعر (ر.س)"
-                          style={{ ...styles.input, width: "150px", margin: 0 }}
-                          value={proposedPrice}
-                          onChange={(e) => setProposedPrice(e.target.value)}
-                        />
-                        <button
-                          onClick={handleSendProposedPrice}
-                          disabled={isSendingPrice}
-                          style={{
-                            ...styles.btn,
-                            backgroundColor: "#f59e0b",
-                            color: "#fff",
-                          }}
-                        >
-                          {isSendingPrice
-                            ? "جاري الإرسال..."
-                            : "إرسال السعر 📨"}
-                        </button>
-                      </div>
-                    )}
-                    {booking.status === "pending" && (
-                      <div
-                        style={{
-                          display: "flex",
-                          gap: "8px",
-                          width: "100%",
-                          flexWrap: "wrap",
-                        }}
-                      >
-                        <button
-                          onClick={() => updateStatus("confirmed", 0)}
-                          style={{
-                            ...styles.btn,
-                            backgroundColor: "#10b981",
-                            color: "#fff",
-                            flex: 1,
-                          }}
-                        >
-                          قبول الطلب
-                        </button>
-                        <div style={{ display: "flex", gap: "5px", flex: 2 }}>
-                          <input
-                            type="number"
-                            placeholder="سعر إضافي (تذاكر، مواصلات، سكن، أدوات..)"
-                            style={{
-                              ...styles.input,
-                              margin: 0,
-                              minWidth: "220px",
-                            }}
-                            value={extraCosts}
-                            onChange={(e) => setExtraCosts(e.target.value)}
-                            title="أدخل هنا أي تكاليف إضافية مثل التذاكر أو المواصلات أو السكن"
-                          />
-                          <button
-                            onClick={() =>
-                              updateStatus("negotiating", extraCosts)
-                            }
-                            style={{
-                              ...styles.btn,
-                              backgroundColor: "#f59e0b",
-                              color: "#fff",
-                              whiteSpace: "nowrap",
-                            }}
-                          >
-                            التفاوض
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                    {booking.status === "confirmed" && (
-                      <button
-                        onClick={() => updateStatus("completed")}
-                        style={{
-                          ...styles.btn,
-                          backgroundColor: "#3b82f6",
-                          color: "#fff",
-                        }}
-                      >
-                        تأكيد التنفيذ 🏁
-                      </button>
-                    )}
-                  </>
-                )}
-
-                {/* زر الإلغاء المشترك */}
-                {canCancel && booking.status !== "awaiting_pricing" && (
-                  <button
-                    onClick={() => setIsCanceling(true)}
-                    style={{
-                      ...styles.btn,
-                      backgroundColor: "transparent",
-                      color: "#ef4444",
-                      border: "1px solid #fca5a5",
-                    }}
-                  >
-                    {isProviderView && booking.status === "pending"
-                      ? "رفض الطلب ✖"
-                      : "إلغاء الطلب ✖"}
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* ✨ التقييمات والعمولات (Footer Extensions) ✨ */}
-          {booking.status === "cancelled" && booking.cancellation_reason && (
-            <div style={styles.alertBox}>
-              <strong>سبب الإلغاء:</strong> {booking.cancellation_reason}
-            </div>
-          )}
-
-          {booking.status === "completed" && (
-            <div style={styles.footerSection}>
-              {/* التقييم */}
-              {booking.rating ? (
-                <div style={styles.reviewBox}>
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "flex-start",
-                      width: "100%",
-                    }}
-                  >
-                    <div>
-                      <span
-                        style={{
-                          fontSize: "0.8rem",
-                          color: "#92400e",
-                          fontWeight: "bold",
-                        }}
-                      >
-                        التقييم:
-                      </span>
-                      <div
-                        style={{
-                          color: "#f59e0b",
-                          fontSize: "1.1rem",
-                          marginTop: "3px",
-                        }}
-                      >
-                        {"⭐".repeat(booking.rating)}
-                      </div>
-                    </div>
-                    {isProviderView &&
-                      allowTextReviews &&
-                      booking.review &&
-                      !booking.is_comment_hidden && (
-                        <button
-                          onClick={() => {
-                            if (
-                              window.confirm(
-                                "هل أنت متأكد من إخفاء هذا التعليق؟",
-                              )
-                            ) {
-                              supabase
-                                .from("bookings")
-                                .update({ is_comment_hidden: true })
-                                .eq("id", booking.id)
-                                .then(() => onRefresh());
-                            }
-                          }}
-                          style={{
-                            ...styles.btn,
-                            backgroundColor: "transparent",
-                            color: "#ef4444",
-                            padding: "4px 8px",
-                            fontSize: "0.7rem",
-                          }}
-                        >
-                          إخفاء التعليق المسيء
-                        </button>
-                      )}
-                  </div>
-                  {booking.review && allowTextReviews && (
-                    <div
-                      style={{
-                        color: "#78350f",
-                        fontSize: "0.85rem",
-                        marginTop: "8px",
-                        fontStyle: "italic",
-                        padding: "8px",
-                        backgroundColor: "rgba(255,255,255,0.5)",
-                        borderRadius: "8px",
-                      }}
-                    >
-                      {booking.is_comment_hidden
-                        ? "🚫 تم إخفاء التعليق بواسطة المزود."
-                        : `"${booking.review}"`}
-                    </div>
-                  )}
-                </div>
-              ) : (
-                !isProviderView &&
-                (isRatingMode ? (
-                  <div style={styles.reviewBox}>
-                    <div
-                      style={{
-                        display: "flex",
-                        gap: "8px",
-                        marginBottom: "10px",
-                        direction: "ltr",
-                        justifyContent: "center",
-                      }}
-                    >
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <span
-                          key={star}
-                          onClick={() => setRatingValue(star)}
-                          style={{
-                            cursor: "pointer",
-                            fontSize: "1.8rem",
-                            color: star <= ratingValue ? "#f59e0b" : "#cbd5e1",
-                            transition: "0.2s",
-                          }}
-                        >
-                          ★
-                        </span>
-                      ))}
-                    </div>
-                    {allowTextReviews && (
-                      <textarea
-                        placeholder="اكتب تجربتك (اختياري).."
-                        style={{ ...styles.input, height: "60px" }}
-                        value={reviewText}
-                        onChange={(e) => setReviewText(e.target.value)}
-                      />
-                    )}
-                    <div
-                      style={{ display: "flex", gap: "8px", marginTop: "10px" }}
-                    >
-                      <button
-                        onClick={submitRating}
-                        style={{
-                          ...styles.btn,
-                          backgroundColor: "#f59e0b",
-                          color: "#fff",
-                        }}
-                      >
-                        حفظ التقييم
-                      </button>
-                      <button
-                        onClick={() => setIsRatingMode(false)}
-                        style={{
-                          ...styles.btn,
-                          backgroundColor: "#e2e8f0",
-                          color: "#475569",
-                        }}
-                      >
-                        إلغاء
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => setIsRatingMode(true)}
-                    style={{
-                      ...styles.btn,
-                      backgroundColor: "#fffbeb",
-                      color: "#f59e0b",
-                      border: "1px dashed #f59e0b",
-                      width: "100%",
-                    }}
-                  >
-                    ⭐ تقييم الخدمة
-                  </button>
-                ))
-              )}
-
-              {/* العمولة (للمزود فقط) */}
-              {isProviderView && (
-                <div
-                  style={{
-                    ...styles.commissionBox,
-                    backgroundColor: booking.is_commission_paid
-                      ? "#ecfdf5"
-                      : "#fef2f2",
-                    borderLeft: `4px solid ${booking.is_commission_paid ? "#10b981" : "#ef4444"}`,
-                  }}
-                >
-                  <div
-                    style={{
-                      fontSize: "0.8rem",
-                      color: "#334155",
-                      fontWeight: "bold",
-                    }}
-                  >
-                    عمولة المنصة
-                  </div>
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      marginTop: "4px",
-                    }}
-                  >
-                    <span
-                      style={{
-                        fontSize: "1rem",
-                        color: booking.is_commission_paid
-                          ? "#059669"
-                          : "#dc2626",
-                        fontWeight: "bold",
-                        direction: "ltr",
-                      }}
-                    >
-                      {(basePrice * qty * 0.1).toFixed(2)} ر.س
-                    </span>
-                    <span
-                      style={{
-                        fontSize: "0.75rem",
-                        padding: "3px 8px",
-                        borderRadius: "10px",
-                        backgroundColor: booking.is_commission_paid
-                          ? "#d1fae5"
-                          : "#fee2e2",
-                        color: booking.is_commission_paid
-                          ? "#047857"
-                          : "#b91c1c",
-                        fontWeight: "bold",
-                      }}
-                    >
-                      {booking.is_commission_paid ? "✅ مسددة" : "❌ غير مسددة"}
-                    </span>
-                  </div>
-                </div>
-              )}
-            </div>
+                ⭐ تقييم الخدمة
+              </button>
+            ))
           )}
         </div>
-      </td>
-    </tr>
+      )}
+    </div>
   );
 }
 
@@ -987,10 +880,7 @@ const styles = {
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
-  },
-  commissionBox: {
-    padding: "12px 15px",
-    borderRadius: "8px",
-    marginTop: "5px",
+    width: "100%",
+    boxSizing: "border-box",
   },
 };
