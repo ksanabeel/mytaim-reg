@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 import { useTranslation } from "react-i18next";
 import { useParams } from "react-router-dom"; // ✨ استيراد قارئ الروابط ✨
+import { Helmet } from "react-helmet-async"; // 🚀 استيراد مكتبة SEO والتسويق
 
 export default function ClientMarketplace({
   session,
@@ -548,6 +549,45 @@ export default function ClientMarketplace({
 
   return (
     <div style={{ direction: isRTL ? "rtl" : "ltr" }}>
+      {/* 🚀 قسم الـ SEO الديناميكي 🚀 */}
+      {isStoreMode && storeProfile ? (
+        <Helmet>
+          <title>
+            {storeProfile.full_name || storeProfile.username} | خدمات{" "}
+            {storeProfile.provider_type === "institution" ? "مؤسسة" : "مستقل"}
+          </title>
+          <meta
+            name="description"
+            content={
+              storeProfile.provider_note ||
+              `تصفح واحجز خدمات ${storeProfile.full_name || storeProfile.username} مباشرة وبكل سهولة`
+            }
+          />
+
+          {/* إعدادات الواتساب وتويتر (Open Graph) */}
+          <meta
+            property="og:title"
+            content={`${storeProfile.full_name || storeProfile.username} | احجز الآن`}
+          />
+          <meta
+            property="og:description"
+            content={
+              storeProfile.provider_note ||
+              `تصفح واحجز خدمات ${storeProfile.full_name || storeProfile.username} مباشرة وبكل سهولة`
+            }
+          />
+          {storeProfile.avatar_url && (
+            <meta property="og:image" content={storeProfile.avatar_url} />
+          )}
+          <meta property="og:type" content="profile" />
+        </Helmet>
+      ) : (
+        <Helmet>
+          <title>{welcomeMsg} | دليلك لأفضل الخدمات</title>
+          <meta name="description" content={heroSubtitle} />
+        </Helmet>
+      )}
+
       <style>{`
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
@@ -1561,7 +1601,7 @@ export default function ClientMarketplace({
   );
 }
 
-// التنسيقات
+// התنسيقات
 const heroSectionS = {
   background: "linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)",
   padding: "55px 20px 85px",

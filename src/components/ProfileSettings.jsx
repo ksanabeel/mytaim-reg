@@ -9,12 +9,16 @@ export default function ProfileSettings({ session, onUpdate }) {
   const [maxCapacity, setMaxCapacity] = useState(1);
   const [phone, setPhone] = useState("");
 
-  // ✨ المتغيرات الجديدة الخاصة باسم المستخدم والتسويق ✨
+  // ✨ المتغيرات الخاصة باسم المستخدم والتسويق
   const [username, setUsername] = useState("");
-  const [originalUsername, setOriginalUsername] = useState(""); // لمعرفة اسم المستخدم الحالي وتجاهله في الفحص
-  const [usernameStatus, setUsernameStatus] = useState("idle"); // idle, checking, available, taken, invalid
+  const [originalUsername, setOriginalUsername] = useState("");
+  const [usernameStatus, setUsernameStatus] = useState("idle");
   const [marketingSource, setMarketingSource] = useState("");
   const [referredBy, setReferredBy] = useState("");
+
+  // 🔒 المتغيرات الخاصة ببيانات الدخول والأمان
+  const [email, setEmail] = useState("");
+  const [newPassword, setNewPassword] = useState("");
 
   const [themeColor, setThemeColor] = useState("#7c3aed");
 
@@ -40,7 +44,6 @@ export default function ProfileSettings({ session, onUpdate }) {
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef(null);
 
-  // مؤقت للتحقق من اسم المستخدم (Debounce)
   const typingTimeoutRef = useRef(null);
 
   const availableColors = [
@@ -60,11 +63,16 @@ export default function ProfileSettings({ session, onUpdate }) {
 
   useEffect(() => {
     async function loadProfile() {
+      if (session && session.user) {
+        setEmail(session.user.email || "");
+      }
+
       const { data } = await supabase
         .from("profiles")
         .select("*")
         .eq("id", session.user.id)
         .single();
+
       if (data) {
         setFullName(data.full_name || "");
         setAvatarUrl(data.avatar_url || "");
@@ -73,7 +81,6 @@ export default function ProfileSettings({ session, onUpdate }) {
         setMaxCapacity(data.max_concurrent_bookings || 1);
         setPhone(data.phone || "");
 
-        // تحميل بيانات التسويق واسم المستخدم
         setUsername(data.username || "");
         setOriginalUsername(data.username || "");
         setMarketingSource(data.marketing_source || "");
@@ -102,7 +109,6 @@ export default function ProfileSettings({ session, onUpdate }) {
     loadProfile();
   }, [session]);
 
-  // ✨ دالة التحقق من توفر اسم المستخدم (تعمل تلقائياً عند الكتابة) ✨
   const handleUsernameChange = (e) => {
     const val = e.target.value.toLowerCase().trim();
     setUsername(val);
@@ -114,14 +120,12 @@ export default function ProfileSettings({ session, onUpdate }) {
       return;
     }
 
-    // التحقق من الصيغة (حروف إنجليزية وأرقام فقط بدون مسافات)
     const isValidFormat = /^[a-z0-9_]+$/.test(val);
     if (!isValidFormat) {
       setUsernameStatus("invalid");
       return;
     }
 
-    // إذا كان هو نفس اسمه القديم، لا داعي للتحقق من قاعدة البيانات
     if (val === originalUsername) {
       setUsernameStatus("available");
       return;
@@ -140,7 +144,7 @@ export default function ProfileSettings({ session, onUpdate }) {
       } else {
         setUsernameStatus("available");
       }
-    }, 800); // ينتظر 800 جزء من الثانية بعد التوقف عن الكتابة ليفحص
+    }, 800);
   };
 
   const uploadAvatar = async (event) => {
@@ -164,18 +168,6 @@ export default function ProfileSettings({ session, onUpdate }) {
     } finally {
       setIsUploading(false);
     }
-  };
-
-  const handleSendReply = async () => {
-    if (!providerNote.trim()) return alert("الرجاء كتابة رد أولاً ✍️");
-    setIsSubmitting(true);
-    const { error } = await supabase
-      .from("profiles")
-      .update({ provider_note: providerNote })
-      .eq("id", session.user.id);
-    setIsSubmitting(false);
-    if (!error) alert("تم إرسال الرد للإدارة بنجاح ✅");
-    else alert("خطأ في إرسال الرد: " + error.message);
   };
 
   const handleVerificationRequest = async () => {
@@ -220,11 +212,44 @@ export default function ProfileSettings({ session, onUpdate }) {
     }
 
     setIsSubmitting(true);
+
+    // 1️⃣ تحديث بيانات الدخول بذكاء لتفادي مشاكل الملء التلقائي للمتصفح
+    let authUpdateError = null;
+    const isEmailChanged = email !== session.user.email;
+    const isPasswordChanged = newPassword && newPassword.trim().length > 0;
+
+    if (isPasswordChanged || isEmailChanged) {
+      const authUpdates = {};
+      if (isPasswordChanged) authUpdates.password = newPassword;
+      if (isEmailChanged) authUpdates.email = email;
+
+      const { error } = await supabase.auth.updateUser(authUpdates);
+
+      if (error) {
+        // ✨ السحر هنا: إذا كان الخطأ بسبب أن كلمة المرور مطابقة للقديمة، نتجاهله بصمت ونكمل الحفظ
+        if (
+          error.message.includes("different from the old password") ||
+          error.status === 422
+        ) {
+          console.warn("تجاهل تحديث كلمة المرور (مطابقة للقديمة)");
+        } else {
+          authUpdateError = error;
+        }
+      }
+    }
+
+    if (authUpdateError) {
+      setIsSubmitting(false);
+      alert("حدث خطأ أثناء تحديث بيانات الدخول: " + authUpdateError.message);
+      return;
+    }
+
+    // 2️⃣ تحديث باقي البيانات في جدول Profiles
     const { error } = await supabase
       .from("profiles")
       .update({
         full_name: fullName,
-        username: username || null, // لتجنب الأخطاء إذا كان فارغاً
+        username: username || null,
         marketing_source: marketingSource,
         referred_by: referredBy,
         avatar_url: avatarUrl,
@@ -249,18 +274,24 @@ export default function ProfileSettings({ session, onUpdate }) {
     setIsSubmitting(false);
 
     if (!error) {
-      setOriginalUsername(username); // تحديث الاسم الأصلي بعد الحفظ الناجح
-      alert("تم التحديث بنجاح ✅");
+      setOriginalUsername(username);
+      setNewPassword(""); // تفريغ الخانة بعد النجاح
+
+      if (isEmailChanged) {
+        alert(
+          "تم الحفظ بنجاح ✅\nلقد قمت بتغيير بريدك الإلكتروني، يرجى مراجعة بريدك الجديد للضغط على رابط التأكيد.",
+        );
+      } else {
+        alert("تم تحديث الملف الشخصي بنجاح ✅");
+      }
+
       if (onUpdate) onUpdate();
     } else {
       if (error.code === "23505") {
-        // كود الخطأ الخاص بتكرار البيانات الفريدة في قاعدة البيانات
-        alert(
-          "عذراً! اسم المستخدم هذا تم حجزه في هذه اللحظة، الرجاء اختيار اسم آخر.",
-        );
+        alert("عذراً! اسم المستخدم هذا تم حجزه للتو، الرجاء اختيار اسم آخر.");
         setUsernameStatus("taken");
       } else {
-        alert("خطأ: " + error.message);
+        alert("خطأ في تحديث البيانات: " + error.message);
       }
     }
   };
@@ -394,7 +425,9 @@ export default function ProfileSettings({ session, onUpdate }) {
         <p
           style={{ margin: "0 0 20px 0", color: "#64748b", fontSize: "0.9rem" }}
         >
-          {providerType === "institution" ? "مؤسسة / شركة" : "فرد (مستقل)"}
+          {providerType === "institution"
+            ? "/متعهد/قائد فريق او مجموعه/ مؤسسة / شركة"
+            : "فرد (مستقل)"}
         </p>
 
         <div
@@ -450,6 +483,7 @@ export default function ProfileSettings({ session, onUpdate }) {
 
       <form
         onSubmit={handleUpdate}
+        autoComplete="off" // ✨ منع الملء التلقائي للنموذج ككل
         style={{ display: "flex", flexDirection: "column", gap: "25px" }}
       >
         {/* 🚀 قسم الهوية الرقمية والتسويق 🚀 */}
@@ -474,14 +508,68 @@ export default function ProfileSettings({ session, onUpdate }) {
           </h3>
 
           <div style={{ marginBottom: "20px" }}>
-            <label style={{ ...lblS, color: "#1e293b" }}>
-              اسم المستخدم (Username):
-            </label>
+            {/* ✨ التعديل: نقل رسائل التحذير لتكون بجانب العنوان فوق الحقل ✨ */}
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "8px",
+              }}
+            >
+              <label
+                style={{ fontWeight: "bold", color: "#475569", margin: 0 }}
+              >
+                اسم المستخدم (Username):
+              </label>
+              <div>
+                {usernameStatus === "checking" && (
+                  <span style={{ fontSize: "0.85rem", color: "#64748b" }}>
+                    ⏳ جاري الفحص...
+                  </span>
+                )}
+                {usernameStatus === "available" &&
+                  username !== originalUsername && (
+                    <span
+                      style={{
+                        fontSize: "0.85rem",
+                        color: "#10b981",
+                        fontWeight: "bold",
+                      }}
+                    >
+                      ✅ متاح
+                    </span>
+                  )}
+                {usernameStatus === "taken" && (
+                  <span
+                    style={{
+                      fontSize: "0.85rem",
+                      color: "#ef4444",
+                      fontWeight: "bold",
+                    }}
+                  >
+                    ❌ مستخدم مسبقاً
+                  </span>
+                )}
+                {usernameStatus === "invalid" && (
+                  <span
+                    style={{
+                      fontSize: "0.85rem",
+                      color: "#ef4444",
+                      fontWeight: "bold",
+                    }}
+                  >
+                    ⚠️ حروف إنجليزية وأرقام فقط
+                  </span>
+                )}
+              </div>
+            </div>
+
             <div style={{ position: "relative" }}>
               <span
                 style={{
                   position: "absolute",
-                  left: "12px",
+                  right: "12px",
                   top: "12px",
                   color: "#94a3b8",
                   fontWeight: "bold",
@@ -492,9 +580,12 @@ export default function ProfileSettings({ session, onUpdate }) {
               <input
                 type="text"
                 dir="ltr"
+                value={username}
+                onChange={handleUsernameChange}
+                placeholder="nabeel88"
                 style={{
                   ...inpS,
-                  paddingLeft: "35px",
+                  paddingRight: "35px",
                   borderColor:
                     usernameStatus === "taken" || usernameStatus === "invalid"
                       ? "#ef4444"
@@ -502,74 +593,48 @@ export default function ProfileSettings({ session, onUpdate }) {
                         ? "#10b981"
                         : "#cbd5e1",
                 }}
-                value={username}
-                onChange={handleUsernameChange}
-                placeholder="nabeel88"
               />
-              {usernameStatus === "checking" && (
-                <span
-                  style={{
-                    position: "absolute",
-                    right: "12px",
-                    top: "12px",
-                    fontSize: "0.9rem",
-                  }}
-                >
-                  ⏳ جاري الفحص...
-                </span>
-              )}
-              {usernameStatus === "available" && (
-                <span
-                  style={{
-                    position: "absolute",
-                    right: "12px",
-                    top: "12px",
-                    color: "#10b981",
-                    fontSize: "0.9rem",
-                    fontWeight: "bold",
-                  }}
-                >
-                  ✅ متاح
-                </span>
-              )}
-              {usernameStatus === "taken" && (
-                <span
-                  style={{
-                    position: "absolute",
-                    right: "12px",
-                    top: "12px",
-                    color: "#ef4444",
-                    fontSize: "0.9rem",
-                    fontWeight: "bold",
-                  }}
-                >
-                  ❌ مستخدم مسبقاً
-                </span>
-              )}
-              {usernameStatus === "invalid" && (
-                <span
-                  style={{
-                    position: "absolute",
-                    right: "12px",
-                    top: "12px",
-                    color: "#ef4444",
-                    fontSize: "0.9rem",
-                    fontWeight: "bold",
-                  }}
-                >
-                  ⚠️ حروف إنجليزية وأرقام فقط
-                </span>
-              )}
             </div>
-            <p
-              style={{
-                margin: "5px 0 0 0",
-                fontSize: "0.75rem",
-                color: "#64748b",
-              }}
-            >
-              * سيتم استخدامه كرابط مباشر لملفك الشخصي.
-            </p>
+
+            {/* رسالة التحذير تظهر فقط إذا قام بتغيير اليوزر نيم */}
+            {username !== originalUsername ? (
+              <div
+                style={{
+                  marginTop: "10px",
+                  padding: "10px",
+                  backgroundColor: "#fef2f2",
+                  borderRight: "4px solid #ef4444",
+                  borderRadius: "8px",
+                  color: "#991b1b",
+                  fontSize: "0.85rem",
+                  display: "flex",
+                  gap: "8px",
+                  alignItems: "center",
+                }}
+              >
+                <span>⚠️</span>
+                <span>
+                  <strong>تنبيه هام:</strong> تغيير اسم المستخدم سيؤدي إلى تغيير
+                  الرابط الخاص بملفك، وسيتوقف الرابط القديم عن العمل.
+                  <br />
+                  <small>
+                    * لا يمكنك تغيير اسم المستخدم مرة أخرى إلا بعد مرور 30
+                    يوماً.
+                  </small>
+                </span>
+              </div>
+            ) : (
+              <small
+                style={{
+                  color: "#64748b",
+                  fontSize: "0.8rem",
+                  display: "block",
+                  marginTop: "6px",
+                }}
+              >
+                * سيتم استخدامه كرابط مباشر لملفك الشخصي وللتسويق.
+              </small>
+            )}
           </div>
 
           <div
@@ -869,7 +934,9 @@ export default function ProfileSettings({ session, onUpdate }) {
                 onChange={(e) => setProviderType(e.target.value)}
               >
                 <option value="individual">👤 فرد (مستقل)</option>
-                <option value="institution">🏢 مؤسسة / شركة</option>
+                <option value="institution">
+                  🏢 /متعهد/ قائد فريق او مجموعه/مؤسسة / شركة
+                </option>
               </select>
             </div>
             {providerType === "institution" && (
@@ -882,7 +949,7 @@ export default function ProfileSettings({ session, onUpdate }) {
                 }}
               >
                 <label style={{ ...lblS, color: "#1e40af" }}>
-                  الطاقة الاستيعابية (حجوزات מתزامنة):
+                  الطاقة الاستيعابية (حجوزات متزامنة):
                 </label>
                 <input
                   type="number"
@@ -923,6 +990,131 @@ export default function ProfileSettings({ session, onUpdate }) {
                   placeholder="سيظهر للعملاء لزيادة الثقة.."
                 />
               </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ✨ بطاقة بيانات الدخول والأمان ✨ */}
+        <div
+          style={{
+            background: "#fff",
+            padding: "25px",
+            borderRadius: "16px",
+            border: "1px solid #e2e8f0",
+            marginBottom: "25px",
+            boxShadow: "0 4px 6px rgba(0,0,0,0.02)",
+          }}
+        >
+          <h3
+            style={{
+              margin: "0 0 20px 0",
+              color: "#1e293b",
+              fontSize: "1.2rem",
+              fontWeight: "bold",
+              display: "flex",
+              alignItems: "center",
+              gap: "10px",
+            }}
+          >
+            🔒 بيانات الدخول والأمان
+          </h3>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
+              gap: "20px",
+            }}
+          >
+            {/* حقل البريد الإلكتروني */}
+            <div>
+              <label
+                style={{
+                  display: "block",
+                  marginBottom: "8px",
+                  fontWeight: "bold",
+                  color: "#475569",
+                  fontSize: "0.95rem",
+                }}
+              >
+                البريد الإلكتروني (Email):
+              </label>
+              <input
+                type="email"
+                autoComplete="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="example@email.com"
+                required
+                dir="ltr"
+                style={{
+                  width: "100%",
+                  padding: "12px",
+                  borderRadius: "10px",
+                  border: "1px solid #cbd5e1",
+                  outline: "none",
+                  fontSize: "1rem",
+                  transition: "0.2s",
+                  textAlign: "left",
+                }}
+                onFocus={(e) => (e.target.style.borderColor = "#7c3aed")}
+                onBlur={(e) => (e.target.style.borderColor = "#cbd5e1")}
+              />
+              <small
+                style={{
+                  color: "#64748b",
+                  fontSize: "0.8rem",
+                  display: "block",
+                  marginTop: "6px",
+                }}
+              >
+                * عند تغيير البريد، سيتم إرسال رابط تأكيد للإيميل الجديد.
+              </small>
+            </div>
+
+            {/* ✨ حقل كلمة المرور (مع منع الملء التلقائي) ✨ */}
+            <div>
+              <label
+                style={{
+                  display: "block",
+                  marginBottom: "8px",
+                  fontWeight: "bold",
+                  color: "#475569",
+                  fontSize: "0.95rem",
+                }}
+              >
+                كلمة المرور الجديدة:
+              </label>
+              <input
+                type="password"
+                autoComplete="new-password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="••••••••"
+                dir="ltr"
+                style={{
+                  width: "100%",
+                  padding: "12px",
+                  borderRadius: "10px",
+                  border: "1px solid #cbd5e1",
+                  outline: "none",
+                  fontSize: "1rem",
+                  transition: "0.2s",
+                  textAlign: "left",
+                }}
+                onFocus={(e) => (e.target.style.borderColor = "#7c3aed")}
+                onBlur={(e) => (e.target.style.borderColor = "#cbd5e1")}
+              />
+              <small
+                style={{
+                  color: "#64748b",
+                  fontSize: "0.8rem",
+                  display: "block",
+                  marginTop: "6px",
+                }}
+              >
+                * اترك الحقل فارغاً إذا لم ترغب في تغيير كلمة المرور.
+              </small>
             </div>
           </div>
         </div>
