@@ -217,49 +217,78 @@ export default function ClientMarketplace({
     fetchReviews();
   }, [selected]);
 
+  // ✨ الخوارزمية الذكية المحدثة لحساب الكميات والفترات ✨
   useEffect(() => {
     if (!selected) return;
     const model = selected.pricing_model || "fixed";
-    const price = Number(selected.price);
+    const price = Number(selected.price) || 0;
     let qty = 1;
     let label = t("task", "مهمة");
 
-    if (model === "period") {
-      qty = Number(bookingData.manualQuantity) || 1;
-      label = t("period", "فترة");
-    } else if (
+    if (
       model !== "fixed" &&
       model !== "free" &&
       bookingData.startDate &&
-      bookingData.endDate
+      bookingData.endDate &&
+      bookingData.startTime &&
+      bookingData.endTime
     ) {
-      const startStr = `${bookingData.startDate}T${bookingData.startTime || "00:00"}:00`;
-      const endStr = `${bookingData.endDate}T${bookingData.endTime || "23:59"}:00`;
+      const startStr = `${bookingData.startDate}T${bookingData.startTime}:00`;
+      const endStr = `${bookingData.endDate}T${bookingData.endTime}:00`;
       const start = new Date(startStr);
       const end = new Date(endStr);
-      let diffHours = (end - start) / (1000 * 60 * 60);
-      if (diffHours <= 0) diffHours += 24;
 
-      if (model === "hourly") {
-        qty = Math.round(diffHours * 100) / 100;
-        label = t("hour", "ساعة");
-      } else if (model === "daily") {
-        qty = Math.max(1, Math.ceil(diffHours / 24));
-        label = t("day", "يوم");
-      } else if (model === "monthly") {
-        qty = Math.max(1, Math.ceil(diffHours / (24 * 30)));
-        label = t("month", "شهر");
-      } else if (model === "yearly") {
-        qty = Math.max(1, Math.ceil(diffHours / (24 * 365)));
-        label = t("year", "سنة");
+      let diffHours = (end - start) / (1000 * 60 * 60);
+
+      // معالجة الحجوزات التي تتجاوز منتصف الليل
+      if (diffHours <= 0 && bookingData.startDate === bookingData.endDate) {
+        diffHours += 24;
       }
-    } else if (model === "fixed" || model === "free") {
-      qty = 1;
-      label =
-        model === "free"
-          ? t("volunteer", "تطوع")
-          : t("fixed_task", "مهمة ثابتة");
+
+      if (diffHours > 0) {
+        if (model === "hourly") {
+          qty = Math.round(diffHours * 100) / 100;
+          label = t("hour", "ساعة");
+        } else if (model === "daily") {
+          qty = Math.max(1, Math.ceil(diffHours / 24));
+          label = t("day", "يوم");
+        } else if (model === "monthly") {
+          qty = Math.max(1, Math.ceil(diffHours / (24 * 30)));
+          label = t("month", "شهر");
+        } else if (model === "yearly") {
+          qty = Math.max(1, Math.ceil(diffHours / (24 * 365)));
+          label = t("year", "سنة");
+        } else if (model === "period") {
+          // استخراج مدة الفترة التي حددها المزود (افتراضياً 4 ساعات إذا لم تكن موجودة)
+          let periodLengthInHours = 4;
+
+          if (selected.duration) {
+            const extractedNumber = parseInt(
+              String(selected.duration).replace(/\D/g, ""),
+            );
+            if (!isNaN(extractedNumber) && extractedNumber > 0) {
+              periodLengthInHours = extractedNumber;
+            }
+          }
+
+          qty = Math.max(1, Math.ceil(diffHours / periodLengthInHours));
+          label = t("period", "فترة");
+        }
+      }
+    } else {
+      // في حال لم يكمل العميل التواريخ أو كان نموذج التسعير ثابت/مجاني
+      if (model === "period") {
+        qty = 1;
+        label = t("period", "فترة");
+      } else if (model === "fixed" || model === "free") {
+        qty = 1;
+        label =
+          model === "free"
+            ? t("volunteer", "تطوع")
+            : t("fixed_task", "مهمة ثابتة");
+      }
     }
+
     setCalculatedData({ price: price * qty, quantity: qty, text: label });
   }, [bookingData, selected, t]);
 
@@ -400,7 +429,7 @@ export default function ClientMarketplace({
       );
     }
 
-    // 🚀 تم إضافة :00 لضمان صحة قراءة الوقت الإنجليزي في كل المتصفحات
+    // 🚀 إضافة الثواني :00 لضمان القراءة الصحيحة في كل المتصفحات
     const requestedStart = new Date(
       `${bookingData.startDate}T${bookingData.startTime || "00:00"}:00`,
     );
@@ -551,6 +580,7 @@ export default function ClientMarketplace({
           padding: isStoreMode ? "30px 20px 85px" : "40px 20px 85px",
         }}
       >
+        {/* ✨ الساعة الحية المتزامنة ✨ */}
         <div
           style={{
             fontSize: "0.95rem",
