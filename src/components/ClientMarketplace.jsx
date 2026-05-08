@@ -1,8 +1,18 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 import { useTranslation } from "react-i18next";
-import { useParams } from "react-router-dom"; // ✨ استيراد قارئ الروابط ✨
-import { Helmet } from "react-helmet-async"; // 🚀 استيراد مكتبة SEO والتسويق
+import { useParams } from "react-router-dom";
+
+// ✨ استيرادات مكتبة التقويم + إضافة الوقت
+import DatePicker from "react-multi-date-picker";
+import TimePicker from "react-multi-date-picker/plugins/time_picker";
+import gregorian from "react-date-object/calendars/gregorian";
+import gregorian_ar from "react-date-object/locales/gregorian_ar";
+import "react-multi-date-picker/styles/layouts/mobile.css";
+
+// 🚀 الحيلة الذكية لحل مشكلة الـ Object مع سيرفر Vite
+const SmartDatePicker = DatePicker.default || DatePicker;
+const SmartTimePicker = TimePicker.default || TimePicker;
 
 export default function ClientMarketplace({
   session,
@@ -12,17 +22,19 @@ export default function ClientMarketplace({
 }) {
   const { t, i18n } = useTranslation();
   const { storeUsername } = useParams();
-  const username = storeUsername ? storeUsername.replace("@", "") : null; // إزالة الـ @ للبحث الصافي في قاعدة البيانات
+  const username = storeUsername ? storeUsername.replace("@", "") : null;
+  const isRTL = i18n.language === "ar";
+
+  // ✨ حالة الساعة الحية (Live Clock)
+  const [liveTime, setLiveTime] = useState(new Date());
 
   const [offerings, setOfferings] = useState([]);
   const [dbCategories, setDbCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
 
-  // ✨ حالة جديدة لحفظ بيانات المزود صاحب المتجر (إذا دخلنا من رابطه)
   const [storeProfile, setStoreProfile] = useState(null);
 
-  // فلاتر البحث
   const [localSearch, setLocalSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState("all");
   const [filterCountry, setFilterCountry] = useState("all");
@@ -50,8 +62,6 @@ export default function ClientMarketplace({
     text: "",
   });
 
-  const todayDate = new Date().toISOString().split("T")[0];
-
   const dayLabels = {
     sun: "الأحد",
     mon: "الإثنين",
@@ -62,16 +72,20 @@ export default function ClientMarketplace({
     sat: "السبت",
   };
 
+  // ✨ تحديث الساعة الحية كل ثانية
+  useEffect(() => {
+    const timer = setInterval(() => setLiveTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
   useEffect(() => {
     const fetchData = async () => {
-      // 1. جلب الأقسام
       const { data: cats } = await supabase
         .from("categories")
         .select("*")
         .order("created_at");
       if (cats) setDbCategories(cats);
 
-      // 2. إذا كنا في وضع "المتجر الشخصي" (يوجد يوزر في الرابط)، نجلب بيانات هذا المزود أولاً
       if (username) {
         const { data: prof } = await supabase
           .from("profiles")
@@ -81,13 +95,11 @@ export default function ClientMarketplace({
         if (prof) setStoreProfile(prof);
       }
 
-      // 3. جلب الخدمات (مع الفلترة إذا كنا في متجر شخصي)
       let query = supabase
         .from("offerings")
         .select("*, profiles!inner(*)")
         .eq("profiles.is_active", true);
 
-      // ✨ السحر هنا: إذا كان هناك يوزر في الرابط، اجلب خدماته هو فقط! ✨
       if (username) {
         query = query.eq("profiles.username", username);
       }
@@ -101,13 +113,13 @@ export default function ClientMarketplace({
       setLoading(false);
     };
     fetchData();
-  }, [username]); // إعادة التحديث إذا تغير الرابط
+  }, [username]);
 
   const displayCategories = [
     { id: "all", label: t("cat_all", "الكل"), icon: "🌟" },
     ...dbCategories.map((c) => ({
       id: c.id,
-      label: i18n.language === "ar" ? c.label_ar : c.label_en,
+      label: isRTL ? c.label_ar : c.label_en,
       icon: c.icon,
     })),
   ];
@@ -221,8 +233,8 @@ export default function ClientMarketplace({
       bookingData.startDate &&
       bookingData.endDate
     ) {
-      const startStr = `${bookingData.startDate}T${bookingData.startTime || "00:00"}`;
-      const endStr = `${bookingData.endDate}T${bookingData.endTime || "23:59"}`;
+      const startStr = `${bookingData.startDate}T${bookingData.startTime || "00:00"}:00`;
+      const endStr = `${bookingData.endDate}T${bookingData.endTime || "23:59"}:00`;
       const start = new Date(startStr);
       const end = new Date(endStr);
       let diffHours = (end - start) / (1000 * 60 * 60);
@@ -254,7 +266,7 @@ export default function ClientMarketplace({
   const handleGetLocation = () => {
     if (!navigator.geolocation)
       return alert(
-        i18n.language === "ar"
+        isRTL
           ? "جهازك لا يدعم تحديد الموقع."
           : "Your device doesn't support geolocation.",
       );
@@ -262,41 +274,16 @@ export default function ClientMarketplace({
       (pos) =>
         setBookingData({
           ...bookingData,
-          gpsLocation: `https://www.google.com/maps?q=${pos.coords.latitude},${pos.coords.longitude}`,
+          gpsLocation: `http://googleusercontent.com/maps.google.com/${pos.coords.latitude},${pos.coords.longitude}`,
           manualLocation: "",
         }),
       () =>
         alert(
-          i18n.language === "ar"
+          isRTL
             ? "يرجى السماح بالوصول للـ GPS 📍"
             : "Please allow GPS access 📍",
         ),
     );
-  };
-
-  const handleDateChange = (field, value) => {
-    if (!value) {
-      setBookingData({ ...bookingData, [field]: value });
-      return;
-    }
-    const selectedDate = new Date(value);
-    const dayMap = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
-    const dayId = dayMap[selectedDate.getDay()];
-    const activeDays =
-      Array.isArray(selected.available_days) &&
-      selected.available_days.length > 0
-        ? selected.available_days
-        : dayMap;
-    if (!activeDays.includes(dayId)) {
-      alert(
-        i18n.language === "ar"
-          ? `⛔ عذراً! المزود لا يعمل في يوم (${dayLabels[dayId] || dayId}). الرجاء اختيار يوم آخر.`
-          : "⛔ The provider does not work on this day.",
-      );
-      setBookingData({ ...bookingData, [field]: "" });
-      return;
-    }
-    setBookingData({ ...bookingData, [field]: value });
   };
 
   const handleSuggestNextSlot = () => {
@@ -373,7 +360,7 @@ export default function ClientMarketplace({
       });
     } else {
       alert(
-        i18n.language === "ar"
+        isRTL
           ? "لا يمكن تحديد موعد تلقائي، يرجى الاختيار يدوياً."
           : "Cannot auto-suggest a slot.",
       );
@@ -381,13 +368,12 @@ export default function ClientMarketplace({
   };
 
   const handleBook = async () => {
-    // ✨ التعديل السحري: إذا كان زائراً، نفتح نافذة تسجيل الدخول ✨
     if (!session) {
       if (typeof onRequireLogin === "function") {
         onRequireLogin();
       } else {
         alert(
-          i18n.language === "ar"
+          isRTL
             ? "يرجى تسجيل الدخول أو إنشاء حساب أولاً 🔐"
             : "Please login first 🔐",
         );
@@ -408,29 +394,28 @@ export default function ClientMarketplace({
       !bookingData.clientContact
     ) {
       return alert(
-        i18n.language === "ar"
+        isRTL
           ? "يرجى إكمال جميع التفاصيل المطلوبة (الموقع، التواريخ، ورقم التواصل) 📍📞"
           : "Please complete all details.",
       );
     }
 
+    // 🚀 تم إضافة :00 لضمان صحة قراءة الوقت الإنجليزي في كل المتصفحات
     const requestedStart = new Date(
-      `${bookingData.startDate}T${bookingData.startTime || "00:00"}`,
+      `${bookingData.startDate}T${bookingData.startTime || "00:00"}:00`,
     );
     let requestedEnd = new Date(
-      `${bookingData.endDate}T${bookingData.endTime || "23:59"}`,
+      `${bookingData.endDate}T${bookingData.endTime || "23:59"}:00`,
     );
     const now = new Date();
 
     if (requestedStart < now && bookingData.startTime)
       return alert(
-        i18n.language === "ar"
-          ? "⛔ لا يمكن الحجز في الماضي."
-          : "⛔ Cannot book in the past.",
+        isRTL ? "⛔ لا يمكن الحجز في الماضي." : "⛔ Cannot book in the past.",
       );
     if (requestedEnd <= requestedStart)
       return alert(
-        i18n.language === "ar"
+        isRTL
           ? "⛔ وقت الانتهاء يجب أن يكون بعد وقت البدء."
           : "⛔ End time must be after start time.",
       );
@@ -458,7 +443,7 @@ export default function ClientMarketplace({
           : rStartMins;
       if (normRStart < pStartMins || normRStart > pEndMins) {
         return alert(
-          i18n.language === "ar"
+          isRTL
             ? `⛔ الوقت المحدد خارج أوقات الدوام! ساعات العمل من ${selected.work_start_time.substring(0, 5)} إلى ${selected.work_end_time.substring(0, 5)}.`
             : "⛔ Outside working hours.",
         );
@@ -480,7 +465,7 @@ export default function ClientMarketplace({
     });
     if (overlaps >= (selected.profiles?.max_concurrent_bookings || 1))
       return alert(
-        i18n.language === "ar"
+        isRTL
           ? "⚠️ هذا الوقت محجوز مسبقاً، لا توجد سعة."
           : "⚠️ This time is already booked.",
       );
@@ -500,7 +485,7 @@ export default function ClientMarketplace({
 
     if (!error) {
       alert(
-        i18n.language === "ar"
+        isRTL
           ? selected.price_upon_agreement
             ? "تم إرسال طلب التسعير للمزود بنجاح 📨"
             : "تم إرسال الطلب للمزود بنجاح ✅"
@@ -533,7 +518,7 @@ export default function ClientMarketplace({
           fontWeight: "bold",
         }}
       >
-        ⏳ {i18n.language === "ar" ? "جاري التحميل..." : "Loading..."}
+        ⏳ {isRTL ? "جاري التحميل..." : "Loading..."}
       </div>
     );
 
@@ -541,71 +526,64 @@ export default function ClientMarketplace({
     selected &&
     (["fixed", "daily"].includes(selected.pricing_model) ||
       selected.price_upon_agreement);
-  const isRTL = i18n.language === "ar";
-
-  // ✨ المتغيرات الخاصة بمتجر المزود (الرابط المباشر) ✨
   const isStoreMode = !!username;
   const storeTheme = storeProfile?.theme_color || "#7c3aed";
 
   return (
     <div style={{ direction: isRTL ? "rtl" : "ltr" }}>
-      {/* 🚀 قسم الـ SEO الديناميكي 🚀 */}
-      {isStoreMode && storeProfile ? (
-        <Helmet>
-          <title>
-            {storeProfile.full_name || storeProfile.username} | خدمات{" "}
-            {storeProfile.provider_type === "institution" ? "مؤسسة" : "مستقل"}
-          </title>
-          <meta
-            name="description"
-            content={
-              storeProfile.provider_note ||
-              `تصفح واحجز خدمات ${storeProfile.full_name || storeProfile.username} مباشرة وبكل سهولة`
-            }
-          />
-
-          {/* إعدادات الواتساب وتويتر (Open Graph) */}
-          <meta
-            property="og:title"
-            content={`${storeProfile.full_name || storeProfile.username} | احجز الآن`}
-          />
-          <meta
-            property="og:description"
-            content={
-              storeProfile.provider_note ||
-              `تصفح واحجز خدمات ${storeProfile.full_name || storeProfile.username} مباشرة وبكل سهولة`
-            }
-          />
-          {storeProfile.avatar_url && (
-            <meta property="og:image" content={storeProfile.avatar_url} />
-          )}
-          <meta property="og:type" content="profile" />
-        </Helmet>
-      ) : (
-        <Helmet>
-          <title>{welcomeMsg} | دليلك لأفضل الخدمات</title>
-          <meta name="description" content={heroSubtitle} />
-        </Helmet>
-      )}
-
       <style>{`
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         .smart-card { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); top: 0; }
         .smart-card:hover { transform: translateY(-5px); box-shadow: 0 15px 30px rgba(0,0,0,0.08); }
         .search-container { position: relative; z-index: 10; margin-top: -35px; margin-bottom: 30px; }
+        .rmdp-container { width: 100%; }
+        .rmdp-input { width: 100% !important; padding: 12px !important; border-radius: 12px !important; border: 1px solid #cbd5e1 !important; font-family: inherit !important; font-size: 0.95rem !important; outline: none; box-sizing: border-box; background: #fff; cursor: pointer; color: #1e293b; font-weight: bold; }
+        .rmdp-input::placeholder { color: #94a3b8; font-weight: normal; }
       `}</style>
 
-      {/* ✨ البانر الذكي: يتغير شكله بالكامل إذا دخلنا رابط مزود معين ✨ */}
       <div
         style={{
           ...heroSectionS,
           background: isStoreMode
             ? storeTheme
             : "linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)",
-          padding: isStoreMode ? "40px 20px 85px" : "55px 20px 85px", // تقليل المساحة العلوية في المتجر
+          padding: isStoreMode ? "30px 20px 85px" : "40px 20px 85px",
         }}
       >
+        <div
+          style={{
+            fontSize: "0.95rem",
+            color: "rgba(255,255,255,0.9)",
+            marginBottom: "20px",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            gap: "10px",
+            fontWeight: "bold",
+            backgroundColor: "rgba(0,0,0,0.15)",
+            padding: "8px 20px",
+            borderRadius: "20px",
+            width: "fit-content",
+            margin: "0 auto 20px auto",
+            backdropFilter: "blur(5px)",
+          }}
+        >
+          <span>🕒</span>
+          <span dir="ltr">
+            {liveTime.toLocaleTimeString(isRTL ? "ar-SA" : "en-US")}
+          </span>
+          <span style={{ opacity: 0.5 }}>|</span>
+          <span>
+            {liveTime.toLocaleDateString(isRTL ? "ar-SA" : "en-US", {
+              weekday: "long",
+              year: "numeric",
+              month: "short",
+              day: "numeric",
+            })}
+          </span>
+        </div>
+
         {isStoreMode && storeProfile ? (
           <div
             style={{
@@ -766,16 +744,38 @@ export default function ClientMarketplace({
               flex: "1.5 1 150px",
               display: "flex",
               alignItems: "center",
-              padding: "0 10px",
+              padding: "8px 10px",
             }}
           >
-            <input
-              type="date"
-              min={todayDate}
+            <SmartDatePicker
+              calendar={gregorian}
+              locale={isRTL ? gregorian_ar : undefined}
               value={filterDate}
-              onChange={(e) => setFilterDate(e.target.value)}
-              style={{ ...floatingSelectS(isRTL), border: "none" }}
-              title={isRTL ? "تاريخ الحجز (اختياري)" : "Date (Optional)"}
+              onChange={(date) => {
+                if (!date) {
+                  setFilterDate("");
+                  return;
+                }
+                const jsDate = date.toDate();
+                setFilterDate(
+                  `${jsDate.getFullYear()}-${String(jsDate.getMonth() + 1).padStart(2, "0")}-${String(jsDate.getDate()).padStart(2, "0")}`,
+                );
+              }}
+              minDate={new Date()}
+              format="YYYY-MM-DD"
+              placeholder={
+                isRTL ? "تاريخ الحجز (اختياري) 📅" : "Date (Optional) 📅"
+              }
+              containerStyle={{ width: "100%" }}
+              style={{
+                border: "none",
+                backgroundColor: "transparent",
+                outline: "none",
+                cursor: "pointer",
+                color: "#475569",
+                fontWeight: "bold",
+                width: "100%",
+              }}
             />
           </div>
 
@@ -811,7 +811,6 @@ export default function ClientMarketplace({
         </div>
       </div>
 
-      {/* إخفاء الأقسام إذا كنا في متجر شخصي (لأنها قد لا تكون ضرورية لمتجر واحد) */}
       {!isStoreMode && (
         <div className="hide-scrollbar" style={categoryScrollWrapperS}>
           {displayCategories.map((cat) => {
@@ -841,7 +840,7 @@ export default function ClientMarketplace({
       {(filterDate || filterStartTime || filterEndTime) && (
         <div style={searchAlertS}>
           ✅{" "}
-          {i18n.language === "ar"
+          {isRTL
             ? `نعرض لك فقط الخدمات المتاحة ${filterDate ? `يوم (${filterDate})` : ""} ${filterStartTime ? `من (${filterStartTime})` : ""} ${filterEndTime ? `إلى (${filterEndTime})` : ""}`
             : "Showing available providers for selected date/time."}
         </div>
@@ -1036,7 +1035,7 @@ export default function ClientMarketplace({
             <div style={{ fontSize: "3rem", marginBottom: "15px" }}>
               {isStoreMode ? "🛒" : "🕵️‍♂️"}
             </div>
-            {i18n.language === "ar"
+            {isRTL
               ? isStoreMode
                 ? "لا توجد خدمات متاحة حالياً في هذا المتجر.."
                 : "لم نجد خدمات تطابق بحثك حالياً.."
@@ -1045,7 +1044,6 @@ export default function ClientMarketplace({
         )}
       </div>
 
-      {/* النافذة المنبثقة الذكية المتفاعلة مع لون المزود */}
       {selected && (
         <div style={modalOverlay}>
           <div style={modalContent}>
@@ -1161,32 +1159,6 @@ export default function ClientMarketplace({
                       style={socialBtn("#10b981")}
                     >
                       {t("call")}
-                    </a>
-                  )}
-                  {(selected.twitter_url || selected.profiles?.twitter_url) && (
-                    <a
-                      href={
-                        selected.twitter_url || selected.profiles.twitter_url
-                      }
-                      target="_blank"
-                      rel="noreferrer"
-                      style={socialBtn("#0f1419")}
-                    >
-                      𝕏 تويتر
-                    </a>
-                  )}
-                  {(selected.instagram_url ||
-                    selected.profiles?.instagram_url) && (
-                    <a
-                      href={
-                        selected.instagram_url ||
-                        selected.profiles.instagram_url
-                      }
-                      target="_blank"
-                      rel="noreferrer"
-                      style={socialBtn("#db2777")}
-                    >
-                      إنستغرام
                     </a>
                   )}
                 </div>
@@ -1306,6 +1278,7 @@ export default function ClientMarketplace({
             >
               📝 نموذج الحجز المباشر:
             </h4>
+
             <div
               style={{
                 display: "flex",
@@ -1372,158 +1345,169 @@ export default function ClientMarketplace({
 
             <div
               style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: "15px",
+                backgroundColor: "#f8fafc",
+                padding: "20px",
+                borderRadius: "16px",
+                border: "1px solid #e2e8f0",
                 marginBottom: "25px",
               }}
             >
-              <div style={dateTimeCard}>
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    marginBottom: "12px",
-                  }}
-                >
-                  <label
-                    style={{
-                      ...labelS,
-                      color: "#059669",
-                      fontSize: "0.9rem",
-                      margin: 0,
-                    }}
-                  >
-                    🟢 موعد البدء:
-                  </label>
-                  <button
-                    type="button"
-                    onClick={handleSuggestNextSlot}
-                    style={{
-                      backgroundColor:
-                        selected.profiles?.theme_color || "#7c3aed",
-                      color: "#fff",
-                      border: "none",
-                      padding: "6px 12px",
-                      borderRadius: "10px",
-                      fontSize: "0.75rem",
-                      fontWeight: "bold",
-                      cursor: "pointer",
-                      transition: "0.2s",
-                      boxShadow: `0 2px 8px ${selected.profiles?.theme_color || "#7c3aed"}40`,
-                    }}
-                  >
-                    ✨ اقتراح موعد
-                  </button>
-                </div>
-                <div style={{ display: "flex", gap: "12px" }}>
-                  <div style={{ flex: 1 }}>
-                    <label
-                      style={{
-                        fontSize: "0.75rem",
-                        color: "#64748b",
-                        fontWeight: "bold",
-                        display: "block",
-                        marginBottom: "4px",
-                      }}
-                    >
-                      التاريخ:
-                    </label>
-                    <input
-                      type="date"
-                      min={todayDate}
-                      style={fancyDateTimeInput}
-                      value={bookingData.startDate}
-                      onChange={(e) =>
-                        handleDateChange("startDate", e.target.value)
-                      }
-                    />
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <label
-                      style={{
-                        fontSize: "0.75rem",
-                        color: "#64748b",
-                        fontWeight: "bold",
-                        display: "block",
-                        marginBottom: "4px",
-                      }}
-                    >
-                      الوقت {isTimeOptional && "(اختياري)"}:
-                    </label>
-                    <input
-                      type="time"
-                      style={fancyDateTimeInput}
-                      value={bookingData.startTime}
-                      onChange={(e) =>
-                        setBookingData({
-                          ...bookingData,
-                          startTime: e.target.value,
-                        })
-                      }
-                    />
-                  </div>
-                </div>
-              </div>
-              <div style={dateTimeCard}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: "12px",
+                }}
+              >
                 <label
                   style={{
                     ...labelS,
-                    color: "#ef4444",
-                    fontSize: "0.9rem",
-                    marginBottom: "12px",
+                    color: "#1e293b",
+                    fontSize: "1rem",
+                    margin: 0,
                   }}
                 >
-                  🏁 موعد الانتهاء:
+                  🗓️ فترة الحجز:
                 </label>
-                <div style={{ display: "flex", gap: "12px" }}>
-                  <div style={{ flex: 1 }}>
-                    <label
-                      style={{
-                        fontSize: "0.75rem",
-                        color: "#64748b",
-                        fontWeight: "bold",
-                        display: "block",
-                        marginBottom: "4px",
-                      }}
-                    >
-                      التاريخ:
-                    </label>
-                    <input
-                      type="date"
-                      min={bookingData.startDate || todayDate}
-                      style={fancyDateTimeInput}
-                      value={bookingData.endDate}
-                      onChange={(e) =>
-                        handleDateChange("endDate", e.target.value)
+                <button
+                  type="button"
+                  onClick={handleSuggestNextSlot}
+                  style={{
+                    backgroundColor:
+                      selected.profiles?.theme_color || "#7c3aed",
+                    color: "#fff",
+                    border: "none",
+                    padding: "6px 12px",
+                    borderRadius: "10px",
+                    fontSize: "0.75rem",
+                    fontWeight: "bold",
+                    cursor: "pointer",
+                  }}
+                >
+                  ✨ اقتراح موعد
+                </button>
+              </div>
+
+              {/* ✨ حقول التاريخ المنفصلة ✨ */}
+              <div
+                style={{ display: "flex", gap: "12px", marginBottom: "15px" }}
+              >
+                <div style={{ flex: 1 }}>
+                  <label
+                    style={{ ...labelS, color: "#64748b", fontSize: "0.8rem" }}
+                  >
+                    تاريخ (البدء):
+                  </label>
+                  <SmartDatePicker
+                    calendar={gregorian}
+                    locale={isRTL ? gregorian_ar : undefined}
+                    value={bookingData.startDate}
+                    onChange={(date) => {
+                      if (!date) {
+                        setBookingData({ ...bookingData, startDate: "" });
+                        return;
                       }
-                    />
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <label
-                      style={{
-                        fontSize: "0.75rem",
-                        color: "#64748b",
-                        fontWeight: "bold",
-                        display: "block",
-                        marginBottom: "4px",
-                      }}
-                    >
-                      الوقت {isTimeOptional && "(اختياري)"}:
-                    </label>
-                    <input
-                      type="time"
-                      style={fancyDateTimeInput}
-                      value={bookingData.endTime}
-                      onChange={(e) =>
-                        setBookingData({
-                          ...bookingData,
-                          endTime: e.target.value,
-                        })
+                      const jsDate = date.toDate();
+                      const start = `${jsDate.getFullYear()}-${String(jsDate.getMonth() + 1).padStart(2, "0")}-${String(jsDate.getDate()).padStart(2, "0")}`;
+                      setBookingData({ ...bookingData, startDate: start });
+                    }}
+                    minDate={new Date()}
+                    placeholder="اختر تاريخ البدء 📅"
+                    containerStyle={{ width: "100%" }}
+                    inputClass="rmdp-input"
+                  />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label
+                    style={{ ...labelS, color: "#64748b", fontSize: "0.8rem" }}
+                  >
+                    تاريخ (الانتهاء):
+                  </label>
+                  <SmartDatePicker
+                    calendar={gregorian}
+                    locale={isRTL ? gregorian_ar : undefined}
+                    value={bookingData.endDate}
+                    onChange={(date) => {
+                      if (!date) {
+                        setBookingData({ ...bookingData, endDate: "" });
+                        return;
                       }
-                    />
-                  </div>
+                      const jsDate = date.toDate();
+                      const end = `${jsDate.getFullYear()}-${String(jsDate.getMonth() + 1).padStart(2, "0")}-${String(jsDate.getDate()).padStart(2, "0")}`;
+                      setBookingData({ ...bookingData, endDate: end });
+                    }}
+                    minDate={
+                      bookingData.startDate
+                        ? new Date(bookingData.startDate)
+                        : new Date()
+                    }
+                    placeholder="اختر تاريخ الانتهاء 📅"
+                    containerStyle={{ width: "100%" }}
+                    inputClass="rmdp-input"
+                  />
+                </div>
+              </div>
+
+              {/* ✨ حقول الوقت المنفصلة ✨ */}
+              <div style={{ display: "flex", gap: "12px" }}>
+                <div style={{ flex: 1 }}>
+                  <label
+                    style={{ ...labelS, color: "#64748b", fontSize: "0.8rem" }}
+                  >
+                    الوقت (البدء) {isTimeOptional && "(اختياري)"}:
+                  </label>
+                  <SmartDatePicker
+                    disableDayPicker
+                    format="hh:mm A"
+                    plugins={[<SmartTimePicker hideSeconds />]}
+                    value={
+                      bookingData.startTime
+                        ? new Date(`2026-01-01T${bookingData.startTime}:00`)
+                        : null
+                    }
+                    onChange={(date) => {
+                      if (!date) {
+                        setBookingData({ ...bookingData, startTime: "" });
+                        return;
+                      }
+                      const jsDate = date.toDate();
+                      const time = `${String(jsDate.getHours()).padStart(2, "0")}:${String(jsDate.getMinutes()).padStart(2, "0")}`;
+                      setBookingData({ ...bookingData, startTime: time });
+                    }}
+                    containerStyle={{ width: "100%" }}
+                    inputClass="rmdp-input"
+                    placeholder="اختر الوقت ⏰"
+                  />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label
+                    style={{ ...labelS, color: "#64748b", fontSize: "0.8rem" }}
+                  >
+                    الوقت (الانتهاء) {isTimeOptional && "(اختياري)"}:
+                  </label>
+                  <SmartDatePicker
+                    disableDayPicker
+                    format="hh:mm A"
+                    plugins={[<SmartTimePicker hideSeconds />]}
+                    value={
+                      bookingData.endTime
+                        ? new Date(`2026-01-01T${bookingData.endTime}:00`)
+                        : null
+                    }
+                    onChange={(date) => {
+                      if (!date) {
+                        setBookingData({ ...bookingData, endTime: "" });
+                        return;
+                      }
+                      const jsDate = date.toDate();
+                      const time = `${String(jsDate.getHours()).padStart(2, "0")}:${String(jsDate.getMinutes()).padStart(2, "0")}`;
+                      setBookingData({ ...bookingData, endTime: time });
+                    }}
+                    containerStyle={{ width: "100%" }}
+                    inputClass="rmdp-input"
+                    placeholder="اختر الوقت ⏰"
+                  />
                 </div>
               </div>
             </div>
@@ -1601,7 +1585,7 @@ export default function ClientMarketplace({
   );
 }
 
-// התنسيقات
+// --- Styles ---
 const heroSectionS = {
   background: "linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)",
   padding: "55px 20px 85px",
@@ -1728,7 +1712,6 @@ const cardFooterS = {
   paddingTop: "15px",
 };
 const smartBookBtnS = {
-  backgroundColor: "#1e293b",
   color: "#fff",
   border: "none",
   padding: "10px 18px",
@@ -1837,22 +1820,3 @@ const socialBtn = (bg) => ({
   fontSize: "0.75rem",
   fontWeight: "bold",
 });
-const dateTimeCard = {
-  backgroundColor: "#f8fafc",
-  padding: "18px",
-  borderRadius: "16px",
-  border: "1px solid #e2e8f0",
-};
-const fancyDateTimeInput = {
-  width: "100%",
-  padding: "10px",
-  borderRadius: "10px",
-  border: "1px solid #cbd5e1",
-  fontSize: "0.95rem",
-  color: "#1e293b",
-  backgroundColor: "#fff",
-  outline: "none",
-  boxSizing: "border-box",
-  fontFamily: "inherit",
-  cursor: "pointer",
-};
