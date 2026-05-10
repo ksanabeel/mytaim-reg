@@ -3390,11 +3390,130 @@ function MainAppContent() {
   );
 }
 
+// ✨ بوابة الدخول السرية للمرحلة التجريبية (Beta Gate) ✨
+const BetaGate = ({ children }) => {
+  // للتحقق مما إذا كان المستخدم قد أدخل الرمز مسبقاً
+  const [isUnlocked, setIsUnlocked] = useState(
+    localStorage.getItem("beta_unlocked") === "true",
+  );
+  const [passcode, setPasscode] = useState("");
+
+  // إذا كان مفتوحاً، اعرض المنصة مباشرة
+  if (isUnlocked) return children;
+
+  // إذا كان مغلقاً، اعرض شاشة الرمز السري
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
+        alignItems: "center",
+        minHeight: "100vh",
+        backgroundColor: "#0f172a",
+        fontFamily: "system-ui",
+        direction: "rtl",
+        padding: "20px",
+      }}
+    >
+      <div
+        style={{
+          backgroundColor: "#1e293b",
+          padding: "40px",
+          borderRadius: "24px",
+          textAlign: "center",
+          boxShadow: "0 25px 50px rgba(0,0,0,0.5)",
+          maxWidth: "400px",
+          width: "100%",
+          border: "1px solid #334155",
+        }}
+      >
+        <div style={{ fontSize: "4rem", marginBottom: "15px" }}>🚧</div>
+        <h2
+          style={{ color: "#f8fafc", margin: "0 0 10px 0", fontSize: "1.8rem" }}
+        >
+          منصة مغلقة مؤقتاً
+        </h2>
+        <p
+          style={{
+            color: "#94a3b8",
+            marginBottom: "30px",
+            fontSize: "0.95rem",
+            lineHeight: "1.6",
+          }}
+        >
+          المنصة حالياً في مرحلة الاختبار المغلق (Beta). يرجى إدخال رمز المرور
+          السري المخصص للوصول.
+        </p>
+        <input
+          type="password"
+          placeholder="أدخل الرمز هنا..."
+          value={passcode}
+          onChange={(e) => setPasscode(e.target.value)}
+          style={{
+            width: "100%",
+            padding: "15px",
+            borderRadius: "14px",
+            border: "1px solid #475569",
+            backgroundColor: "#0f172a",
+            color: "#fff",
+            outline: "none",
+            textAlign: "center",
+            fontSize: "1.2rem",
+            letterSpacing: "5px",
+            marginBottom: "20px",
+            boxSizing: "border-box",
+            transition: "0.2s",
+          }}
+          dir="ltr"
+          onFocus={(e) => (e.target.style.borderColor = "#3b82f6")}
+          onBlur={(e) => (e.target.style.borderColor = "#475569")}
+        />
+        <button
+          onClick={() => {
+            // 💡 هنا تضع الرقم السري الخاص بك (الآن هو 2030)
+            if (passcode === "2030") {
+              localStorage.setItem("beta_unlocked", "true");
+              setIsUnlocked(true);
+            } else {
+              alert("الرمز غير صحيح ❌");
+              setPasscode("");
+            }
+          }}
+          style={{
+            width: "100%",
+            backgroundColor: "#3b82f6",
+            color: "#fff",
+            border: "none",
+            padding: "15px",
+            borderRadius: "14px",
+            fontWeight: "900",
+            fontSize: "1.1rem",
+            cursor: "pointer",
+            transition: "0.2s",
+          }}
+          onMouseOver={(e) =>
+            (e.currentTarget.style.backgroundColor = "#2563eb")
+          }
+          onMouseOut={(e) =>
+            (e.currentTarget.style.backgroundColor = "#3b82f6")
+          }
+        >
+          دخول للمنصة 🔓
+        </button>
+      </div>
+    </div>
+  );
+};
+
 export default function AppWrapper() {
   return (
     <HelmetProvider>
       <BrowserRouter>
-        <MainAppContent />
+        {/* تغليف المنصة بالبوابة السرية */}
+        <BetaGate>
+          <MainAppContent />
+        </BetaGate>
       </BrowserRouter>
     </HelmetProvider>
   );
