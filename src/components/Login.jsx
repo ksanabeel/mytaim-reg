@@ -58,7 +58,6 @@ const Login = () => {
 
   const handleAppleLogin = async () => {
     try {
-      // الكود جاهز، يحتاج فقط تفعيل Apple Provider من إعدادات Supabase
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "apple",
         options: { redirectTo: window.location.origin },
@@ -98,15 +97,34 @@ const Login = () => {
     }
   };
 
+  // ✉️ دالة استعادة كلمة المرور الجديدة
+  const handleResetPassword = async () => {
+    if (!email) {
+      alert("الرجاء إدخال بريدك الإلكتروني في الحقل المخصص أولاً.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin,
+      });
+      if (error) throw error;
+      alert(
+        "تم إرسال رابط استعادة كلمة المرور إلى إيميلك! (شيك صندوق الوارد أو البريد المزعج Spam).",
+      );
+    } catch (err) {
+      alert("حدث خطأ: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handlePhoneSubmit = async (e) => {
     e.preventDefault();
     if (!phone || phone.length < 9) return alert("الرجاء إدخال رقم جوال صحيح.");
 
     setLoading(true);
     try {
-      // هذا محاكاة (Mock) لإرسال الرسالة، سيتم استبداله بكود Supabase الفعلي لاحقاً
-      // await supabase.auth.signInWithOtp({ phone });
-
       alert("وضع الاختبار: استخدم الرمز 123456 للدخول.");
       setAuthMode("phone_otp");
     } catch (error) {
@@ -122,11 +140,9 @@ const Login = () => {
 
     setLoading(true);
     try {
-      // هذا محاكاة للتحقق
       if (otp === "123456") {
         alert("نجاح! في البيئة الحقيقية سيتم دخولك الآن.");
-        // await supabase.auth.verifyOtp({ phone, token: otp, type: 'sms' });
-        setAuthMode("email_login"); // إعادته مؤقتاً للواجهة الرئيسية
+        setAuthMode("email_login");
       } else {
         alert("رمز التحقق غير صحيح (استخدم 123456)");
       }
@@ -237,6 +253,29 @@ const Login = () => {
           dir="ltr"
           minLength="6"
         />
+
+        {/* 🚀 زر استعادة كلمة المرور يظهر فقط في شاشة تسجيل الدخول */}
+        {authMode === "email_login" && (
+          <button
+            type="button"
+            onClick={handleResetPassword}
+            style={{
+              background: "transparent",
+              color: "#3b82f6",
+              border: "none",
+              fontSize: "0.85rem",
+              fontWeight: "bold",
+              cursor: "pointer",
+              textAlign: i18n.language === "ar" ? "right" : "left",
+              textDecoration: "underline",
+              marginTop: "-5px",
+              marginBottom: "5px",
+            }}
+          >
+            نسيت كلمة المرور؟
+          </button>
+        )}
+
         <button type="submit" disabled={loading} style={styles.submitBtn}>
           {loading
             ? "جاري التحقق..."
@@ -284,7 +323,6 @@ const Login = () => {
           <h2 style={styles.title}>BookOnMap</h2>
         </div>
 
-        {/* إخفاء خيارات السوشال ميديا في شاشة إدخال رمز التحقق */}
         {authMode !== "phone_otp" && (
           <>
             <p style={styles.subtitle}>سجل دخولك لبدء استخدام المنصة</p>
@@ -331,7 +369,6 @@ const Login = () => {
 
         {renderFormContent()}
 
-        {/* الروابط القانونية */}
         <div style={styles.legalLinks}>
           <span
             onClick={() => setActiveLegalDoc("terms")}
@@ -356,7 +393,6 @@ const Login = () => {
         </div>
       </div>
 
-      {/* نافذة عرض الوثائق القانونية */}
       {activeLegalDoc && (
         <div style={styles.modalOverlay}>
           <div style={styles.modalContent}>

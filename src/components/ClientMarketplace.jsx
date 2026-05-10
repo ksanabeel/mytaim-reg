@@ -3,14 +3,13 @@ import { supabase } from "../lib/supabase";
 import { useTranslation } from "react-i18next";
 import { useParams } from "react-router-dom";
 
-// ✨ استيرادات مكتبة التقويم + إضافة الوقت
+// استيرادات مكتبة التقويم
 import DatePicker from "react-multi-date-picker";
 import TimePicker from "react-multi-date-picker/plugins/time_picker";
 import gregorian from "react-date-object/calendars/gregorian";
 import gregorian_ar from "react-date-object/locales/gregorian_ar";
 import "react-multi-date-picker/styles/layouts/mobile.css";
 
-// 🚀 الحيلة الذكية لحل مشكلة الـ Object مع سيرفر Vite
 const SmartDatePicker = DatePicker.default || DatePicker;
 const SmartTimePicker = TimePicker.default || TimePicker;
 
@@ -25,9 +24,7 @@ export default function ClientMarketplace({
   const username = storeUsername ? storeUsername.replace("@", "") : null;
   const isRTL = i18n.language === "ar";
 
-  // ✨ حالة الساعة الحية (Live Clock)
   const [liveTime, setLiveTime] = useState(new Date());
-
   const [offerings, setOfferings] = useState([]);
   const [dbCategories, setDbCategories] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -45,6 +42,7 @@ export default function ClientMarketplace({
 
   const [reviews, setReviews] = useState([]);
 
+  // ✨ حالة الحجز تتضمن العدد اليدوي ✨
   const [bookingData, setBookingData] = useState({
     startDate: "",
     startTime: "",
@@ -59,6 +57,8 @@ export default function ClientMarketplace({
   const [calculatedData, setCalculatedData] = useState({
     price: 0,
     quantity: 1,
+    timeMultiplier: 1,
+    requestedCount: 1,
     text: "",
   });
 
@@ -72,7 +72,6 @@ export default function ClientMarketplace({
     sat: "السبت",
   };
 
-  // ✨ تحديث الساعة الحية كل ثانية
   useEffect(() => {
     const timer = setInterval(() => setLiveTime(new Date()), 1000);
     return () => clearInterval(timer);
@@ -99,10 +98,7 @@ export default function ClientMarketplace({
         .from("offerings")
         .select("*, profiles!inner(*)")
         .eq("profiles.is_active", true);
-
-      if (username) {
-        query = query.eq("profiles.username", username);
-      }
+      if (username) query = query.eq("profiles.username", username);
 
       const { data: offs } = await query.order("rating", {
         foreignTable: "profiles",
@@ -144,6 +140,7 @@ export default function ClientMarketplace({
       (item.title || "").toLowerCase().includes(s) ||
       (item.nickname || "").toLowerCase().includes(s) ||
       (item.provider_name || "").toLowerCase().includes(s) ||
+      (item.provider_role || "").toLowerCase().includes(s) ||
       (item.profiles?.full_name || "").toLowerCase().includes(s) ||
       (item.profiles?.username || "").toLowerCase().includes(s) ||
       (item.description || "").toLowerCase().includes(s);
@@ -199,30 +196,36 @@ export default function ClientMarketplace({
     );
   });
 
+  // ✨ جلب التقييمات السابقة بمجرد فتح تفاصيل الخدمة ✨
   useEffect(() => {
     if (!selected) {
       setReviews([]);
+      setBookingData((prev) => ({ ...prev, manualQuantity: 1 })); // إعادة تصفير العدد
       return;
     }
     const fetchReviews = async () => {
       const { data } = await supabase
         .from("bookings")
-        .select("rating, review, profiles!bookings_customer_id_fkey(full_name)")
+        .select(
+          "rating, review, review_text, client_review, profiles!bookings_customer_id_fkey(full_name)",
+        )
         .eq("offering_id", selected.id)
+        .eq("status", "completed") // جلب التقييمات للطلبات المكتملة فقط
         .not("rating", "is", null)
         .order("id", { ascending: false })
-        .limit(5);
+        .limit(10);
       setReviews(data || []);
     };
     fetchReviews();
   }, [selected]);
 
-  // ✨ الخوارزمية الذكية المحدثة لحساب الكميات والفترات ✨
+  // 🚀 الخوارزمية الذكية المحدثة (السعر × المدة × العدد) 🚀
   useEffect(() => {
     if (!selected) return;
     const model = selected.pricing_model || "fixed";
-    const price = Number(selected.price) || 0;
-    let qty = 1;
+    const basePrice = Number(selected.price) || 0;
+
+    let timeMultiplier = 1;
     let label = t("task", "مهمة");
 
     if (
@@ -239,49 +242,44 @@ export default function ClientMarketplace({
       const end = new Date(endStr);
 
       let diffHours = (end - start) / (1000 * 60 * 60);
-
-      // معالجة الحجوزات التي تتجاوز منتصف الليل
-      if (diffHours <= 0 && bookingData.startDate === bookingData.endDate) {
+      if (diffHours <= 0 && bookingData.startDate === bookingData.endDate)
         diffHours += 24;
-      }
 
       if (diffHours > 0) {
         if (model === "hourly") {
-          qty = Math.round(diffHours * 100) / 100;
+          timeMultiplier = Math.round(diffHours * 100) / 100;
           label = t("hour", "ساعة");
         } else if (model === "daily") {
-          qty = Math.max(1, Math.ceil(diffHours / 24));
+          timeMultiplier = Math.max(1, Math.ceil(diffHours / 24));
           label = t("day", "يوم");
         } else if (model === "monthly") {
-          qty = Math.max(1, Math.ceil(diffHours / (24 * 30)));
+          timeMultiplier = Math.max(1, Math.ceil(diffHours / (24 * 30)));
           label = t("month", "شهر");
         } else if (model === "yearly") {
-          qty = Math.max(1, Math.ceil(diffHours / (24 * 365)));
+          timeMultiplier = Math.max(1, Math.ceil(diffHours / (24 * 365)));
           label = t("year", "سنة");
         } else if (model === "period") {
-          // استخراج مدة الفترة التي حددها المزود (افتراضياً 4 ساعات إذا لم تكن موجودة)
           let periodLengthInHours = 4;
-
           if (selected.duration) {
             const extractedNumber = parseInt(
               String(selected.duration).replace(/\D/g, ""),
             );
-            if (!isNaN(extractedNumber) && extractedNumber > 0) {
+            if (!isNaN(extractedNumber) && extractedNumber > 0)
               periodLengthInHours = extractedNumber;
-            }
           }
-
-          qty = Math.max(1, Math.ceil(diffHours / periodLengthInHours));
+          timeMultiplier = Math.max(
+            1,
+            Math.ceil(diffHours / periodLengthInHours),
+          );
           label = t("period", "فترة");
         }
       }
     } else {
-      // في حال لم يكمل العميل التواريخ أو كان نموذج التسعير ثابت/مجاني
       if (model === "period") {
-        qty = 1;
+        timeMultiplier = 1;
         label = t("period", "فترة");
       } else if (model === "fixed" || model === "free") {
-        qty = 1;
+        timeMultiplier = 1;
         label =
           model === "free"
             ? t("volunteer", "تطوع")
@@ -289,7 +287,17 @@ export default function ClientMarketplace({
       }
     }
 
-    setCalculatedData({ price: price * qty, quantity: qty, text: label });
+    // 🎯 ضرب المدة في العدد المطلوب من العميل
+    const requestedCount = bookingData.manualQuantity || 1;
+    const finalTotalPrice = basePrice * timeMultiplier * requestedCount;
+
+    setCalculatedData({
+      price: finalTotalPrice,
+      quantity: timeMultiplier * requestedCount,
+      timeMultiplier: timeMultiplier,
+      requestedCount: requestedCount,
+      text: label,
+    });
   }, [bookingData, selected, t]);
 
   const handleGetLocation = () => {
@@ -398,15 +406,13 @@ export default function ClientMarketplace({
 
   const handleBook = async () => {
     if (!session) {
-      if (typeof onRequireLogin === "function") {
-        onRequireLogin();
-      } else {
+      if (typeof onRequireLogin === "function") onRequireLogin();
+      else
         alert(
           isRTL
             ? "يرجى تسجيل الدخول أو إنشاء حساب أولاً 🔐"
             : "Please login first 🔐",
         );
-      }
       return;
     }
 
@@ -429,7 +435,10 @@ export default function ClientMarketplace({
       );
     }
 
-    // 🚀 إضافة الثواني :00 لضمان القراءة الصحيحة في كل المتصفحات
+    if (bookingData.manualQuantity < 1) {
+      return alert("الرجاء تحديد عدد صحيح للخدمة.");
+    }
+
     const requestedStart = new Date(
       `${bookingData.startDate}T${bookingData.startTime || "00:00"}:00`,
     );
@@ -470,34 +479,36 @@ export default function ClientMarketplace({
         rStartMins < pStartMins && pEndMins > 24 * 60
           ? rStartMins + 24 * 60
           : rStartMins;
-      if (normRStart < pStartMins || normRStart > pEndMins) {
+      if (normRStart < pStartMins || normRStart > pEndMins)
         return alert(
           isRTL
             ? `⛔ الوقت المحدد خارج أوقات الدوام! ساعات العمل من ${selected.work_start_time.substring(0, 5)} إلى ${selected.work_end_time.substring(0, 5)}.`
             : "⛔ Outside working hours.",
         );
-      }
     }
 
+    // 🛡️ حماية الطاقة الاستيعابية
     const { data: existing } = await supabase
       .from("bookings")
-      .select("appointment_date, end_time")
+      .select("appointment_date, end_time, quantity")
       .eq("offering_id", selected.id)
       .neq("status", "cancelled");
-    let overlaps = 0;
+
+    let overlappingUsedCapacity = 0;
     existing?.forEach((b) => {
-      if (
-        requestedStart < new Date(b.end_time) &&
-        requestedEnd > new Date(b.appointment_date)
-      )
-        overlaps++;
+      const bStart = new Date(b.appointment_date);
+      const bEnd = new Date(b.end_time);
+      if (requestedStart < bEnd && requestedEnd > bStart) {
+        overlappingUsedCapacity += b.quantity || 1;
+      }
     });
-    if (overlaps >= (selected.profiles?.max_concurrent_bookings || 1))
+
+    const maxCapacity = selected.max_capacity || 1;
+    if (overlappingUsedCapacity + bookingData.manualQuantity > maxCapacity) {
       return alert(
-        isRTL
-          ? "⚠️ هذا الوقت محجوز مسبقاً، لا توجد سعة."
-          : "⚠️ This time is already booked.",
+        `⚠️ نعتذر، السعة المتاحة في هذا الوقت هي ${Math.max(0, maxCapacity - overlappingUsedCapacity)} فقط من أصل ${maxCapacity}. الرجاء تقليل العدد المطلوب أو تغيير الوقت.`,
       );
+    }
 
     const { error } = await supabase.from("bookings").insert([
       {
@@ -506,13 +517,27 @@ export default function ClientMarketplace({
         appointment_date: requestedStart.toISOString(),
         end_time: requestedEnd.toISOString(),
         location: finalLocation,
-        quantity: calculatedData.quantity,
+        quantity: bookingData.manualQuantity, // حفظ العدد الفعلي الذي طلبه العميل
         status: selected.price_upon_agreement ? "awaiting_pricing" : "pending",
         client_contact: bookingData.clientContact,
+        proposed_price: selected.price_upon_agreement
+          ? null
+          : calculatedData.price, // حفظ التكلفة المحسوبة
       },
     ]);
 
     if (!error) {
+      const providerId = selected.provider_id || selected.profiles?.id;
+      if (providerId) {
+        await supabase.from("notifications").insert([
+          {
+            user_id: providerId,
+            title: "طلب حجز جديد 🆕",
+            message: `لديك طلب حجز جديد لخدمة "${selected.title}". يرجى مراجعته في لوحة أعمالك.`,
+            is_read: false,
+          },
+        ]);
+      }
       alert(
         isRTL
           ? selected.price_upon_agreement
@@ -580,7 +605,6 @@ export default function ClientMarketplace({
           padding: isStoreMode ? "30px 20px 85px" : "40px 20px 85px",
         }}
       >
-        {/* ✨ الساعة الحية المتزامنة ✨ */}
         <div
           style={{
             fontSize: "0.95rem",
@@ -903,7 +927,7 @@ export default function ClientMarketplace({
                   >
                     {item.profiles?.provider_type === "institution" && (
                       <span style={coverBadgeS("#1e293b", "#fff")}>
-                        🏢 {t("institution")}
+                        🏢 فريق عمل / مجموعة
                       </span>
                     )}
                     {(item.license_number || item.profiles?.license_info) && (
@@ -985,6 +1009,24 @@ export default function ClientMarketplace({
                           @{item.profiles.username}
                         </span>
                       )}
+                    </div>
+                  )}
+
+                  {/* ✨ إظهار المسمى المهني في البطاقة ✨ */}
+                  {item.provider_role && (
+                    <div
+                      style={{
+                        backgroundColor: "#f1f5f9",
+                        color: "#3b82f6",
+                        padding: "4px 8px",
+                        borderRadius: "8px",
+                        fontSize: "0.75rem",
+                        fontWeight: "bold",
+                        display: "inline-block",
+                        marginBottom: "8px",
+                      }}
+                    >
+                      👨‍💼 {item.provider_role}
                     </div>
                   )}
 
@@ -1173,6 +1215,7 @@ export default function ClientMarketplace({
                     flexWrap: "wrap",
                   }}
                 >
+                  {/* زر الواتساب */}
                   {(selected.whatsapp_number || selected.profiles?.phone) && (
                     <a
                       href={`https://wa.me/${(selected.whatsapp_number || selected.profiles?.phone).replace(/\D/g, "")}`}
@@ -1183,12 +1226,64 @@ export default function ClientMarketplace({
                       واتساب
                     </a>
                   )}
+                  {/* زر الاتصال */}
                   {selected.profiles?.phone && (
                     <a
                       href={`tel:${selected.profiles.phone}`}
                       style={socialBtn("#10b981")}
                     >
                       {t("call")}
+                    </a>
+                  )}
+                  {/* ✨ أزرار السوشيال ميديا الجديدة ✨ */}
+                  {selected.youtube_url && (
+                    <a
+                      href={selected.youtube_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={socialBtn("#ef4444")}
+                    >
+                      يوتيوب 📺
+                    </a>
+                  )}
+                  {selected.instagram_url && (
+                    <a
+                      href={selected.instagram_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={socialBtn("#e1306c")}
+                    >
+                      إنستقرام
+                    </a>
+                  )}
+                  {selected.tiktok_url && (
+                    <a
+                      href={selected.tiktok_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={socialBtn("#000000")}
+                    >
+                      تيك توك
+                    </a>
+                  )}
+                  {selected.twitter_url && (
+                    <a
+                      href={selected.twitter_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={socialBtn("#0f1419")}
+                    >
+                      𝕏 (تويتر)
+                    </a>
+                  )}
+                  {selected.snapchat_url && (
+                    <a
+                      href={selected.snapchat_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={socialBtn("#d97706")}
+                    >
+                      سناب شات
                     </a>
                   )}
                 </div>
@@ -1205,6 +1300,29 @@ export default function ClientMarketplace({
                 textAlign: isRTL ? "right" : "left",
               }}
             >
+              {selected.provider_role && (
+                <div
+                  style={{
+                    marginBottom: "15px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                  }}
+                >
+                  <span
+                    style={{
+                      backgroundColor: "#1e293b",
+                      color: "#fff",
+                      padding: "6px 12px",
+                      borderRadius: "10px",
+                      fontSize: "0.9rem",
+                      fontWeight: "bold",
+                    }}
+                  >
+                    💼 مقدم الخدمة: {selected.provider_role}
+                  </span>
+                </div>
+              )}
               <h4
                 style={{
                   margin: "0 0 8px 0",
@@ -1419,7 +1537,61 @@ export default function ClientMarketplace({
                 </button>
               </div>
 
-              {/* ✨ حقول التاريخ المنفصلة ✨ */}
+              {/* ✨ الخانة الذكية: إدخال العدد المطلوب وحمايته بالسعة القصوى ✨ */}
+              <div
+                style={{
+                  marginBottom: "15px",
+                  backgroundColor: "#fff",
+                  padding: "15px",
+                  borderRadius: "12px",
+                  border: "1px dashed #3b82f6",
+                }}
+              >
+                <label
+                  style={{ ...labelS, color: "#1d4ed8", fontSize: "0.95rem" }}
+                >
+                  👥 العدد المطلوب من (
+                  {selected.provider_role || "مقدمي الخدمة"}):
+                </label>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "10px",
+                    marginTop: "8px",
+                  }}
+                >
+                  <input
+                    type="number"
+                    min="1"
+                    max={selected.max_capacity || 1}
+                    value={bookingData.manualQuantity}
+                    onChange={(e) => {
+                      let val = parseInt(e.target.value) || 1;
+                      if (val > (selected.max_capacity || 1))
+                        val = selected.max_capacity || 1;
+                      setBookingData({ ...bookingData, manualQuantity: val });
+                    }}
+                    style={{
+                      ...inputS,
+                      flex: 1,
+                      borderColor: "#bfdbfe",
+                      fontWeight: "bold",
+                      fontSize: "1.1rem",
+                    }}
+                  />
+                  <span
+                    style={{
+                      fontSize: "0.85rem",
+                      color: "#ef4444",
+                      fontWeight: "bold",
+                    }}
+                  >
+                    (أقصى عدد متاح: {selected.max_capacity || 1})
+                  </span>
+                </div>
+              </div>
+
               <div
                 style={{ display: "flex", gap: "12px", marginBottom: "15px" }}
               >
@@ -1479,7 +1651,6 @@ export default function ClientMarketplace({
                 </div>
               </div>
 
-              {/* ✨ حقول الوقت المنفصلة ✨ */}
               <div style={{ display: "flex", gap: "12px" }}>
                 <div style={{ flex: 1 }}>
                   <label
@@ -1566,19 +1737,54 @@ export default function ClientMarketplace({
                 </span>
               ) : (
                 <>
-                  <span
+                  {/* ✨ تفصيل الحسبة الشفافة ليراها العميل بوضوح ✨ */}
+                  <div
                     style={{
-                      fontSize: "0.9rem",
+                      fontSize: "0.95rem",
                       color: "#475569",
                       fontWeight: "bold",
+                      marginBottom: "10px",
+                      display: "flex",
+                      justifyContent: "center",
+                      gap: "10px",
+                      flexWrap: "wrap",
+                      direction: "rtl",
                     }}
                   >
-                    {t("total")} {calculatedData.quantity} {calculatedData.text}
-                    :{" "}
-                  </span>
+                    <span
+                      style={{
+                        backgroundColor: "#e2e8f0",
+                        padding: "4px 8px",
+                        borderRadius: "6px",
+                      }}
+                    >
+                      {selected.price} {selected.currency || "SAR"}
+                    </span>{" "}
+                    ×
+                    <span
+                      style={{
+                        backgroundColor: "#e2e8f0",
+                        padding: "4px 8px",
+                        borderRadius: "6px",
+                      }}
+                    >
+                      {calculatedData.timeMultiplier} ({calculatedData.text})
+                    </span>{" "}
+                    ×
+                    <span
+                      style={{
+                        backgroundColor: "#e2e8f0",
+                        padding: "4px 8px",
+                        borderRadius: "6px",
+                      }}
+                    >
+                      {calculatedData.requestedCount} (مطلوب)
+                    </span>
+                  </div>
+
                   <span
                     style={{
-                      fontSize: "1.4rem",
+                      fontSize: "1.5rem",
                       fontWeight: "900",
                       color:
                         selected.pricing_model === "free"
@@ -1588,7 +1794,7 @@ export default function ClientMarketplace({
                   >
                     {selected.pricing_model === "free"
                       ? `${t("free")} 💚`
-                      : `${calculatedData.price} SAR`}
+                      : `الإجمالي = ${calculatedData.price} SAR`}
                   </span>
                 </>
               )}
@@ -1608,6 +1814,84 @@ export default function ClientMarketplace({
                   ? "تأكيد وإرسال الطلب ✅"
                   : "Confirm Booking ✅"}
             </button>
+
+            {/* ✨ التقييمات السابقة ✨ */}
+            {reviews && reviews.length > 0 && (
+              <div
+                style={{
+                  marginTop: "30px",
+                  borderTop: "2px dashed #e2e8f0",
+                  paddingTop: "20px",
+                  textAlign: isRTL ? "right" : "left",
+                }}
+              >
+                <h4
+                  style={{
+                    color: "#1e293b",
+                    marginBottom: "15px",
+                    fontSize: "1.1rem",
+                    fontWeight: "900",
+                  }}
+                >
+                  ⭐️ آراء العملاء السابقين:
+                </h4>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "10px",
+                  }}
+                >
+                  {reviews.map((r, idx) => (
+                    <div
+                      key={idx}
+                      style={{
+                        backgroundColor: "#f8fafc",
+                        padding: "15px",
+                        borderRadius: "12px",
+                        border: "1px solid #e2e8f0",
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          marginBottom: "8px",
+                          alignItems: "center",
+                        }}
+                      >
+                        <strong
+                          style={{ color: "#334155", fontSize: "0.9rem" }}
+                        >
+                          👤 {r.profiles?.full_name || "عميل"}
+                        </strong>
+                        <span
+                          style={{
+                            color: "#f59e0b",
+                            fontWeight: "bold",
+                            fontSize: "0.85rem",
+                          }}
+                        >
+                          {"⭐".repeat(r.rating || 5)}
+                        </span>
+                      </div>
+                      {(r.review || r.review_text || r.client_review) && (
+                        <p
+                          style={{
+                            margin: 0,
+                            color: "#64748b",
+                            fontSize: "0.85rem",
+                            lineHeight: "1.6",
+                          }}
+                        >
+                          💬 {r.review || r.review_text || r.client_review}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

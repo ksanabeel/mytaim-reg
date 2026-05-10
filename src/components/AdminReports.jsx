@@ -75,19 +75,19 @@ const fetchSafe = async (tableName) => {
 };
 
 const calculateFinancials = (b, commissionRate) => {
-  const basePricePerUnit =
-    Number(b.proposed_price) || Number(b.offerings?.price) || 0;
-  const additional = Number(b.additional_costs) || Number(b.extra_costs) || 0;
-  const qty = b.quantity || 1;
-  const baseTotal = basePricePerUnit * qty;
-  const totalClientPrice = baseTotal + additional;
-  const platformCommission = baseTotal * commissionRate;
-  const providerNet = baseTotal - platformCommission + additional;
+  const finalTotal =
+    b.proposed_price && Number(b.proposed_price) > 0
+      ? Number(b.proposed_price)
+      : (Number(b.offerings?.price) || 0) * (b.quantity || 1);
+
+  const platformCommission = finalTotal * commissionRate;
+  const providerNet = finalTotal - platformCommission;
+
   return {
-    baseTotal,
-    qty,
-    additional,
-    totalClientPrice,
+    baseTotal: finalTotal,
+    qty: b.quantity || 1,
+    additional: 0,
+    totalClientPrice: finalTotal,
     platformCommission,
     providerNet,
   };
@@ -125,6 +125,10 @@ export default function AdminReports({
 
   const [payoutModalData, setPayoutModalData] = useState(null);
   const [isProcessingPayout, setIsProcessingPayout] = useState(false);
+
+  // ✨ حالات المراسلة الداخلية في النظام ✨
+  const [activeMsgId, setActiveMsgId] = useState(null);
+  const [sysMsgText, setSysMsgText] = useState("");
 
   const fetchStats = async () => {
     setLoading(true);
@@ -171,6 +175,26 @@ export default function AdminReports({
   useEffect(() => {
     fetchStats();
   }, []);
+
+  // ✉️ دالة إرسال التنبيه الداخلي للنظام ✉️
+  const handleSendSysMsg = async (userId, bookingId) => {
+    if (!sysMsgText.trim()) return alert("الرجاء كتابة رسالة التنبيه.");
+    try {
+      await supabase.from("notifications").insert([
+        {
+          user_id: userId,
+          title: `تنبيه مالي للحجز #${bookingId.substring(0, 8).toUpperCase()}`,
+          message: sysMsgText,
+          is_read: false,
+        },
+      ]);
+      alert("تم إرسال التنبيه للمزود داخل النظام بنجاح! 🔔✅");
+      setActiveMsgId(null);
+      setSysMsgText("");
+    } catch (err) {
+      alert("حدث خطأ أثناء الإرسال: " + err.message);
+    }
+  };
 
   const handleAdminDeleteBooking = async (id) => {
     if (
@@ -367,6 +391,8 @@ export default function AdminReports({
                 <th>رقم الحجز</th>
                 <th>المزود والخدمة</th>
                 <th>بيانات العميل</th>
+                <th>الإجمالي</th>
+                <th>صافي المزود</th>
                 <th>عمولة المنصة</th>
                 <th>الحالة</th>
               </tr>
@@ -375,8 +401,8 @@ export default function AdminReports({
               ${filteredBookings
                 .map((b) => {
                   const curr = b.offerings?.currency || "SAR";
+                  const fin = calculateFinancials(b, commissionRate);
 
-                  // ✨ السحر هنا: قراءة الموقع من b.location كما اكتشفنا ✨
                   const locationData = b.location || "";
                   const isUrl = locationData.includes("http");
                   const locString = locationData
@@ -392,6 +418,13 @@ export default function AdminReports({
                     ? `<br><small style="color:#059669;" dir="ltr">@${b.profiles.username}</small>`
                     : "";
 
+                  const commissionColor = b.is_commission_paid
+                    ? "#10b981"
+                    : "#ef4444";
+                  const commissionBadge = b.is_commission_paid
+                    ? `<span style="background:#d1fae5; color:#047857; padding:3px 8px; border-radius:6px; font-size:0.75rem; margin-top:5px; display:inline-block;">مسددة ✅</span>`
+                    : `<span style="background:#fef2f2; color:#b91c1c; padding:3px 8px; border-radius:6px; font-size:0.75rem; margin-top:5px; display:inline-block;">غير مسددة ❌</span>`;
+
                   return `
                   <tr>
                     <td style="font-family:monospace; font-weight:bold;">${b.id.substring(0, 8)}</td>
@@ -404,7 +437,12 @@ export default function AdminReports({
                       <strong>${b.profiles?.full_name || "غير محدد"}</strong> ${cUser}<br>
                       <small dir="ltr" style="display:block; margin-top:5px; font-weight:bold;">📞 ${b.profiles?.phone}</small>
                     </td>
-                    <td style="color:#ef4444; font-weight:bold;">${calculateFinancials(b, commissionRate).platformCommission.toFixed(2)} ${curr}</td>
+                    <td style="font-weight:bold; direction:ltr;">${fin.baseTotal.toFixed(2)} ${curr}</td>
+                    <td style="color:#10b981; font-weight:bold; direction:ltr;">${fin.providerNet.toFixed(2)} ${curr}</td>
+                    <td style="color:${commissionColor}; font-weight:bold; direction:ltr;">
+                      ${fin.platformCommission.toFixed(2)} ${curr}<br>
+                      ${commissionBadge}
+                    </td>
                     <td>${b.status}</td>
                   </tr>
                 `;
@@ -1309,7 +1347,9 @@ export default function AdminReports({
                 >
                   <th style={thS}>المزود / الخدمة / الموقع</th>
                   <th style={thS}>العميل والتواصل</th>
-                  <th style={thS}>العمولة</th>
+                  <th style={thS}>الإجمالي</th>
+                  <th style={thS}>صافي المزود</th>
+                  <th style={thS}>عمولة المنصة</th>
                   <th style={thS}>الحالة</th>
                   <th style={{ ...thS, width: "80px" }}>إجراء</th>
                 </tr>
@@ -1317,12 +1357,8 @@ export default function AdminReports({
               <tbody>
                 {filteredBookings.map((b) => {
                   const currency = b.offerings?.currency || "SAR";
-                  const { platformCommission } = calculateFinancials(
-                    b,
-                    commissionRate,
-                  );
+                  const fin = calculateFinancials(b, commissionRate);
 
-                  // ✨ صائد الموقع الجغرافي السحري بناءً على صورتك (b.location) ✨
                   const locationData = b.location || "";
                   const isUrl = locationData.includes("http");
 
@@ -1376,7 +1412,6 @@ export default function AdminReports({
                           📌 خدمة: {b.offerings?.title || "غير محددة"}
                         </div>
 
-                        {/* ✨ صندوق تفاصيل الموقع ورقم الحجز ✨ */}
                         <div
                           style={{
                             marginTop: "12px",
@@ -1493,16 +1528,203 @@ export default function AdminReports({
                       </td>
 
                       <td
+                        style={{ ...tdS, fontWeight: "bold", direction: "ltr" }}
+                      >
+                        {fin.baseTotal.toFixed(2)} {currency}
+                      </td>
+                      <td
                         style={{
                           ...tdS,
-                          color: "#ef4444",
-                          fontWeight: "900",
+                          color: "#10b981",
+                          fontWeight: "bold",
                           direction: "ltr",
-                          fontSize: "1.1rem",
                         }}
                       >
-                        {platformCommission.toFixed(2)} {currency}
+                        {fin.providerNet.toFixed(2)} {currency}
                       </td>
+
+                      {/* ✨ عمود عمولة المنصة (المراسلة الداخلية + الواتساب) ✨ */}
+                      <td style={{ ...tdS, verticalAlign: "middle" }}>
+                        <div
+                          style={{
+                            color: b.is_commission_paid ? "#10b981" : "#ef4444",
+                            fontWeight: "900",
+                            direction: "ltr",
+                            fontSize: "1.1rem",
+                          }}
+                        >
+                          {fin.platformCommission.toFixed(2)} {currency}
+                        </div>
+
+                        {b.is_commission_paid ? (
+                          <div
+                            style={{
+                              marginTop: "8px",
+                              fontSize: "0.8rem",
+                              color: "#059669",
+                              fontWeight: "bold",
+                              backgroundColor: "#d1fae5",
+                              padding: "4px 8px",
+                              borderRadius: "8px",
+                              display: "inline-block",
+                            }}
+                          >
+                            مسددة ✅
+                          </div>
+                        ) : (
+                          <div
+                            style={{
+                              display: "flex",
+                              flexDirection: "column",
+                              gap: "6px",
+                              marginTop: "10px",
+                              alignItems: "center",
+                            }}
+                          >
+                            {/* 1. زر الواتساب المباشر */}
+                            <a
+                              href={`https://wa.me/${(b.offerings?.profiles?.phone || "").replace(/\D/g, "")}?text=${encodeURIComponent(
+                                `مرحباً ${b.offerings?.profiles?.full_name || "مزود الخدمة"}،\n\nنود تذكيركم بضرورة سداد عمولة المنصة المستحقة بمبلغ *${fin.platformCommission.toFixed(2)} ${currency}*\nلرقم الحجز: #${b.id.substring(0, 8).toUpperCase()}\n\nوشكراً لتعاونكم.`,
+                              )}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title="مراسلة عبر الواتساب"
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                width: "100%",
+                                gap: "4px",
+                                backgroundColor: "#fef2f2",
+                                color: "#ef4444",
+                                border: "1px solid #fca5a5",
+                                padding: "6px 10px",
+                                borderRadius: "8px",
+                                fontSize: "0.75rem",
+                                fontWeight: "bold",
+                                textDecoration: "none",
+                                cursor: "pointer",
+                                transition: "0.2s",
+                              }}
+                              onMouseOver={(e) =>
+                                (e.currentTarget.style.backgroundColor =
+                                  "#fee2e2")
+                              }
+                              onMouseOut={(e) =>
+                                (e.currentTarget.style.backgroundColor =
+                                  "#fef2f2")
+                              }
+                            >
+                              <span>💬</span> واتساب
+                            </a>
+
+                            {/* 2. المراسلة الداخلية في النظام */}
+                            {activeMsgId === b.id ? (
+                              <div
+                                style={{
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  gap: "5px",
+                                  width: "100%",
+                                  marginTop: "5px",
+                                  padding: "8px",
+                                  backgroundColor: "#f8fafc",
+                                  borderRadius: "10px",
+                                  border: "1px dashed #cbd5e1",
+                                }}
+                              >
+                                <input
+                                  type="text"
+                                  value={sysMsgText}
+                                  onChange={(e) =>
+                                    setSysMsgText(e.target.value)
+                                  }
+                                  placeholder="اكتب التنبيه هنا..."
+                                  style={{
+                                    ...smInput,
+                                    padding: "6px",
+                                    fontSize: "0.75rem",
+                                    width: "auto",
+                                  }}
+                                />
+                                <div style={{ display: "flex", gap: "5px" }}>
+                                  <button
+                                    onClick={() =>
+                                      handleSendSysMsg(
+                                        b.offerings?.provider_id,
+                                        b.id,
+                                      )
+                                    }
+                                    style={{
+                                      flex: 1,
+                                      backgroundColor: "#3b82f6",
+                                      color: "white",
+                                      border: "none",
+                                      borderRadius: "6px",
+                                      fontSize: "0.75rem",
+                                      fontWeight: "bold",
+                                      padding: "5px",
+                                      cursor: "pointer",
+                                    }}
+                                  >
+                                    إرسال
+                                  </button>
+                                  <button
+                                    onClick={() => setActiveMsgId(null)}
+                                    style={{
+                                      backgroundColor: "#f1f5f9",
+                                      color: "#64748b",
+                                      border: "1px solid #cbd5e1",
+                                      borderRadius: "6px",
+                                      fontSize: "0.75rem",
+                                      padding: "5px 10px",
+                                      cursor: "pointer",
+                                    }}
+                                  >
+                                    ✖
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => {
+                                  setActiveMsgId(b.id);
+                                  setSysMsgText(
+                                    `تذكير ودي: نرجو منكم المبادرة بسداد عمولة المنصة (${fin.platformCommission.toFixed(2)} ${currency}) للحجز المكتمل لضمان استمرار تقديم الخدمات.`,
+                                  );
+                                }}
+                                style={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  width: "100%",
+                                  gap: "4px",
+                                  backgroundColor: "#fff",
+                                  color: "#3b82f6",
+                                  border: "1px solid #bfdbfe",
+                                  padding: "6px 10px",
+                                  borderRadius: "8px",
+                                  fontSize: "0.75rem",
+                                  fontWeight: "bold",
+                                  cursor: "pointer",
+                                  transition: "0.2s",
+                                }}
+                                onMouseOver={(e) =>
+                                  (e.currentTarget.style.backgroundColor =
+                                    "#eff6ff")
+                                }
+                                onMouseOut={(e) =>
+                                  (e.currentTarget.style.backgroundColor =
+                                    "#fff")
+                                }
+                              >
+                                <span>🔔</span> تنبيه بالنظام
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </td>
+
                       <td style={{ ...tdS }}>
                         <span
                           style={{
@@ -1559,7 +1781,7 @@ export default function AdminReports({
                 {filteredBookings.length === 0 && (
                   <tr>
                     <td
-                      colSpan="5"
+                      colSpan="7"
                       style={{
                         padding: "40px",
                         color: "#94a3b8",

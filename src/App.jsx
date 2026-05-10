@@ -21,6 +21,8 @@ import ProfileSettings from "./components/ProfileSettings";
 import AddOffering from "./components/AddOffering";
 import CalendarView from "./components/CalendarView";
 import { useTranslation } from "react-i18next";
+import { HelmetProvider } from "react-helmet-async";
+import UpdatePasswordModal from "./components/UpdatePasswordModal"; // تأكد من مسار الملف
 
 // --- التنسيقات العامة والجمالية ---
 const padS = { padding: "16px" };
@@ -151,19 +153,19 @@ const defaultLegalDocs = {
 };
 
 const calculateFinancials = (b, commissionRate) => {
-  const basePricePerUnit =
-    Number(b.proposed_price) || Number(b.offerings?.price) || 0;
-  const additional = Number(b.additional_costs) || 0;
-  const qty = b.quantity || 1;
-  const baseTotal = basePricePerUnit * qty;
-  const totalClientPrice = baseTotal + additional;
-  const platformCommission = baseTotal * commissionRate;
-  const providerNet = baseTotal - platformCommission + additional;
+  const finalTotal =
+    b.proposed_price && Number(b.proposed_price) > 0
+      ? Number(b.proposed_price)
+      : (Number(b.offerings?.price) || 0) * (b.quantity || 1);
+
+  const platformCommission = finalTotal * commissionRate;
+  const providerNet = finalTotal - platformCommission;
+
   return {
-    baseTotal,
-    qty,
-    additional,
-    totalClientPrice,
+    baseTotal: finalTotal,
+    qty: b.quantity || 1,
+    additional: 0,
+    totalClientPrice: finalTotal,
     platformCommission,
     providerNet,
   };
@@ -201,6 +203,9 @@ function MainAppContent() {
 
   const [isSuspended, setIsSuspended] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
+
+  // 🚀 حالة النافذة الجديدة لاستعادة كلمة المرور
+  const [showUpdatePassword, setShowUpdatePassword] = useState(false);
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [editOfferingData, setEditOfferingData] = useState(null);
@@ -350,7 +355,6 @@ function MainAppContent() {
         safeProfilesList = [...allProfiles, currentUserData];
       }
 
-      // 1. أولاً: نقوم بدمج الحجوزات مع تفاصيل الخدمات والأسعار
       const enrichedOfferings = allOfferings.map((o) => ({
         ...o,
         profiles: safeProfilesList.find((p) => p.id === o.provider_id),
@@ -367,7 +371,6 @@ function MainAppContent() {
             new Date(a.appointment_date || 0),
         );
 
-      // 2. ثانياً: ✨ حساب أرباح التسويق للمستخدم الحالي ✨
       let affTotal = 0;
       let affUnpaid = 0;
       let affClients = 0;
@@ -379,9 +382,7 @@ function MainAppContent() {
         const myReferredIds = myReferred.map((u) => u.id);
 
         const myRefBookings = enrichedBookings.filter((b) => {
-          // ✨ التعديل المالي: لا تحسب العمولة للمسوق إلا إذا سدد المزود عمولة المنصة ✨
           if (b.status !== "completed" || !b.is_commission_paid) return false;
-
           const isCustomerReferred = myReferredIds.includes(b.customer_id);
           const isProviderReferred =
             b.offerings && myReferredIds.includes(b.offerings.provider_id);
@@ -404,7 +405,6 @@ function MainAppContent() {
         clients: affClients,
       });
 
-      // 3. أخيراً: توزيع البيانات على الجداول
       setMyOfferings(enrichedOfferings.filter((o) => o.provider_id === userId));
       setProviderBookings(
         enrichedBookings.filter((b) => b.offerings?.provider_id === userId),
@@ -427,11 +427,39 @@ function MainAppContent() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_e, session) => {
+      // 🚀 التقاط حدث استعادة كلمة المرور لفتح النافذة
+      if (_e === "PASSWORD_RECOVERY") {
+        setShowUpdatePassword(true);
+      }
+
       setSession(session);
       fetchAllData(session?.user?.id);
     });
     return () => subscription.unsubscribe();
   }, [fetchAllData]);
+
+  useEffect(() => {
+    if (!session?.user?.id) return;
+
+    const globalRadar = supabase
+      .channel("notifications-channel")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "notifications" },
+        (payload) => {
+          if (payload.new.user_id === session.user.id) {
+            if (typeof fetchAllData === "function") {
+              fetchAllData(session.user.id);
+            }
+          }
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(globalRadar);
+    };
+  }, [session, fetchAllData]);
 
   useEffect(() => {
     if (session && showLoginModal) {
@@ -728,196 +756,173 @@ function MainAppContent() {
           ></div>
         </div>
 
-        <div style={{ overflowX: "auto", paddingBottom: "10px" }}>
-          <table
-            style={{
-              width: "100%",
-              borderCollapse: "separate",
-              borderSpacing: "0 15px",
-              fontSize: "0.8rem",
-            }}
-          >
-            <tbody style={{ textAlign: "center" }}>
-              {filtered.map((b) => {
-                const currency = b.offerings?.currency || "USD";
-                const { platformCommission } = calculateFinancials(
-                  b,
-                  commissionRate,
-                );
-                const hasComment =
-                  b.review_text ||
-                  b.review_comment ||
-                  b.client_review ||
-                  b.review ||
-                  b.comment ||
-                  b.feedback;
-                const isHidden =
-                  b.is_comment_hidden ||
-                  (hasComment && hasComment.includes("🚫"));
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "15px",
+            paddingBottom: "10px",
+          }}
+        >
+          {filtered.map((b) => {
+            const currency = b.offerings?.currency || "USD";
+            const { platformCommission } = calculateFinancials(
+              b,
+              commissionRate,
+            );
+            const hasComment =
+              b.review_text ||
+              b.review_comment ||
+              b.client_review ||
+              b.review ||
+              b.comment ||
+              b.feedback;
+            const isHidden =
+              b.is_comment_hidden || (hasComment && hasComment.includes("🚫"));
 
-                return (
-                  <Fragment key={b.id}>
-                    <BookingRow
-                      booking={b}
-                      onRefresh={() => fetchAllData(session.user.id)}
-                      isProviderView={isProvider}
-                    />
+            return (
+              <div
+                key={b.id}
+                style={{ display: "flex", flexDirection: "column" }}
+              >
+                <BookingRow
+                  booking={b}
+                  onRefresh={() => fetchAllData(session.user.id)}
+                  isProviderView={isProvider}
+                />
 
-                    {/* ✨ تعليق العميل ✨ */}
-                    {isProvider &&
-                      b.status === "completed" &&
-                      hasComment &&
-                      !isHidden && (
-                        <tr>
-                          <td
-                            colSpan="5"
-                            style={{ padding: 0, border: "none" }}
-                          >
-                            <div
-                              style={{
-                                backgroundColor: "#fffbeb",
-                                border: "1px solid #fde68a",
-                                borderTop: "none",
-                                padding: "10px 20px",
-                                borderBottomRightRadius: "16px",
-                                borderBottomLeftRadius: "16px",
-                                display: "flex",
-                                justifyContent: "space-between",
-                                alignItems: "center",
-                                flexWrap: "wrap",
-                                gap: "10px",
-                                marginTop: "-15px",
-                                position: "relative",
-                                zIndex: 0,
-                              }}
-                            >
-                              <span
-                                style={{
-                                  color: "#b45309",
-                                  fontSize: "0.85rem",
-                                  fontWeight: "bold",
-                                }}
-                              >
-                                💬 تعليق العميل: "{hasComment}"
-                              </span>
-                              <button
-                                onClick={() => hideProviderComment(b.id)}
-                                style={{
-                                  background: "#fef2f2",
-                                  color: "#ef4444",
-                                  border: "1px solid #fca5a5",
-                                  padding: "6px 12px",
-                                  borderRadius: "8px",
-                                  cursor: "pointer",
-                                  fontWeight: "bold",
-                                  fontSize: "0.75rem",
-                                  transition: "0.2s",
-                                }}
-                                onMouseOver={(e) =>
-                                  (e.currentTarget.style.background = "#fee2e2")
-                                }
-                                onMouseOut={(e) =>
-                                  (e.currentTarget.style.background = "#fef2f2")
-                                }
-                              >
-                                🗑️ إخفاء التعليق
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      )}
+                {isProvider &&
+                  b.status === "completed" &&
+                  hasComment &&
+                  !isHidden && (
+                    <div
+                      style={{
+                        backgroundColor: "#fffbeb",
+                        border: "1px solid #fde68a",
+                        borderTop: "none",
+                        padding: "10px 20px",
+                        borderBottomRightRadius: "16px",
+                        borderBottomLeftRadius: "16px",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        flexWrap: "wrap",
+                        gap: "10px",
+                        marginTop: "-15px",
+                        position: "relative",
+                        zIndex: 0,
+                      }}
+                    >
+                      <span
+                        style={{
+                          color: "#b45309",
+                          fontSize: "0.85rem",
+                          fontWeight: "bold",
+                        }}
+                      >
+                        💬 تعليق العميل: "{hasComment}"
+                      </span>
+                      <button
+                        onClick={() => hideProviderComment(b.id)}
+                        style={{
+                          background: "#fef2f2",
+                          color: "#ef4444",
+                          border: "1px solid #fca5a5",
+                          padding: "6px 12px",
+                          borderRadius: "8px",
+                          cursor: "pointer",
+                          fontWeight: "bold",
+                          fontSize: "0.75rem",
+                          transition: "0.2s",
+                        }}
+                        onMouseOver={(e) =>
+                          (e.currentTarget.style.background = "#fee2e2")
+                        }
+                        onMouseOut={(e) =>
+                          (e.currentTarget.style.background = "#fef2f2")
+                        }
+                      >
+                        🗑️ إخفاء التعليق
+                      </button>
+                    </div>
+                  )}
 
-                    {/* ✨ التعليق المخفي ✨ */}
-                    {isProvider && b.status === "completed" && isHidden && (
-                      <tr>
-                        <td colSpan="5" style={{ padding: 0, border: "none" }}>
-                          <div
-                            style={{
-                              backgroundColor: "#f8fafc",
-                              border: "1px solid #e2e8f0",
-                              borderTop: "none",
-                              padding: "12px 20px",
-                              borderBottomRightRadius: "16px",
-                              borderBottomLeftRadius: "16px",
-                              color: "#64748b",
-                              fontSize: "0.85rem",
-                              fontStyle: "italic",
-                              marginTop: "-15px",
-                              position: "relative",
-                              zIndex: 0,
-                            }}
-                          >
-                            🚫 تم إخفاء التعليق
-                          </div>
-                        </td>
-                      </tr>
-                    )}
+                {isProvider && b.status === "completed" && isHidden && (
+                  <div
+                    style={{
+                      backgroundColor: "#f8fafc",
+                      border: "1px solid #e2e8f0",
+                      borderTop: "none",
+                      padding: "12px 20px",
+                      borderBottomRightRadius: "16px",
+                      borderBottomLeftRadius: "16px",
+                      color: "#64748b",
+                      fontSize: "0.85rem",
+                      fontStyle: "italic",
+                      marginTop: "-15px",
+                      position: "relative",
+                      zIndex: 0,
+                    }}
+                  >
+                    🚫 تم إخفاء التعليق
+                  </div>
+                )}
 
-                    {/* ✨ عمولة المنصة تظهر تحت الحجز للمزود ✨ */}
-                    {isProvider && b.status === "completed" && (
-                      <tr>
-                        <td colSpan="5" style={{ padding: 0, border: "none" }}>
-                          <div
-                            style={{
-                              backgroundColor: b.is_commission_paid
-                                ? "#ecfdf5"
-                                : "#fef2f2",
-                              border: b.is_commission_paid
-                                ? "1px solid #a7f3d0"
-                                : "1px solid #fca5a5",
-                              borderTop: "none",
-                              padding: "12px 20px",
-                              borderBottomRightRadius: "16px",
-                              borderBottomLeftRadius: "16px",
-                              color: b.is_commission_paid
-                                ? "#047857"
-                                : "#b91c1c",
-                              fontWeight: "bold",
-                              fontSize: "0.85rem",
-                              marginTop:
-                                hasComment || isHidden ? "0px" : "-15px",
-                              position: "relative",
-                              zIndex: -1,
-                              display: "flex",
-                              flexWrap: "wrap",
-                              alignItems: "center",
-                              justifyContent: "space-between",
-                            }}
-                          >
-                            <span>
-                              💰 عمولة المنصة لهذا الحجز:{" "}
-                              <strong
-                                style={{
-                                  direction: "ltr",
-                                  display: "inline-block",
-                                  fontSize: "1rem",
-                                }}
-                              >
-                                {platformCommission.toFixed(2)} {currency}
-                              </strong>
-                            </span>
-                            <span
-                              style={{
-                                backgroundColor: "#fff",
-                                padding: "4px 10px",
-                                borderRadius: "8px",
-                                fontSize: "0.75rem",
-                                boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
-                              }}
-                            >
-                              {b.is_commission_paid
-                                ? "✅ مسددة للمنصة"
-                                : "❌ مستحقة ولم تسدد بعد"}
-                            </span>
-                          </div>
-                        </td>
-                      </tr>
-                    )}
-                  </Fragment>
-                );
-              })}
-            </tbody>
-          </table>
+                {isProvider && b.status === "completed" && (
+                  <div
+                    style={{
+                      backgroundColor: b.is_commission_paid
+                        ? "#ecfdf5"
+                        : "#fef2f2",
+                      border: b.is_commission_paid
+                        ? "1px solid #a7f3d0"
+                        : "1px solid #fca5a5",
+                      borderTop: "none",
+                      padding: "12px 20px",
+                      borderBottomRightRadius: "16px",
+                      borderBottomLeftRadius: "16px",
+                      color: b.is_commission_paid ? "#047857" : "#b91c1c",
+                      fontWeight: "bold",
+                      fontSize: "0.85rem",
+                      marginTop: hasComment || isHidden ? "0px" : "-15px",
+                      position: "relative",
+                      zIndex: -1,
+                      display: "flex",
+                      flexWrap: "wrap",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                    }}
+                  >
+                    <span>
+                      💰 عمولة المنصة لهذا الحجز:{" "}
+                      <strong
+                        style={{
+                          direction: "ltr",
+                          display: "inline-block",
+                          fontSize: "1rem",
+                        }}
+                      >
+                        {platformCommission.toFixed(2)} {currency}
+                      </strong>
+                    </span>
+                    <span
+                      style={{
+                        backgroundColor: "#fff",
+                        padding: "4px 10px",
+                        borderRadius: "8px",
+                        fontSize: "0.75rem",
+                        boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
+                      }}
+                    >
+                      {b.is_commission_paid
+                        ? "✅ مسددة للمنصة"
+                        : "❌ مستحقة ولم تسدد بعد"}
+                    </span>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
     );
@@ -1791,7 +1796,7 @@ function MainAppContent() {
               (e.currentTarget.style.backgroundColor = "transparent")
             }
           >
-            {/* ✨ نظام الشعار الذكي: يقرأ من الإدارة، وإلا يعرض الشعار الافتراضي ✨ */}
+            {/* ✨ نظام الشعار الذكي ✨ */}
             {platformLogo?.includes("http") ||
             platformLogo?.startsWith("data:image") ? (
               <img
@@ -2089,7 +2094,6 @@ function MainAppContent() {
           </div>
         </div>
 
-        {/* ✨ تم تقصير أسماء التبويبات وتم السماح لها بالنزول لسطر جديد ✨ */}
         <div
           className="hide-scrollbar"
           style={{
@@ -3019,7 +3023,6 @@ function MainAppContent() {
                                 SAR
                               </span>
                             </div>
-                            {/* التنبيه داخل البطاقة بشكل صحيح */}
                             <div
                               style={{
                                 fontSize: "0.75rem",
@@ -3378,11 +3381,14 @@ function MainAppContent() {
           </span>
         </div>
       </div>
+
+      {/* ✨ نافذة استعادة كلمة المرور الجديدة ✨ */}
+      {showUpdatePassword && (
+        <UpdatePasswordModal onClose={() => setShowUpdatePassword(false)} />
+      )}
     </div>
   );
 }
-
-import { HelmetProvider } from "react-helmet-async"; // 👈 أضفنا استيراد المكتبة
 
 export default function AppWrapper() {
   return (

@@ -200,6 +200,7 @@ export default function ProfileSettings({ session, onUpdate }) {
     }
   };
 
+  // ✨ دالة الحفظ المحدثة والمنفصلة بحرفية ✨
   const handleUpdate = async (e) => {
     e.preventDefault();
     if (
@@ -213,20 +214,15 @@ export default function ProfileSettings({ session, onUpdate }) {
 
     setIsSubmitting(true);
 
-    // 1️⃣ تحديث بيانات الدخول بذكاء لتفادي مشاكل الملء التلقائي للمتصفح
     let authUpdateError = null;
-    const isEmailChanged = email !== session.user.email;
-    const isPasswordChanged = newPassword && newPassword.trim().length > 0;
+    let emailConfirmationSent = false;
 
-    if (isPasswordChanged || isEmailChanged) {
-      const authUpdates = {};
-      if (isPasswordChanged) authUpdates.password = newPassword;
-      if (isEmailChanged) authUpdates.email = email;
-
-      const { error } = await supabase.auth.updateUser(authUpdates);
-
+    // 1️⃣ تحديث كلمة المرور (مفصولة عن الإيميل لتجنب التداخل)
+    if (newPassword && newPassword.trim().length > 0) {
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
       if (error) {
-        // ✨ السحر هنا: إذا كان الخطأ بسبب أن كلمة المرور مطابقة للقديمة، نتجاهله بصمت ونكمل الحفظ
         if (
           error.message.includes("different from the old password") ||
           error.status === 422
@@ -238,13 +234,24 @@ export default function ProfileSettings({ session, onUpdate }) {
       }
     }
 
+    // 2️⃣ تحديث الإيميل (يتطلب إرسال رابط تأكيد)
+    if (!authUpdateError && email && email.trim() !== session.user.email) {
+      const { error } = await supabase.auth.updateUser({ email: email.trim() });
+      if (error) {
+        authUpdateError = error;
+      } else {
+        emailConfirmationSent = true;
+      }
+    }
+
+    // إيقاف العملية إذا حدث خطأ في المصادقة
     if (authUpdateError) {
       setIsSubmitting(false);
       alert("حدث خطأ أثناء تحديث بيانات الدخول: " + authUpdateError.message);
       return;
     }
 
-    // 2️⃣ تحديث باقي البيانات في جدول Profiles
+    // 3️⃣ تحديث باقي البيانات في جدول Profiles
     const { error } = await supabase
       .from("profiles")
       .update({
@@ -277,9 +284,10 @@ export default function ProfileSettings({ session, onUpdate }) {
       setOriginalUsername(username);
       setNewPassword(""); // تفريغ الخانة بعد النجاح
 
-      if (isEmailChanged) {
+      // التنبيه الذكي للمستخدم
+      if (emailConfirmationSent) {
         alert(
-          "تم الحفظ بنجاح ✅\nلقد قمت بتغيير بريدك الإلكتروني، يرجى مراجعة بريدك الجديد للضغط على رابط التأكيد.",
+          "تم حفظ البيانات الشاملة بنجاح ✅\n\n⚠️ تنبيه بخصوص الإيميل:\nلقد تم إرسال رابط تأكيد إلى بريدك الجديد.\nيجب عليك فتحه والضغط على الرابط ليتم التغيير الفعلي، وإلا سيبقى حسابك على الإيميل القديم.",
         );
       } else {
         alert("تم تحديث الملف الشخصي بنجاح ✅");
@@ -924,45 +932,6 @@ export default function ProfileSettings({ session, onUpdate }) {
             gap: "25px",
           }}
         >
-          <div style={sectionS}>
-            <h3 style={secTitle}>نوع الحساب</h3>
-            <div style={{ marginBottom: "15px" }}>
-              <label style={lblS}>تصنيف الحساب:</label>
-              <select
-                style={{ ...inpS, cursor: "pointer" }}
-                value={providerType}
-                onChange={(e) => setProviderType(e.target.value)}
-              >
-                <option value="individual">👤 فرد (مستقل)</option>
-                <option value="institution">
-                  🏢 /متعهد/ قائد فريق او مجموعه/مؤسسة / شركة
-                </option>
-              </select>
-            </div>
-            {providerType === "institution" && (
-              <div
-                style={{
-                  backgroundColor: "#eff6ff",
-                  padding: "15px",
-                  borderRadius: "12px",
-                  border: "1px dashed #3b82f6",
-                }}
-              >
-                <label style={{ ...lblS, color: "#1e40af" }}>
-                  الطاقة الاستيعابية (حجوزات متزامنة):
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  required
-                  style={{ ...inpS, borderColor: "#bfdbfe" }}
-                  value={maxCapacity}
-                  onChange={(e) => setMaxCapacity(e.target.value)}
-                />
-              </div>
-            )}
-          </div>
-
           <div style={sectionS}>
             <h3 style={secTitle}>الضرائب والتراخيص</h3>
             <div

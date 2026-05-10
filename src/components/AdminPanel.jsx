@@ -2,16 +2,12 @@ import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 
 export default function AdminPanel({ session }) {
-  // 🔘 حالة التبويب النشط
   const [activeTab, setActiveTab] = useState("users");
-
-  // 👑 حالات بيانات المدير
   const [users, setUsers] = useState([]);
-  const [commission, setCommission] = useState("");
+  const [commission, setCommission] = useState(""); // نسبة العمولة من الإعدادات (مثلاً 0.10)
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
 
-  // 🛠️ متغيرات النافذة المنبثقة للتعديل الإجباري
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [newUsername, setNewUsername] = useState("");
@@ -47,17 +43,39 @@ export default function AdminPanel({ session }) {
       .from("profiles")
       .select("*")
       .order("created_at", { ascending: false });
+
     const { data: config } = await supabase
       .from("system_settings")
       .select("*")
       .eq("key", "commission_rate")
       .single();
+
     if (usersData) setUsers(usersData);
     if (config) setCommission(config.value);
     setLoading(false);
   };
 
-  // 👑 وظائف إدارة المستخدمين
+  // ✨ الدالة المحاسبية المطورة للحساب الحي ✨
+  const calculateFinancials = (user) => {
+    // جلب نسبة العمولة من الإعدادات أو افتراض 10%
+    const rate = parseFloat(commission) || 0.1;
+
+    // إجمالي المبالغ التي دخلت النظام لهذا المستخدم
+    const rawEarnings = user.total_earnings || 0;
+
+    // الحسبة الحية:
+    // العمولة = الإجمالي × النسبة
+    const liveCommission = rawEarnings * rate;
+
+    // الصافي للمزود = الإجمالي - العمولة
+    const netEarnings = rawEarnings - liveCommission;
+
+    return {
+      commissionDisplay: liveCommission.toFixed(2),
+      earningsDisplay: netEarnings.toFixed(2),
+    };
+  };
+
   const changeUserRole = async (userId, newRole) => {
     if (!window.confirm(`تغيير الصلاحية إلى "${newRole}"؟`)) return;
     const { error } = await supabase
@@ -65,8 +83,8 @@ export default function AdminPanel({ session }) {
       .update({ role: newRole })
       .eq("id", userId);
     if (!error) {
-      alert("تم التحديث ✅");
       fetchAdminData();
+      alert("تم التحديث ✅");
     }
   };
 
@@ -103,13 +121,9 @@ export default function AdminPanel({ session }) {
       })
       .eq("id", editingUser.id);
     if (!error) {
-      alert("تم التعديل الإجباري بنجاح! 👑");
       setIsModalOpen(false);
       fetchAdminData();
-    } else {
-      error.code === "23505"
-        ? alert("اسم المستخدم هذا محجوز.")
-        : alert("خطأ: " + error.message);
+      alert("تم التعديل الإجباري بنجاح! 👑");
     }
   };
 
@@ -118,7 +132,8 @@ export default function AdminPanel({ session }) {
       .from("system_settings")
       .update({ value: commission })
       .eq("key", "commission_rate");
-    alert("تم التحديث ✅");
+    alert("تم تحديث نسبة العمولة العامة ✅");
+    fetchAdminData(); // تحديث الحسابات فوراً بعد تغيير النسبة
   };
 
   if (loading)
@@ -127,8 +142,7 @@ export default function AdminPanel({ session }) {
         ⏳ جاري فحص الصلاحيات...
       </div>
     );
-
-  if (!isAdmin) {
+  if (!isAdmin)
     return (
       <div
         style={{
@@ -142,7 +156,6 @@ export default function AdminPanel({ session }) {
         <h2 style={{ color: "#dc2626" }}>🚫 وصول غير مصرح به</h2>
       </div>
     );
-  }
 
   return (
     <div
@@ -165,7 +178,6 @@ export default function AdminPanel({ session }) {
         👑 لوحة تحكم الإدارة العليا
       </h2>
 
-      {/* 🟡 الشريط العلوي للتبويبات 🟡 */}
       <div
         style={{
           display: "flex",
@@ -184,7 +196,6 @@ export default function AdminPanel({ session }) {
           label="رسائل الزوار"
           isActive={activeTab === "messages"}
           onClick={() => setActiveTab("messages")}
-          badge="1"
         />
         <TabButton
           icon="⭐"
@@ -218,9 +229,6 @@ export default function AdminPanel({ session }) {
         />
       </div>
 
-      {/* ========================================= */}
-      {/* 📄 تبويب المستخدمين (الجدول الجديد بالكامل) */}
-      {/* ========================================= */}
       {activeTab === "users" && (
         <div className="animate-fade-in">
           <div
@@ -259,189 +267,158 @@ export default function AdminPanel({ session }) {
                   <th style={thStyle}>الاسم</th>
                   <th style={thStyle}>اليوزر / النوع</th>
                   <th style={thStyle}>الصلاحية</th>
-                  <th style={thStyle}>المستحق 💰</th>
+                  <th style={thStyle}>المستحق للمنصة 💰</th>
+                  <th style={thStyle}>صافي الأرباح 📈</th>
                   <th style={thStyle}>الحالة</th>
-                  <th style={thStyle}>الإجراءات (التعديل/الإيقاف)</th>
+                  <th style={thStyle}>الإجراءات</th>
                 </tr>
               </thead>
               <tbody>
-                {users.map((u) => (
-                  <tr
-                    key={u.id}
-                    style={{ borderBottom: "1px solid #f1f5f9" }}
-                    onMouseEnter={(e) =>
-                      (e.currentTarget.style.backgroundColor = "#f8fafc")
-                    }
-                    onMouseLeave={(e) =>
-                      (e.currentTarget.style.backgroundColor = "transparent")
-                    }
-                  >
-                    <td style={tdStyle}>
-                      <strong>{u.full_name || "بدون اسم"}</strong>
-                      <br />
-                      <small dir="ltr" style={{ color: "#64748b" }}>
-                        {u.phone || "لا يوجد رقم"}
-                      </small>
-                    </td>
-
-                    <td style={tdStyle}>
-                      <span
-                        dir="ltr"
-                        style={{ color: "#7c3aed", fontWeight: "bold" }}
-                      >
-                        @{u.username || "---"}
-                      </span>
-                      <br />
-                      <small style={{ color: "#64748b" }}>
-                        {u.provider_type === "institution"
-                          ? "🏢 مؤسسة"
-                          : "👤 فرد"}
-                      </small>
-                    </td>
-
-                    <td style={tdStyle}>
-                      <select
-                        value={u.role || "عادي"}
-                        onChange={(e) => changeUserRole(u.id, e.target.value)}
+                {users.map((u) => {
+                  const financials = calculateFinancials(u);
+                  return (
+                    <tr
+                      key={u.id}
+                      style={{ borderBottom: "1px solid #f1f5f9" }}
+                    >
+                      <td style={tdStyle}>
+                        <strong>{u.full_name || "بدون اسم"}</strong>
+                        <br />
+                        <small dir="ltr" style={{ color: "#64748b" }}>
+                          {u.phone || "---"}
+                        </small>
+                      </td>
+                      <td style={tdStyle}>
+                        <span
+                          dir="ltr"
+                          style={{ color: "#7c3aed", fontWeight: "bold" }}
+                        >
+                          @{u.username || "---"}
+                        </span>
+                        <br />
+                        <small style={{ color: "#64748b" }}>
+                          {u.provider_type === "institution"
+                            ? "🏢 مؤسسة"
+                            : "👤 فرد"}
+                        </small>
+                      </td>
+                      <td style={tdStyle}>
+                        <select
+                          value={u.role || "عادي"}
+                          onChange={(e) => changeUserRole(u.id, e.target.value)}
+                          style={{
+                            padding: "8px",
+                            borderRadius: "8px",
+                            border: "1px solid #cbd5e1",
+                            fontWeight: "bold",
+                          }}
+                        >
+                          <option value="عادي">👤 عادي</option>
+                          <option value="مدير">👑 مدير</option>
+                        </select>
+                      </td>
+                      <td
                         style={{
-                          padding: "8px 10px",
-                          borderRadius: "8px",
-                          border:
-                            u.role === "مدير" || u.role === "admin"
-                              ? "1px solid #fca5a5"
-                              : "1px solid #cbd5e1",
-                          backgroundColor:
-                            u.role === "مدير" || u.role === "admin"
-                              ? "#fef2f2"
-                              : "#fff",
-                          color:
-                            u.role === "مدير" || u.role === "admin"
-                              ? "#ef4444"
-                              : "#475569",
+                          ...tdStyle,
+                          color: "#ef4444",
                           fontWeight: "bold",
-                          cursor: "pointer",
                         }}
                       >
-                        <option value="عادي">👤 عادي</option>
-                        <option value="مدير">👑 مدير</option>
-                      </select>
-                    </td>
-
-                    <td
-                      style={{
-                        ...tdStyle,
-                        color: "#ef4444",
-                        fontWeight: "bold",
-                      }}
-                    >
-                      {u.commission_owed || 0} ر.س
-                    </td>
-
-                    <td style={tdStyle}>
-                      {u.is_active !== false ? (
-                        <span style={badgeStyle("#10b981")}>نشط</span>
-                      ) : (
-                        <span style={badgeStyle("#ef4444")}>موقوف</span>
-                      )}
-                    </td>
-
-                    {/* 🚀 الأزرار الجديدة هنا (الأزرق للتعديل، الأصفر للإيقاف، الأحمر للحذف) 🚀 */}
-                    <td style={{ ...tdStyle, display: "flex", gap: "5px" }}>
-                      <button
-                        onClick={() => openForceEdit(u)}
-                        style={actionBtn("#3b82f6")}
-                        title="تعديل إجباري"
+                        {financials.commissionDisplay} ر.س
+                      </td>
+                      <td
+                        style={{
+                          ...tdStyle,
+                          color: "#10b981",
+                          fontWeight: "bold",
+                        }}
                       >
-                        ✏️
-                      </button>
-                      <button
-                        onClick={() =>
-                          toggleUserStatus(u.id, u.is_active !== false)
-                        }
-                        style={actionBtn(
-                          u.is_active !== false ? "#f59e0b" : "#10b981",
-                        )}
-                        title={u.is_active !== false ? "إيقاف" : "تفعيل"}
-                      >
-                        {u.is_active !== false ? "⏸️" : "▶️"}
-                      </button>
-                      <button
-                        onClick={() => deleteUser(u.id)}
-                        style={actionBtn("#ef4444")}
-                        title="حذف"
-                      >
-                        🗑️
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                        {financials.earningsDisplay} ر.س
+                      </td>
+                      <td style={tdStyle}>
+                        <span
+                          style={badgeStyle(
+                            u.is_active !== false ? "#10b981" : "#ef4444",
+                          )}
+                        >
+                          {u.is_active !== false ? "نشط" : "موقوف"}
+                        </span>
+                      </td>
+                      <td style={{ ...tdStyle, display: "flex", gap: "5px" }}>
+                        <button
+                          onClick={() => openForceEdit(u)}
+                          style={actionBtn("#3b82f6")}
+                          title="تعديل"
+                        >
+                          ✏️
+                        </button>
+                        <button
+                          onClick={() =>
+                            toggleUserStatus(u.id, u.is_active !== false)
+                          }
+                          style={actionBtn(
+                            u.is_active !== false ? "#f59e0b" : "#10b981",
+                          )}
+                        >
+                          {u.is_active !== false ? "⏸️" : "▶️"}
+                        </button>
+                        <button
+                          onClick={() => deleteUser(u.id)}
+                          style={actionBtn("#ef4444")}
+                        >
+                          🗑️
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         </div>
       )}
 
-      {/* ========================================= */}
-      {/* 📄 إعدادات المنصة */}
       {activeTab === "settings" && (
-        <div className="animate-fade-in">
-          <div
-            style={{
-              backgroundColor: "#f8fafc",
-              padding: "20px",
-              borderRadius: "15px",
-              border: "1px solid #e2e8f0",
-            }}
-          >
-            <h4 style={{ margin: "0 0 15px 0", color: "#334155" }}>
-              💰 نسبة عمولة المنصة العامة
-            </h4>
-            <div style={{ display: "flex", gap: "10px", maxWidth: "400px" }}>
+        <div
+          style={{
+            backgroundColor: "#f8fafc",
+            padding: "20px",
+            borderRadius: "15px",
+            border: "1px solid #e2e8f0",
+          }}
+        >
+          <h4 style={{ margin: "0 0 15px 0", color: "#334155" }}>
+            💰 إعدادات العمولة العامة
+          </h4>
+          <div style={{ display: "flex", gap: "10px", maxWidth: "450px" }}>
+            <div style={{ flex: 1 }}>
+              <label style={{ fontSize: "0.8rem", color: "#64748b" }}>
+                نسبة العمولة (0.10 تعني 10%)
+              </label>
               <input
                 type="number"
                 step="0.01"
                 value={commission}
                 onChange={(e) => setCommission(e.target.value)}
-                placeholder="مثال: 0.05 لـ 5%"
                 style={{
-                  flex: 1,
+                  width: "100%",
                   padding: "12px",
                   borderRadius: "10px",
                   border: "1px solid #cbd5e1",
-                  outline: "none",
                 }}
               />
-              <button onClick={updateCommission} style={btnStyle("#7c3aed")}>
-                تحديث الحفظ
-              </button>
             </div>
+            <button
+              onClick={updateCommission}
+              style={{ ...btnStyle("#7c3aed"), marginTop: "22px" }}
+            >
+              تحديث ⚙️
+            </button>
           </div>
         </div>
       )}
 
-      {/* باقي التبويبات */}
-      {activeTab === "messages" && (
-        <div style={{ padding: "40px", textAlign: "center", color: "#64748b" }}>
-          ضع كود رسائل الزوار هنا 📩
-        </div>
-      )}
-      {activeTab === "reviews" && (
-        <div style={{ padding: "40px", textAlign: "center", color: "#64748b" }}>
-          ضع كود التقييمات هنا ⭐
-        </div>
-      )}
-      {activeTab === "categories" && (
-        <div style={{ padding: "40px", textAlign: "center", color: "#64748b" }}>
-          ضع كود إدارة الأقسام هنا 📁
-        </div>
-      )}
-      {activeTab === "policies" && (
-        <div style={{ padding: "40px", textAlign: "center", color: "#64748b" }}>
-          ضع كود سياسات المنصة هنا 📜
-        </div>
-      )}
-
-      {/* 🛠️ النافذة المنبثقة للتعديل الإجباري 🛠️ */}
+      {/* النافذة المنبثقة للتعديل الإجباري */}
       {isModalOpen && (
         <div
           style={{
@@ -465,74 +442,58 @@ export default function AdminPanel({ session }) {
               borderRadius: "20px",
               width: "90%",
               maxWidth: "450px",
-              boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)",
             }}
           >
-            <h3
+            <h3 style={{ margin: "0 0 20px 0" }}>🛠️ التعديل الإجباري</h3>
+            <label
               style={{
-                margin: "0 0 20px 0",
-                color: "#1e293b",
-                display: "flex",
-                alignItems: "center",
-                gap: "10px",
+                display: "block",
+                marginBottom: "8px",
+                fontWeight: "bold",
               }}
             >
-              🛠️ التعديل الإجباري
-            </h3>
-            <div style={{ marginBottom: "15px" }}>
-              <label
-                style={{
-                  display: "block",
-                  marginBottom: "8px",
-                  fontWeight: "bold",
-                  color: "#475569",
-                }}
-              >
-                الاسم الكامل:
-              </label>
-              <input
-                type="text"
-                value={newFullName}
-                onChange={(e) => setNewFullName(e.target.value)}
-                style={{
-                  width: "100%",
-                  padding: "12px",
-                  borderRadius: "10px",
-                  border: "1px solid #cbd5e1",
-                }}
-              />
-            </div>
-            <div style={{ marginBottom: "25px" }}>
-              <label
-                style={{
-                  display: "block",
-                  marginBottom: "8px",
-                  fontWeight: "bold",
-                  color: "#ef4444",
-                }}
-              >
-                تغيير اليوزر نيم بالقوة:
-              </label>
-              <input
-                type="text"
-                dir="ltr"
-                value={newUsername}
-                onChange={(e) => setNewUsername(e.target.value)}
-                style={{
-                  width: "100%",
-                  padding: "12px",
-                  borderRadius: "10px",
-                  border: "2px solid #fca5a5",
-                  textAlign: "left",
-                }}
-              />
-            </div>
-            <div style={{ display: "flex", gap: "15px" }}>
+              الاسم الكامل:
+            </label>
+            <input
+              type="text"
+              value={newFullName}
+              onChange={(e) => setNewFullName(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "12px",
+                borderRadius: "10px",
+                border: "1px solid #cbd5e1",
+                marginBottom: "15px",
+              }}
+            />
+            <label
+              style={{
+                display: "block",
+                marginBottom: "8px",
+                fontWeight: "bold",
+                color: "#ef4444",
+              }}
+            >
+              اليوزر نيم بالقوة:
+            </label>
+            <input
+              type="text"
+              dir="ltr"
+              value={newUsername}
+              onChange={(e) => setNewUsername(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "12px",
+                borderRadius: "10px",
+                border: "2px solid #fca5a5",
+              }}
+            />
+            <div style={{ display: "flex", gap: "15px", marginTop: "25px" }}>
               <button
                 onClick={saveForceEdit}
                 style={{ flex: 1, ...btnStyle("#7c3aed") }}
               >
-                حفظ وتطبيق
+                حفظ
               </button>
               <button
                 onClick={() => setIsModalOpen(false)}
@@ -548,8 +509,7 @@ export default function AdminPanel({ session }) {
   );
 }
 
-// 🔵 التبويبات والتنسيقات
-function TabButton({ icon, label, isActive, onClick, badge }) {
+function TabButton({ icon, label, isActive, onClick }) {
   return (
     <button
       onClick={onClick}
@@ -562,31 +522,12 @@ function TabButton({ icon, label, isActive, onClick, badge }) {
         backgroundColor: isActive ? "#fff" : "transparent",
         color: isActive ? "#7c3aed" : "#64748b",
         border: isActive ? "1px solid #e2e8f0" : "1px solid transparent",
-        boxShadow: isActive ? "0 4px 6px -1px rgba(0,0,0,0.05)" : "none",
         fontWeight: isActive ? "bold" : "normal",
         cursor: "pointer",
-        transition: "all 0.2s ease",
-        position: "relative",
+        transition: "0.2s",
       }}
     >
       <span>{icon}</span> <span>{label}</span>
-      {badge && (
-        <span
-          style={{
-            position: "absolute",
-            top: "-5px",
-            right: "-5px",
-            backgroundColor: "#ef4444",
-            color: "#fff",
-            fontSize: "0.7rem",
-            fontWeight: "bold",
-            padding: "2px 6px",
-            borderRadius: "10px",
-          }}
-        >
-          {badge}
-        </span>
-      )}
     </button>
   );
 }
@@ -609,7 +550,6 @@ const btnStyle = (color) => ({
   border: "none",
   fontWeight: "bold",
   cursor: "pointer",
-  transition: "0.2s",
 });
 const actionBtn = (color) => ({
   backgroundColor: `${color}15`,
@@ -618,5 +558,4 @@ const actionBtn = (color) => ({
   padding: "8px 12px",
   cursor: "pointer",
   fontSize: "1.1rem",
-  transition: "0.2s",
 });

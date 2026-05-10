@@ -16,6 +16,13 @@ export default function AddOffering({
     editData?.provider_name || "",
   );
   const [nickname, setNickname] = useState(editData?.nickname || "");
+
+  // ✨ الحقول الجديدة: المسمى والطاقة الاستيعابية ✨
+  const [providerRole, setProviderRole] = useState(
+    editData?.provider_role || "",
+  );
+  const [maxCapacity, setMaxCapacity] = useState(editData?.max_capacity || 1);
+
   const [title, setTitle] = useState(editData?.title || "");
   const [description, setDescription] = useState(editData?.description || "");
   const [price, setPrice] = useState(editData?.price || "");
@@ -50,7 +57,7 @@ export default function AddOffering({
   );
   const [workEnd, setWorkEnd] = useState(editData?.work_end_time || "22:00");
   const [availableDays, setAvailableDays] = useState(
-    editData?.available_days || [], // 👈 جعلناها مصفوفة فارغة لتبدأ بدون تحديد
+    editData?.available_days || [],
   );
 
   // 4. السوشيال ميديا الخاصة بالخدمة
@@ -181,6 +188,8 @@ export default function AddOffering({
       provider_id: session.user.id,
       provider_name: providerName,
       nickname: nickname,
+      provider_role: providerRole, // ✨ إضافة المسمى
+      max_capacity: maxCapacity, // ✨ إضافة الطاقة الاستيعابية
       title,
       description,
       price: finalPrice,
@@ -342,6 +351,74 @@ export default function AddOffering({
                   onChange={(e) => setNickname(e.target.value)}
                   style={inputS}
                   placeholder="مثال: أبو طلال"
+                />
+              </div>
+            </div>
+
+            {/* ✨ الحقول الجديدة: المسمى المهني والطاقة الاستيعابية للخدمة ✨ */}
+            <div
+              style={{
+                display: "flex",
+                gap: "15px",
+                flexWrap: "wrap",
+                marginBottom: "15px",
+              }}
+            >
+              <div style={{ flex: 1, minWidth: "200px" }}>
+                <label style={labelS}>مسمى مقدم الخدمة (اختياري):</label>
+                <input
+                  type="text"
+                  className="smart-input"
+                  value={providerRole}
+                  onChange={(e) => setProviderRole(e.target.value)}
+                  style={inputS}
+                  placeholder="مثال: طبيب، ممرض، فرقة شعبية، شاعر..."
+                />
+              </div>
+
+              <div
+                style={{
+                  flex: 1,
+                  minWidth: "200px",
+                  backgroundColor: "#eff6ff",
+                  padding: "12px",
+                  borderRadius: "12px",
+                  border: "1px dashed #3b82f6",
+                }}
+              >
+                <label
+                  style={{ ...labelS, color: "#1e40af", marginBottom: "4px" }}
+                >
+                  👥 عدد مقدمي الخدمة المتاحين (الطاقة الاستيعابية):
+                </label>
+                <p
+                  style={{
+                    margin: "0 0 10px 0",
+                    fontSize: "0.75rem",
+                    color: "#2563eb",
+                    lineHeight: "1.5",
+                  }}
+                >
+                  إذا كنت تعمل بمفردك اترك الرقم (1). وإذا كنت متعهداً أو فريق
+                  عمل، حدد أقصى عدد متوفر لديك ليتمكن العميل من طلبهم معاً.
+                </p>
+                <input
+                  type="number"
+                  min="1"
+                  className="smart-input"
+                  value={maxCapacity}
+                  onChange={(e) => {
+                    let val = parseInt(e.target.value);
+                    if (isNaN(val) || val < 1) val = 1; // إجبار ألا يقل عن 1
+                    setMaxCapacity(val);
+                  }}
+                  style={{
+                    ...inputS,
+                    borderColor: "#bfdbfe",
+                    fontWeight: "bold",
+                    fontSize: "1.1rem",
+                  }}
+                  placeholder="1"
                 />
               </div>
             </div>
@@ -878,15 +955,15 @@ export default function AddOffering({
                 />
               </div>
               <div>
-                <label style={labelS}>الموقع الإلكتروني:</label>
+                <label style={labelS}>قناة اليوتيوب:</label>
                 <input
                   type="url"
                   dir="ltr"
                   className="smart-input"
-                  value={websiteUrl}
-                  onChange={(e) => setWebsiteUrl(e.target.value)}
+                  value={youtubeUrl}
+                  onChange={(e) => setYoutubeUrl(e.target.value)}
                   style={{ ...inputS, textAlign: "left" }}
-                  placeholder="https://..."
+                  placeholder="https://youtube.com/..."
                 />
               </div>
             </div>
