@@ -184,31 +184,50 @@
 }
 
 /* ========================================================
-   📱 الحل الجذري لمشاكل خانات الإدخال في الجوال (سفاري/آيفون)
+   📱 الدفاع البرمجي الشامل ضد مشاكل Safari في الجوال
+   يحل مشكلة اختفاء نقاط الباسوورد والخلفيات السوداء إجبارياً
    ======================================================== */
 
-/* 1. إجبار لون النص على الداكن (باستثناء البوابة السرية) */
-input:not([type="password"]),
+/* استهداف جميع أنواع خانات الإدخال بدون استثناء، وبشكل صريح */
+input,
+input[type="text"],
+input[type="email"],
+input[type="search"],
+input[type="tel"],
+input[type="url"],
+input[type="password"],
+input[type="number"],
 textarea,
 select {
+  /* 1. إجبار Safari على إيقاف جميع قواعد التلوين التلقائية والمظهر الأصلي */
+  appearance: none !important;
+  -webkit-appearance: none !important;
+
+  /* 2. إخبار Safari بشكل صريح أن هذه الخانات "فاتحة" ويجب عدم تحويلها لـ Dark */
+  color-scheme: light !important;
+
+  /* 3. إجبار لون النص الخلفية على اللون الأبيضImmutable، ولون النص على اللون الداكن */
+  background-color: #ffffff !important;
   color: #1e293b !important;
+
+  /* 4. إجبار Safari على استخدام اللون الغامق لنقاط الباسوورد */
   -webkit-text-fill-color: #1e293b !important;
-  opacity: 1 !important; /* يمنع سفاري من تبهيت النص */
+
+  /* 5. ضمان أن النص ونقاط الباسوورد واضحة 100% وغير باهتة */
+  opacity: 1 !important;
+
+  /* 6. منع متصفح الآيفون من عمل التكبير (Zoom) المزعج (اختياري لكن جيد لـ UX) */
+  @media screen and (max-width: 768px) {
+    font-size: 16px !important;
+  }
 }
 
-/* 2. إصلاح لون النص التوضيحي (Placeholder) ليكون رمادياً واضحاً */
+/* تحديد لون النص التوضيحي (Placeholder) ليكون رمادياً واضحاً على الخلفية البيضاء */
 input::placeholder,
-textarea::placeholder {
+textarea::placeholder,
+input:-webkit-input-placeholder,
+textarea:-webkit-input-placeholder {
   color: #94a3b8 !important;
   -webkit-text-fill-color: #94a3b8 !important;
   opacity: 1 !important;
-}
-
-/* 3. منع متصفح الآيفون من عمل التكبير (Zoom) المزعج عند الكتابة */
-@media screen and (max-width: 768px) {
-  input,
-  textarea,
-  select {
-    font-size: 16px !important;
-  }
 }
