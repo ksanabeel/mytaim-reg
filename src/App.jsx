@@ -100,6 +100,7 @@ const modalContent = {
   display: "flex",
   flexDirection: "column",
   boxShadow: "0 25px 50px rgba(0,0,0,0.15)",
+  overflowY: "auto" /* 👈 هذا هو السطر السحري الذي سيحل المشكلة */,
 };
 const smInput = {
   padding: "12px 15px",
