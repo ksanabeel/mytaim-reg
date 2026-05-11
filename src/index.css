@@ -12,7 +12,9 @@
 body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  margin: 0;
 }
+
 :root {
   --text: #6b6375;
   --text-h: #08060d;
@@ -37,8 +39,6 @@ body {
   background: var(--bg);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
 
   @media (max-width: 1024px) {
     font-size: 16px;
@@ -63,10 +63,6 @@ body {
   #social .button-icon {
     filter: invert(1) brightness(2);
   }
-}
-
-body {
-  margin: 0;
 }
 
 #root {
@@ -97,6 +93,7 @@ h1 {
     margin: 20px 0;
   }
 }
+
 h2 {
   font-size: 24px;
   line-height: 118%;
@@ -106,6 +103,7 @@ h2 {
     font-size: 20px;
   }
 }
+
 p {
   margin: 0;
 }
@@ -124,18 +122,33 @@ code {
   padding: 4px 8px;
   background: var(--code-bg);
 }
-/* إجبار لون النص في جميع خانات الإدخال على اللون الداكن في الجوالات */
-input,
+
+/* ========================================================
+   📱 الحل الجذري لمشاكل خانات الإدخال في الجوال (سفاري/آيفون)
+   ======================================================== */
+
+/* 1. إجبار لون النص على الداكن (باستثناء البوابة السرية) */
+input:not([type="password"]),
 textarea,
 select {
   color: #1e293b !important;
   -webkit-text-fill-color: #1e293b !important;
+  opacity: 1 !important; /* يمنع سفاري من تبهيت النص */
 }
 
-/* إصلاح لون النص التوضيحي (Placeholder) ليكون رمادياً واضحاً */
+/* 2. إصلاح لون النص التوضيحي (Placeholder) ليكون رمادياً واضحاً */
 input::placeholder,
 textarea::placeholder {
   color: #94a3b8 !important;
   -webkit-text-fill-color: #94a3b8 !important;
   opacity: 1 !important;
+}
+
+/* 3. منع متصفح الآيفون من عمل التكبير (Zoom) المزعج عند الكتابة */
+@media screen and (max-width: 768px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
 }
