@@ -23,7 +23,7 @@ import CalendarView from "./components/CalendarView";
 import { useTranslation } from "react-i18next";
 import { HelmetProvider } from "react-helmet-async";
 import UpdatePasswordModal from "./components/UpdatePasswordModal"; // تأكد من مسار الملف
-
+import MoyasarPayment from "./components/MoyasarPayment";
 // --- التنسيقات العامة والجمالية ---
 const padS = { padding: "16px" };
 const thS = {
@@ -950,12 +950,23 @@ function MainAppContent() {
     ),
     commissionRate,
   );
+
   const myUnpaidCommissionText = sumByCurrency(
     providerBookings.filter(
       (b) => b.status === "completed" && !b.is_commission_paid,
     ),
     commissionRate,
   );
+
+  // 👈 إضافة هذه العملية الحسابية لاستخراج الرقم الصافي للعمولة من أجل بوابة ميسر
+  const totalUnpaidNumeric = providerBookings
+    .filter((b) => b.status === "completed" && !b.is_commission_paid)
+    .reduce(
+      (acc, b) =>
+        acc + calculateFinancials(b, commissionRate).platformCommission,
+      0,
+    );
+
   const unreadNotifsCount = notifications.filter((n) => !n.is_read).length;
 
   return (
@@ -1287,82 +1298,22 @@ function MainAppContent() {
                     {myUnpaidCommissionText}
                   </strong>
                 </p>
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "12px",
-                  }}
-                >
-                  <input
-                    type="text"
-                    placeholder="الاسم على البطاقة"
-                    style={smInput}
-                  />
-                  <input
-                    type="text"
-                    placeholder="رقم البطاقة (0000 0000 0000 0000)"
-                    style={smInput}
-                    maxLength="16"
-                  />
-                  <div style={{ display: "flex", gap: "12px" }}>
-                    <input
-                      type="text"
-                      placeholder="تاريخ الانتهاء (MM/YY)"
-                      style={{ ...smInput, flex: 1 }}
-                    />
-                    <input
-                      type="text"
-                      placeholder="CVV"
-                      style={{ ...smInput, flex: 1 }}
-                      maxLength="3"
-                    />
-                  </div>
-                  <button
-                    onClick={async () => {
-                      alert("جاري معالجة الدفع (هذه واجهة تجريبية)...");
-                      try {
-                        const unpaidBookings = providerBookings.filter(
-                          (b) =>
-                            b.status === "completed" && !b.is_commission_paid,
-                        );
-                        for (const booking of unpaidBookings) {
-                          await supabase
-                            .from("bookings")
-                            .update({ is_commission_paid: true })
-                            .eq("id", booking.id);
-                        }
-                        fetchAllData(session.user.id);
-                        setShowPaymentModal(false);
-                        alert("✅ تم سداد العمولة بنجاح! شكراً لك.");
-                      } catch (err) {
-                        alert(
-                          "حدث خطأ أثناء تحديث حالة الدفع في قاعدة البيانات.",
-                        );
-                      }
-                    }}
+
+                {/* 👈 تم استبدال الواجهة التجريبية بمكون ميسر الاحترافي هنا */}
+                {totalUnpaidNumeric > 0 ? (
+                  <MoyasarPayment amount={totalUnpaidNumeric} />
+                ) : (
+                  <div
                     style={{
-                      ...addSkillBtn,
-                      backgroundColor: "#10b981",
-                      backgroundImage: "none",
-                      width: "100%",
-                      marginTop: "10px",
-                    }}
-                  >
-                    سداد الآن (تجريبي) 💳
-                  </button>
-                  <p
-                    style={{
-                      fontSize: "0.75rem",
-                      color: "#94a3b8",
                       textAlign: "center",
-                      margin: "10px 0 0 0",
+                      color: "#10b981",
+                      fontWeight: "bold",
+                      padding: "15px",
                     }}
                   >
-                    *هذه واجهة تجريبية لمحاكاة عملية الدفع. لا تدخل بيانات بطاقة
-                    بنكية حقيقية هنا.
-                  </p>
-                </div>
+                    لا توجد مستحقات أو عمولات معلقة حالياً ✅
+                  </div>
+                )}
               </div>
             )}
           </div>
