@@ -1,233 +1,43 @@
-.counter {
-  font-size: 16px;
-  padding: 5px 10px;
-  border-radius: 5px;
-  color: var(--accent);
-  background: var(--accent-bg);
-  border: 2px solid transparent;
-  transition: border-color 0.3s;
-  margin-bottom: 24px;
+/* ... (ضع هنا كود التنسيقات الخاص بك الذي أرسلته لي سابقاً) ... */
 
-  &:hover {
-    border-color: var(--accent-border);
-  }
-  &:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
-  }
-}
-
-.hero {
-  position: relative;
-
-  .base,
-  .framework,
-  .vite {
-    inset-inline: 0;
-    margin: 0 auto;
-  }
-
-  .base {
-    width: 170px;
-    position: relative;
-    z-index: 0;
-  }
-
-  .framework,
-  .vite {
-    position: absolute;
-  }
-
-  .framework {
-    z-index: 1;
-    top: 34px;
-    height: 28px;
-    transform: perspective(2000px) rotateZ(300deg) rotateX(44deg) rotateY(39deg)
-      scale(1.4);
-  }
-
-  .vite {
-    z-index: 0;
-    top: 107px;
-    height: 26px;
-    width: auto;
-    transform: perspective(2000px) rotateZ(300deg) rotateX(40deg) rotateY(39deg)
-      scale(0.8);
-  }
-}
-
-#center {
-  display: flex;
-  flex-direction: column;
-  gap: 25px;
-  place-content: center;
-  place-items: center;
-  flex-grow: 1;
-
-  @media (max-width: 1024px) {
-    padding: 32px 20px 24px;
-    gap: 18px;
-  }
-}
-
-#next-steps {
-  display: flex;
-  border-top: 1px solid var(--border);
-  text-align: left;
-
-  & > div {
-    flex: 1 1 0;
-    padding: 32px;
-    @media (max-width: 1024px) {
-      padding: 24px 20px;
-    }
-  }
-
-  .icon {
-    margin-bottom: 16px;
-    width: 22px;
-    height: 22px;
-  }
-
-  @media (max-width: 1024px) {
-    flex-direction: column;
-    text-align: center;
-  }
-}
-
-#docs {
-  border-right: 1px solid var(--border);
-
-  @media (max-width: 1024px) {
-    border-right: none;
-    border-bottom: 1px solid var(--border);
-  }
-}
-
-#next-steps ul {
-  list-style: none;
-  padding: 0;
-  display: flex;
-  gap: 8px;
-  margin: 32px 0 0;
-
-  .logo {
-    height: 18px;
-  }
-
-  a {
-    color: var(--text-h);
-    font-size: 16px;
-    border-radius: 6px;
-    background: var(--social-bg);
-    display: flex;
-    padding: 6px 12px;
-    align-items: center;
-    gap: 8px;
-    text-decoration: none;
-    transition: box-shadow 0.3s;
-
-    &:hover {
-      box-shadow: var(--shadow);
-    }
-    .button-icon {
-      height: 18px;
-      width: 18px;
-    }
-  }
-
-  @media (max-width: 1024px) {
-    margin-top: 20px;
-    flex-wrap: wrap;
-    justify-content: center;
-
-    li {
-      flex: 1 1 calc(50% - 8px);
-    }
-
-    a {
-      width: 100%;
-      justify-content: center;
-      box-sizing: border-box;
-    }
-  }
-}
-
-#spacer {
-  height: 88px;
-  border-top: 1px solid var(--border);
-  @media (max-width: 1024px) {
-    height: 48px;
-  }
-}
-
-.ticks {
-  position: relative;
-  width: 100%;
-
-  &::before,
-  &::after {
-    content: "";
-    position: absolute;
-    top: -4.5px;
-    border: 5px solid transparent;
-  }
-
-  &::before {
-    left: 0;
-    border-left-color: var(--border);
-  }
-  &::after {
-    right: 0;
-    border-right-color: var(--border);
-  }
-}
-
-/* ========================================================
-   📱 الدفاع البرمجي الشامل ضد مشاكل Safari في الجوال
-   يحل مشكلة اختفاء نقاط الباسوورد والخلفيات السوداء إجبارياً
-   ======================================================== */
-
-/* استهداف جميع أنواع خانات الإدخال بدون استثناء، وبشكل صريح */
+/* 📱 حل مشاكل خانات الإدخال في الجوال (سفاري/آيفون/كروم) */
 input,
-input[type="text"],
-input[type="email"],
-input[type="search"],
-input[type="tel"],
-input[type="url"],
-input[type="password"],
-input[type="number"],
 textarea,
 select {
-  /* 1. إجبار Safari على إيقاف جميع قواعد التلوين التلقائية والمظهر الأصلي */
   appearance: none !important;
   -webkit-appearance: none !important;
-
-  /* 2. إخبار Safari بشكل صريح أن هذه الخانات "فاتحة" ويجب عدم تحويلها لـ Dark */
   color-scheme: light !important;
-
-  /* 3. إجبار لون النص الخلفية على اللون الأبيضImmutable، ولون النص على اللون الداكن */
   background-color: #ffffff !important;
   color: #1e293b !important;
-
-  /* 4. إجبار Safari على استخدام اللون الغامق لنقاط الباسوورد */
   -webkit-text-fill-color: #1e293b !important;
-
-  /* 5. ضمان أن النص ونقاط الباسوورد واضحة 100% وغير باهتة */
   opacity: 1 !important;
+}
 
-  /* 6. منع متصفح الآيفون من عمل التكبير (Zoom) المزعج (اختياري لكن جيد لـ UX) */
-  @media screen and (max-width: 768px) {
+input::placeholder,
+textarea::placeholder {
+  color: #94a3b8 !important;
+  -webkit-text-fill-color: #94a3b8 !important;
+  opacity: 1 !important;
+}
+
+@media screen and (max-width: 768px) {
+  input,
+  textarea,
+  select {
     font-size: 16px !important;
   }
 }
 
-/* تحديد لون النص التوضيحي (Placeholder) ليكون رمادياً واضحاً على الخلفية البيضاء */
-input::placeholder,
-textarea::placeholder,
-input:-webkit-input-placeholder,
-textarea:-webkit-input-placeholder {
-  color: #94a3b8 !important;
-  -webkit-text-fill-color: #94a3b8 !important;
-  opacity: 1 !important;
+/* 💳 تنسيق نموذج دفع ميسر (Moyasar) ليكون احترافياً */
+.mysr-form {
+  background-color: #ffffff !important;
+  border-radius: 12px !important;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1) !important;
+  padding: 20px !important;
+  max-width: 100% !important;
+}
+
+.mysr-form input {
+  border: 1px solid #e2e8f0 !important;
+  background-color: #f8fafc !important;
 }

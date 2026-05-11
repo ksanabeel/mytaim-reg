@@ -17,62 +17,43 @@
     />
     <title>Book on Map</title>
 
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=fetch"></script>
+    <script src="https://sdk.moyasar.com/js/v1/moyasar.js"></script>
+    <link rel="stylesheet" href="https://sdk.moyasar.com/js/v1/moyasar.css" />
+
     <script>
-      // 1. حذف الـ Service Workers التي تسبب عدم فتح الموقع في كروم الجوال
+      // تنظيف الكاش والـ Service Workers
       if ("serviceWorker" in navigator) {
         navigator.serviceWorker
           .getRegistrations()
           .then(function (registrations) {
             for (let registration of registrations) {
-              registration.unregister().then(() => {
-                console.log("ServiceWorker Unregistered");
-              });
+              registration.unregister();
             }
           });
       }
 
-      // 2. تفريغ جميع خزائن الـ Cache البرمجية
-      if ("caches" in window) {
-        caches.keys().then(function (names) {
-          for (let name of names) caches.delete(name);
-        });
-      }
-
-      // 3. آلية التحديث الإجباري (Force Reload) عند تغيير رقم الإصدار
-      // غير الرقم (مثلاً إلى 1.0.4) في كل مرة تريد فيها إجبار جميع المستخدمين على التحديث
-      const APP_VERSION = "1.0.3";
+      // إجبار التحديث عند تغيير رقم الإصدار
+      const APP_VERSION = "1.0.5";
       const storedVersion = localStorage.getItem("app_version");
       if (storedVersion !== APP_VERSION) {
-        localStorage.clear(); // مسح الـ LocalStorage لضمان نظافة البيانات
+        localStorage.clear();
         localStorage.setItem("app_version", APP_VERSION);
-        window.location.reload(true); // إعادة تحميل إجبارية من السيرفر
+        window.location.reload(true);
       }
     </script>
 
     <style>
-      /* إجبار المتصفح على اعتبار نظام الألوان فاتح دائماً في خانات الإدخال */
+      /* حل سريع لمشكلة السواد في خانات الإدخال قبل تحميل ملفات الـ CSS */
       input,
       textarea,
       select {
         color-scheme: light !important;
-        background-color: white !important;
-        color: black !important;
-        -webkit-text-fill-color: black !important;
       }
     </style>
   </head>
   <body>
     <div id="root"></div>
-
     <script type="module" src="/src/main.jsx"></script>
-
-    <script>
-      // التأكد من مسح أي أثار للكاش بعد اكتمال التحميل
-      window.addEventListener("load", function () {
-        if ("serviceWorker" in navigator) {
-          navigator.serviceWorker.ready.then((reg) => reg.unregister());
-        }
-      });
-    </script>
   </body>
 </html>

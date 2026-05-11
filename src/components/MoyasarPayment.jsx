@@ -1,43 +1,49 @@
 import React, { useEffect, useRef } from "react";
 
-export default function MoyasarPayment({ amount }) {
-  // 🔒 هذا هو القفل السحري لمنع تكرار التحميل
+export default function MoyasarPayment({ amount, onSuccess }) {
+  // القفل السحري لمنع تكرار التحميل
   const formCreated = useRef(false);
 
   useEffect(() => {
-    // إذا كان الفورم قد تم إنشاؤه وبدأ التحميل، لا تفعل شيئاً (تجاهل تحديثات React)
     if (formCreated.current) return;
 
     const initMoyasar = () => {
-      const container = document.getElementById("mysr-form-container");
+      const container = document.querySelector(".mysr-form");
 
-      // التأكد من وجود ميسر والصندوق، والتأكد أننا لم نقم بتشغيله مسبقاً
       if (window.Moyasar && container && !formCreated.current) {
-        formCreated.current = true; // إغلاق القفل 🔒
-        container.innerHTML = ""; // تنظيف الصندوق لمرة واحدة فقط
+        formCreated.current = true; // إغلاق القفل
+        container.innerHTML = ""; // تنظيف الصندوق
 
         try {
           window.Moyasar.init({
-            element: "#mysr-form-container",
+            element: ".mysr-form",
             amount: Math.round(amount * 100), // القيمة بالهللة
             currency: "SAR",
             description: "عمولة منصة BookOnMap",
 
-            // ⚠️ الصق مفتاحك العام هنا:
+            // ⚠️ الصق مفتاح pk_test الخاص بك هنا:
             publishable_api_key:
               "pk_test_zaVuLXdXYTLsKhDYbuoeJHVDvHoTyg8V1sC8vPEP",
 
             callback_url: window.location.origin + "/payment-result",
-            methods: ["creditcard"], // إجبار عرض البطاقة فقط لتجنب أخطاء Apple Pay
+
+            // 💡 تحديد طرق الدفع (مدى والبطاقات) لمنع خطأ Apple Pay
+            methods: ["creditcard", "mada", "stcpay"],
+
+            on_completed: function (payment) {
+              if (payment.status === "paid" && onSuccess) {
+                onSuccess(payment);
+              }
+            },
           });
         } catch (error) {
           console.error("خطأ أثناء تشغيل ميسر:", error);
-          formCreated.current = false; // فتح القفل في حال حدوث خطأ كارثي
+          formCreated.current = false;
         }
       }
     };
 
-    // جلب ملف تصميم ميسر (CSS)
+    // 1️⃣ حقن ملف تصميم ميسر (CSS) إجبارياً
     if (!document.getElementById("moyasar-css")) {
       const link = document.createElement("link");
       link.id = "moyasar-css";
@@ -46,18 +52,17 @@ export default function MoyasarPayment({ amount }) {
       document.head.appendChild(link);
     }
 
-    // جلب سكربت ميسر (JS) وتشغيله
+    // 2️⃣ حقن سكربت ميسر (JS) إجبارياً وتشغيله فور انتهاء التحميل
     if (!document.getElementById("moyasar-js")) {
       const script = document.createElement("script");
       script.id = "moyasar-js";
       script.src = "https://cdn.moyasar.com/mpf/1.14.0/moyasar.js";
-      script.onload = initMoyasar; // تشغيل الفورم بمجرد وصول السكربت
+      script.onload = initMoyasar; // 👈 تشغيل الفورم بمجرد وصول السكربت
       document.head.appendChild(script);
     } else {
-      // إذا كان السكربت موجوداً مسبقاً في المتصفح
       setTimeout(initMoyasar, 300);
     }
-  }, [amount]);
+  }, [amount, onSuccess]);
 
   return (
     <div
@@ -76,9 +81,8 @@ export default function MoyasarPayment({ amount }) {
       >
         الدفع الإلكتروني الآمن 🔒
       </h3>
-
       {/* الصندوق الذي سيتم رسم حقول البطاقة فيه */}
-      <div id="mysr-form-container" style={{ direction: "ltr" }}></div>
+      <div className="mysr-form" style={{ direction: "ltr" }}></div>
     </div>
   );
 }
