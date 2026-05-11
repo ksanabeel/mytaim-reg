@@ -167,7 +167,7 @@
 
   &::before,
   &::after {
-    content: '';
+    content: "";
     position: absolute;
     top: -4.5px;
     border: 5px solid transparent;
@@ -181,4 +181,19 @@
     right: 0;
     border-right-color: var(--border);
   }
+}
+/* إجبار لون النص في جميع خانات الإدخال على اللون الداكن في الجوالات */
+input,
+textarea,
+select {
+  color: #1e293b !important;
+  -webkit-text-fill-color: #1e293b !important;
+}
+
+/* إصلاح لون النص التوضيحي (Placeholder) ليكون رمادياً واضحاً */
+input::placeholder,
+textarea::placeholder {
+  color: #94a3b8 !important;
+  -webkit-text-fill-color: #94a3b8 !important;
+  opacity: 1 !important;
 }
