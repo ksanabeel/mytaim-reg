@@ -1301,7 +1301,19 @@ function MainAppContent() {
 
                 {/* 👈 تم استبدال الواجهة التجريبية بمكون ميسر الاحترافي هنا */}
                 {totalUnpaidNumeric > 0 ? (
-                  <MoyasarPayment amount={totalUnpaidNumeric} />
+                  <MoyasarPayment
+                    amount={totalUnpaidNumeric}
+                    booking={{
+                      // 🚀 سحر برمجي: جلب أرقام جميع الحجوزات غير المدفوعة ودمجها في رابط واحد
+                      id: providerBookings
+                        .filter(
+                          (b) =>
+                            b.status === "completed" && !b.is_commission_paid,
+                        )
+                        .map((b) => b.id)
+                        .join(","),
+                    }}
+                  />
                 ) : (
                   <div
                     style={{

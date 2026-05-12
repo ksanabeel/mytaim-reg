@@ -1,10 +1,19 @@
 import React, { useEffect, useRef } from "react";
 
-export default function MoyasarPayment({ amount, onSuccess }) {
+// 1️⃣ أضفنا booking هنا لكي يستطيع الكود قراءة رقم الحجز
+export default function MoyasarPayment({ amount, onSuccess, booking }) {
   // القفل السحري لمنع تكرار التحميل
   const formCreated = useRef(false);
 
   useEffect(() => {
+    // التأكد من وجود بيانات الحجز قبل البدء
+    if (!booking || !booking.id) {
+      console.error(
+        "خطأ: لم يتم العثور على بيانات الحجز (booking object is missing)",
+      );
+      return;
+    }
+
     if (formCreated.current) return;
 
     const initMoyasar = () => {
@@ -19,17 +28,14 @@ export default function MoyasarPayment({ amount, onSuccess }) {
             element: ".mysr-form",
             amount: Math.round(amount * 100),
             currency: "SAR",
-            description: "عمولة منصة BookOnMap",
+            description: `سداد عمولة الحجز رقم: ${booking.id}`,
             publishable_api_key:
               "pk_test_zaVuLXdXYTLsKhDYbuoeJHVDvHoTyg8V1sC8vPEP", // ابقه مفتاح الاختبار حالياً
 
-            // 1️⃣ التعديل الأول: توجيه النتيجة إلى موقعك المباشر وليس اللوكل هوست
-            // أضف id الفاتورة أو الحجز للرابط لكي تعرف صفحة النتيجة ماذا تحدث
+            // ✅ التعديل الجوهري: الآن سيتم إرسال رقم الحجز الفعلي في الرابط
             callback_url: `https://www.bookonmap.com/payment-result?booking_id=${booking.id}`,
 
-            // 2️⃣ التعديل الثاني: تعريب واجهة البطاقات
             language: "ar",
-
             methods: ["creditcard", "mada", "stcpay"],
             on_completed: function (payment) {
               if (payment.status === "paid" && onSuccess) {
@@ -44,7 +50,7 @@ export default function MoyasarPayment({ amount, onSuccess }) {
       }
     };
 
-    // 1️⃣ حقن ملف تصميم ميسر (CSS) إجبارياً
+    // حقن ملف تصميم ميسر (CSS)
     if (!document.getElementById("moyasar-css")) {
       const link = document.createElement("link");
       link.id = "moyasar-css";
@@ -53,17 +59,19 @@ export default function MoyasarPayment({ amount, onSuccess }) {
       document.head.appendChild(link);
     }
 
-    // 2️⃣ حقن سكربت ميسر (JS) إجبارياً وتشغيله فور انتهاء التحميل
+    // حقن سكربت ميسر (JS)
     if (!document.getElementById("moyasar-js")) {
       const script = document.createElement("script");
       script.id = "moyasar-js";
       script.src = "https://cdn.moyasar.com/mpf/1.14.0/moyasar.js";
-      script.onload = initMoyasar; // 👈 تشغيل الفورم بمجرد وصول السكربت
+      script.onload = initMoyasar;
       document.head.appendChild(script);
     } else {
       setTimeout(initMoyasar, 300);
     }
-  }, [amount, onSuccess]);
+
+    // أضفنا booking هنا لضمان تحديث الكود إذا تغير الحجز
+  }, [amount, onSuccess, booking]);
 
   return (
     <div
@@ -82,7 +90,6 @@ export default function MoyasarPayment({ amount, onSuccess }) {
       >
         الدفع الإلكتروني الآمن 🔒
       </h3>
-      {/* الصندوق الذي سيتم رسم حقول البطاقة فيه */}
       <div className="mysr-form" style={{ direction: "ltr" }}></div>
     </div>
   );

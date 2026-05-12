@@ -25,7 +25,7 @@ export default function PaymentResult() {
               is_commission_paid: true, // ⬅️ اسم العمود الصحيح، وتغيير قيمته إلى مدفوع
               // ملاحظة: إذا أردت حفظ رقم عملية الدفع (paymentId)، يجب عليك إنشاء عمود جديد في جدول bookings وتسميته payment_id
             })
-            .eq("id", bookingId); // التحديث يتم للحجز المطابق
+            .in("id", bookingId.split(",")); // 👈 التعديل هنا: يقرأ كل الأرقام ويحولها لمدفوعة دفعة واحدة
 
           if (error) throw error;
           console.log("تم تحديث حالة العمولة بنجاح إلى TRUE!");
