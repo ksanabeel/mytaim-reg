@@ -3345,10 +3345,7 @@ function MainAppContent() {
 
 // ✨ بوابة الدخول السرية للمرحلة التجريبية (Beta Gate) ✨
 const BetaGate = ({ children }) => {
-  // للتحقق مما إذا كان المستخدم قد أدخل الرمز مسبقاً
-  const [isUnlocked, setIsUnlocked] = useState(
-    localStorage.getItem("beta_unlocked") === "false",
-  );
+  const [isUnlocked, setIsUnlocked] = useState(true);
   const [passcode, setPasscode] = useState("");
 
   // إذا كان مفتوحاً، اعرض المنصة مباشرة
