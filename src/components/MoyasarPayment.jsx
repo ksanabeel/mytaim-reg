@@ -24,7 +24,8 @@ export default function MoyasarPayment({ amount, onSuccess }) {
               "pk_test_zaVuLXdXYTLsKhDYbuoeJHVDvHoTyg8V1sC8vPEP", // ابقه مفتاح الاختبار حالياً
 
             // 1️⃣ التعديل الأول: توجيه النتيجة إلى موقعك المباشر وليس اللوكل هوست
-            callback_url: "https://www.bookonmap.com/payment-result",
+            // أضف id الفاتورة أو الحجز للرابط لكي تعرف صفحة النتيجة ماذا تحدث
+            callback_url: `https://www.bookonmap.com/payment-result?booking_id=${booking.id}`,
 
             // 2️⃣ التعديل الثاني: تعريب واجهة البطاقات
             language: "ar",
