@@ -11,7 +11,7 @@ const AdminReports = React.lazy(() => import("./components/AdminReports"));
 const PlatformManagement = React.lazy(
   () => import("./components/PlatformManagement"),
 );
-
+import PaymentResult from "./components/PaymentResult";
 import { BrowserRouter, Routes, Route, useNavigate } from "react-router-dom";
 import { supabase } from "./lib/supabase";
 import Login from "./components/Login";
@@ -2172,6 +2172,7 @@ function MainAppContent() {
         }}
       >
         <Routes>
+          <Route path="/payment-result" element={<PaymentResult />} />
           <Route
             path="/:storeUsername"
             element={
