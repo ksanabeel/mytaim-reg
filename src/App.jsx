@@ -3347,7 +3347,7 @@ function MainAppContent() {
 const BetaGate = ({ children }) => {
   // للتحقق مما إذا كان المستخدم قد أدخل الرمز مسبقاً
   const [isUnlocked, setIsUnlocked] = useState(
-    localStorage.getItem("beta_unlocked") === "true",
+    localStorage.getItem("beta_unlocked") === "false",
   );
   const [passcode, setPasscode] = useState("");
 
