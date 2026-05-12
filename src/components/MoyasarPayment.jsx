@@ -17,19 +17,19 @@ export default function MoyasarPayment({ amount, onSuccess }) {
         try {
           window.Moyasar.init({
             element: ".mysr-form",
-            amount: Math.round(amount * 100), // القيمة بالهللة
+            amount: Math.round(amount * 100),
             currency: "SAR",
             description: "عمولة منصة BookOnMap",
-
-            // ⚠️ الصق مفتاح pk_test الخاص بك هنا:
             publishable_api_key:
-              "pk_test_zaVuLXdXYTLsKhDYbuoeJHVDvHoTyg8V1sC8vPEP",
+              "pk_test_zaVuLXdXYTLsKhDYbuoeJHVDvHoTyg8V1sC8vPEP", // ابقه مفتاح الاختبار حالياً
 
-            callback_url: window.location.origin + "/payment-result",
+            // 1️⃣ التعديل الأول: توجيه النتيجة إلى موقعك المباشر وليس اللوكل هوست
+            callback_url: "https://www.bookonmap.com/payment-result",
 
-            // 💡 تحديد طرق الدفع (مدى والبطاقات) لمنع خطأ Apple Pay
+            // 2️⃣ التعديل الثاني: تعريب واجهة البطاقات
+            language: "ar",
+
             methods: ["creditcard", "mada", "stcpay"],
-
             on_completed: function (payment) {
               if (payment.status === "paid" && onSuccess) {
                 onSuccess(payment);
