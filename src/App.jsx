@@ -24,6 +24,7 @@ import { useTranslation } from "react-i18next";
 import { HelmetProvider } from "react-helmet-async";
 import UpdatePasswordModal from "./components/UpdatePasswordModal"; // تأكد من مسار الملف
 import MoyasarPayment from "./components/MoyasarPayment";
+import { Capacitor } from "@capacitor/core";
 // --- التنسيقات العامة والجمالية ---
 const padS = { padding: "16px" };
 const thS = {
@@ -973,6 +974,8 @@ function MainAppContent() {
     <div
       style={{
         padding: "15px",
+        // 🚀 سحر برمجي: إضافة المساحة الآمنة العلوية لحماية المحتوى من شريط الجوال العلوي
+        paddingTop: "80px",
         maxWidth: "1200px",
         margin: "0 auto",
         fontFamily: "system-ui",
@@ -982,6 +985,17 @@ function MainAppContent() {
         flexDirection: "column",
       }}
     >
+      {/* 🚀 سحر برمجي: إخفاء شريط التمرير (Scrollbar) المزعج ليصبح التطبيق فخماً */}
+      <style>{`
+        ::-webkit-scrollbar {
+          display: none;
+        }
+        * {
+          -ms-overflow-style: none;  /* IE and Edge */
+          scrollbar-width: none;  /* Firefox */
+        }
+      `}</style>
+
       {showLoginModal && !session && (
         <div style={modalOverlay}>
           <div
@@ -1715,7 +1729,7 @@ function MainAppContent() {
       <div
         style={{
           position: "sticky",
-          top: "15px",
+          top: "40px",
           zIndex: 2000,
           backgroundColor: "rgba(255, 255, 255, 0.9)",
           backdropFilter: "blur(20px) saturate(180%)",
