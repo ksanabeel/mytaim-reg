@@ -1727,31 +1727,59 @@ function MainAppContent() {
       <div
         style={{
           position: "sticky",
-          top: "10px" /* 👈 رفعناه قليلاً لأفضل مظهر */,
+          top: "10px",
           zIndex: 2000,
           backgroundColor: "rgba(255, 255, 255, 0.9)",
           backdropFilter: "blur(20px) saturate(180%)",
           WebkitBackdropFilter: "blur(20px) saturate(180%)",
           border: "1px solid rgba(255, 255, 255, 0.8)",
-          padding: "15px" /* 👈 قللنا الحشوة الجانبية لمنع القص */,
+          padding: "15px",
           borderRadius: "24px",
           boxShadow: "0 10px 40px rgba(0, 0, 0, 0.08)",
           marginBottom: "30px",
           display: "flex",
           flexDirection: "column",
-          gap: "20px",
-          width: "100%" /* 👈 إجبار على مقاس الشاشة */,
-          maxWidth: "100%" /* 👈 إجبار على مقاس الشاشة */,
-          boxSizing: "border-box" /* 👈 حساب الحواف */,
+          gap: "15px",
+          width: "100%",
+          maxWidth: "100%",
+          boxSizing: "border-box",
         }}
       >
+        {/* 🚀 سحر البرمجة: فصل تصميم الجوال عن الكمبيوتر */}
+        <style>{`
+          /* الافتراضي: إخفاء سطر الجوال */
+          .mobile-user-row { display: none !important; }
+          
+          @media (max-width: 768px) {
+            /* في الجوال: إخفاء عناصر الكمبيوتر */
+            .desktop-user-group { display: none !important; }
+            
+            /* في الجوال: إظهار السطر الجديد (الاسم + إضافة خدمة) */
+            .mobile-user-row { 
+              display: flex !important; 
+              justify-content: space-between; 
+              align-items: center; 
+              background-color: #f8fafc; 
+              padding: 8px 12px; 
+              border-radius: 18px; 
+              border: 1px solid #e2e8f0; 
+              gap: 10px;
+            }
+            .mobile-user-row .add-btn {
+              padding: 8px 15px !important;
+              font-size: 0.95rem !important;
+            }
+          }
+        `}</style>
+
+        {/* 🥇 الصف الأول (يظهر للكمبيوتر كاملاً، وفي الجوال يظهر الشعار والإشعارات فقط) */}
         <div
           style={{
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
             flexWrap: "wrap",
-            gap: "15px",
+            gap: "10px",
           }}
         >
           <div
@@ -1762,7 +1790,7 @@ function MainAppContent() {
             style={{
               display: "flex",
               alignItems: "center",
-              gap: "15px",
+              gap: "12px",
               cursor: "pointer",
               padding: "5px",
               borderRadius: "16px",
@@ -1775,15 +1803,15 @@ function MainAppContent() {
               (e.currentTarget.style.backgroundColor = "transparent")
             }
           >
-            {/* ✨ نظام الشعار الذكي ✨ */}
+            {/* الشعار */}
             {platformLogo?.includes("http") ||
             platformLogo?.startsWith("data:image") ? (
               <img
                 src={platformLogo}
                 style={{
-                  height: "50px",
-                  width: "50px",
-                  borderRadius: "14px",
+                  height: "45px",
+                  width: "45px",
+                  borderRadius: "12px",
                   boxShadow: "0 4px 15px rgba(0,0,0,0.08)",
                   objectFit: "cover",
                   flexShrink: 0,
@@ -1794,8 +1822,8 @@ function MainAppContent() {
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 viewBox="0 0 100 100"
-                width="50"
-                height="50"
+                width="45"
+                height="45"
                 style={{
                   filter: "drop-shadow(0px 4px 10px rgba(124, 58, 237, 0.3))",
                   transition: "transform 0.3s ease",
@@ -1841,7 +1869,7 @@ function MainAppContent() {
             )}
             <h1
               style={{
-                fontSize: "1.7rem",
+                fontSize: "1.5rem",
                 margin: 0,
                 color: "#1e293b",
                 fontWeight: "900",
@@ -1855,34 +1883,124 @@ function MainAppContent() {
             </h1>
           </div>
 
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "15px",
-              flexWrap: "wrap",
-              justifyContent: "flex-end",
-            }}
-          >
+          <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
             {session ? (
               <>
-                <button
-                  onClick={() => {
-                    if (checkProfileCompletion()) {
-                      setEditOfferingData(null);
-                      setShowAddModal(true);
-                    }
-                  }}
-                  style={addSkillBtn}
+                {/* 💻 مجموعة أزرار الكمبيوتر (تختفي في الجوال تلقائياً) */}
+                <div
+                  className="desktop-user-group"
+                  style={{ display: "flex", alignItems: "center", gap: "15px" }}
                 >
-                  <span style={{ fontSize: "1.2rem" }}>✨</span> إضافة خدمة
-                </button>
+                  <button
+                    onClick={() => {
+                      if (checkProfileCompletion()) {
+                        setEditOfferingData(null);
+                        setShowAddModal(true);
+                      }
+                    }}
+                    style={addSkillBtn}
+                  >
+                    <span style={{ fontSize: "1.2rem" }}>✨</span> إضافة خدمة
+                  </button>
+
+                  <div
+                    style={{
+                      width: "2px",
+                      height: "35px",
+                      background: "#e2e8f0",
+                      margin: "0 5px",
+                    }}
+                  ></div>
+
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "12px",
+                      backgroundColor: "#f8fafc",
+                      padding: "6px 20px 6px 6px",
+                      borderRadius: "30px",
+                      border: "1px solid #e2e8f0",
+                      cursor: "pointer",
+                      transition: "0.2s",
+                    }}
+                    onClick={() => setActiveTab("profile")}
+                    onMouseOver={(e) =>
+                      (e.currentTarget.style.backgroundColor = "#f1f5f9")
+                    }
+                    onMouseOut={(e) =>
+                      (e.currentTarget.style.backgroundColor = "#f8fafc")
+                    }
+                  >
+                    <div
+                      style={{
+                        textAlign: i18n.language === "ar" ? "left" : "right",
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontWeight: "900",
+                          color: "#1e293b",
+                          fontSize: "0.95rem",
+                        }}
+                      >
+                        {userProfile?.full_name || "المستخدم"}
+                      </div>
+                      {(isSuperAdmin || isSupervisor) && (
+                        <div style={{ marginTop: "4px" }}>
+                          {isSuperAdmin && (
+                            <span
+                              style={{
+                                fontSize: "0.65rem",
+                                color: "#fff",
+                                backgroundColor: "#ef4444",
+                                padding: "3px 8px",
+                                borderRadius: "10px",
+                                fontWeight: "bold",
+                              }}
+                            >
+                              👑 مدير المنصة
+                            </span>
+                          )}
+                          {isSupervisor && (
+                            <span
+                              style={{
+                                fontSize: "0.65rem",
+                                color: "#fff",
+                                backgroundColor: "#3b82f6",
+                                padding: "3px 8px",
+                                borderRadius: "10px",
+                                fontWeight: "bold",
+                              }}
+                            >
+                              🛡️ مشرف عام
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    <img
+                      src={userProfile?.avatar_url || defaultAvatar}
+                      style={{
+                        width: "46px",
+                        height: "46px",
+                        borderRadius: "50%",
+                        border: "2px solid #fff",
+                        objectFit: "cover",
+                        boxShadow: "0 4px 10px rgba(0,0,0,0.1)",
+                      }}
+                      alt="avatar"
+                    />
+                  </div>
+                </div>
+
+                {/* 🔔 الإشعارات وزر الخروج (تظهر للجميع كمبيوتر وجوال) */}
                 <div
                   style={{
                     position: "relative",
                     cursor: "pointer",
                     backgroundColor: "#f8fafc",
-                    padding: "12px",
+                    padding: "10px",
                     borderRadius: "14px",
                     border: "1px solid #e2e8f0",
                     display: "flex",
@@ -1898,7 +2016,7 @@ function MainAppContent() {
                     (e.currentTarget.style.backgroundColor = "#f8fafc")
                   }
                 >
-                  <span style={{ fontSize: "1.4rem" }}>🔔</span>
+                  <span style={{ fontSize: "1.3rem" }}>🔔</span>
                   {unreadNotifsCount > 0 && (
                     <span
                       style={{
@@ -1923,95 +2041,6 @@ function MainAppContent() {
                     </span>
                   )}
                 </div>
-                <div
-                  style={{
-                    width: "2px",
-                    height: "35px",
-                    background: "#e2e8f0",
-                    margin: "0 5px",
-                  }}
-                ></div>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "12px",
-                    backgroundColor: "#f8fafc",
-                    padding: "6px 20px 6px 6px",
-                    borderRadius: "30px",
-                    border: "1px solid #e2e8f0",
-                    cursor: "pointer",
-                    transition: "0.2s",
-                  }}
-                  onClick={() => setActiveTab("profile")}
-                  onMouseOver={(e) =>
-                    (e.currentTarget.style.backgroundColor = "#f1f5f9")
-                  }
-                  onMouseOut={(e) =>
-                    (e.currentTarget.style.backgroundColor = "#f8fafc")
-                  }
-                >
-                  <div
-                    style={{
-                      textAlign: i18n.language === "ar" ? "left" : "right",
-                    }}
-                  >
-                    <div
-                      style={{
-                        fontWeight: "900",
-                        color: "#1e293b",
-                        fontSize: "0.95rem",
-                      }}
-                    >
-                      {userProfile?.full_name || "المستخدم"}
-                    </div>
-                    {(isSuperAdmin || isSupervisor) && (
-                      <div style={{ marginTop: "4px" }}>
-                        {isSuperAdmin && (
-                          <span
-                            style={{
-                              fontSize: "0.65rem",
-                              color: "#fff",
-                              backgroundColor: "#ef4444",
-                              padding: "3px 8px",
-                              borderRadius: "10px",
-                              fontWeight: "bold",
-                              letterSpacing: "0.5px",
-                            }}
-                          >
-                            👑 مدير المنصة
-                          </span>
-                        )}
-                        {isSupervisor && (
-                          <span
-                            style={{
-                              fontSize: "0.65rem",
-                              color: "#fff",
-                              backgroundColor: "#3b82f6",
-                              padding: "3px 8px",
-                              borderRadius: "10px",
-                              fontWeight: "bold",
-                            }}
-                          >
-                            🛡️ مشرف عام
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  <img
-                    src={userProfile?.avatar_url || defaultAvatar}
-                    style={{
-                      width: "46px",
-                      height: "46px",
-                      borderRadius: "50%",
-                      border: "2px solid #fff",
-                      objectFit: "cover",
-                      boxShadow: "0 4px 10px rgba(0,0,0,0.1)",
-                    }}
-                    alt="avatar"
-                  />
-                </div>
                 <button
                   onClick={handleLogout}
                   title="تسجيل الخروج المأمون"
@@ -2019,14 +2048,14 @@ function MainAppContent() {
                     backgroundColor: "#fef2f2",
                     color: "#ef4444",
                     border: "1px solid #fca5a5",
-                    width: "46px",
-                    height: "46px",
+                    width: "42px",
+                    height: "42px",
                     borderRadius: "14px",
                     cursor: "pointer",
                     display: "flex",
                     justifyContent: "center",
                     alignItems: "center",
-                    fontSize: "1.4rem",
+                    fontSize: "1.3rem",
                     transition: "all 0.2s ease",
                   }}
                   onMouseOver={(e) => {
@@ -2049,31 +2078,111 @@ function MainAppContent() {
                     "linear-gradient(135deg, #10b981 0%, #059669 100%)",
                   color: "white",
                   border: "none",
-                  padding: "12px 30px",
-                  borderRadius: "16px",
+                  padding: "10px 20px",
+                  borderRadius: "14px",
                   cursor: "pointer",
                   fontWeight: "900",
-                  fontSize: "1.05rem",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  boxShadow: "0 6px 15px rgba(16, 185, 129, 0.25)",
-                  transition: "all 0.3s ease",
+                  fontSize: "1rem",
+                  boxShadow: "0 4px 15px rgba(16, 185, 129, 0.25)",
                 }}
-                onMouseOver={(e) =>
-                  (e.currentTarget.style.transform = "translateY(-2px)")
-                }
-                onMouseOut={(e) =>
-                  (e.currentTarget.style.transform = "translateY(0)")
-                }
               >
-                تسجيل الدخول / إنشاء حساب 🚀
+                دخول / حساب 🚀
               </button>
             )}
           </div>
         </div>
 
-        {/* ✨ قائمة التنقل العلوية (سحب أفقي ذكي) بناءً على طلب الإدارة ✨ */}
+        {/* 📱 السطر الثاني (يظهر في الجوال فقط ويختفي في الكمبيوتر تماماً) */}
+        {session && (
+          <div className="mobile-user-row">
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "10px",
+                cursor: "pointer",
+                flex: 1,
+              }}
+              onClick={() => setActiveTab("profile")}
+            >
+              <img
+                src={userProfile?.avatar_url || defaultAvatar}
+                style={{
+                  width: "40px",
+                  height: "40px",
+                  borderRadius: "50%",
+                  border: "2px solid #fff",
+                  objectFit: "cover",
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+                }}
+                alt="avatar"
+              />
+              <div
+                style={{ textAlign: i18n.language === "ar" ? "left" : "right" }}
+              >
+                <div
+                  style={{
+                    fontWeight: "900",
+                    color: "#1e293b",
+                    fontSize: "0.9rem",
+                  }}
+                >
+                  {userProfile?.full_name || "المستخدم"}
+                </div>
+                {(isSuperAdmin || isSupervisor) && (
+                  <div style={{ marginTop: "2px" }}>
+                    {isSuperAdmin && (
+                      <span
+                        style={{
+                          fontSize: "0.6rem",
+                          color: "#fff",
+                          backgroundColor: "#ef4444",
+                          padding: "2px 6px",
+                          borderRadius: "8px",
+                          fontWeight: "bold",
+                        }}
+                      >
+                        👑 مدير
+                      </span>
+                    )}
+                    {isSupervisor && (
+                      <span
+                        style={{
+                          fontSize: "0.6rem",
+                          color: "#fff",
+                          backgroundColor: "#3b82f6",
+                          padding: "2px 6px",
+                          borderRadius: "8px",
+                          fontWeight: "bold",
+                        }}
+                      >
+                        🛡️ مشرف
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <button
+              className="add-btn"
+              onClick={() => {
+                if (checkProfileCompletion()) {
+                  setEditOfferingData(null);
+                  setShowAddModal(true);
+                }
+              }}
+              style={{
+                ...addSkillBtn,
+                boxShadow: "0 4px 12px rgba(124, 58, 237, 0.2)",
+              }}
+            >
+              <span style={{ fontSize: "1.1rem" }}>✨</span> إضافة خدمة
+            </button>
+          </div>
+        )}
+
+        {/* 🥉 الصف الثالث: التبويبات الساحبة (تظهر للكل) */}
         <div
           className="hide-scrollbar"
           style={{
@@ -2085,8 +2194,8 @@ function MainAppContent() {
             justifyContent: "flex-start",
             flexWrap: "nowrap",
             width: "100%",
-            maxWidth: "100%" /* 👈 يمنع التمدد للخارج */,
-            minWidth: 0 /* 👈 الكود السحري لحل مشكلة تمدد الفليكس بوكس! */,
+            maxWidth: "100%",
+            minWidth: 0,
           }}
         >
           <style>{`.hide-scrollbar::-webkit-scrollbar { display: none; } .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; } .nav-tab { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); flex-shrink: 0; } .nav-tab:hover { transform: translateY(-2px); opacity: 0.9; }`}</style>
