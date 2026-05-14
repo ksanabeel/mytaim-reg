@@ -22,9 +22,10 @@ import AddOffering from "./components/AddOffering";
 import CalendarView from "./components/CalendarView";
 import { useTranslation } from "react-i18next";
 import { HelmetProvider } from "react-helmet-async";
-import UpdatePasswordModal from "./components/UpdatePasswordModal"; // تأكد من مسار الملف
+import UpdatePasswordModal from "./components/UpdatePasswordModal";
 import MoyasarPayment from "./components/MoyasarPayment";
 import { Capacitor } from "@capacitor/core";
+
 // --- التنسيقات العامة والجمالية ---
 const padS = { padding: "16px" };
 const thS = {
@@ -101,7 +102,7 @@ const modalContent = {
   display: "flex",
   flexDirection: "column",
   boxShadow: "0 25px 50px rgba(0,0,0,0.15)",
-  overflowY: "auto" /* 👈 هذا هو السطر السحري الذي سيحل المشكلة */,
+  overflowY: "auto",
 };
 const smInput = {
   padding: "12px 15px",
@@ -206,7 +207,6 @@ function MainAppContent() {
   const [isSuspended, setIsSuspended] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
 
-  // 🚀 حالة النافذة الجديدة لاستعادة كلمة المرور
   const [showUpdatePassword, setShowUpdatePassword] = useState(false);
 
   const [showAddModal, setShowAddModal] = useState(false);
@@ -429,11 +429,9 @@ function MainAppContent() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_e, session) => {
-      // 🚀 التقاط حدث استعادة كلمة المرور لفتح النافذة
       if (_e === "PASSWORD_RECOVERY") {
         setShowUpdatePassword(true);
       }
-
       setSession(session);
       fetchAllData(session?.user?.id);
     });
@@ -961,7 +959,6 @@ function MainAppContent() {
     commissionRate,
   );
 
-  // 👈 إضافة هذه العملية الحسابية لاستخراج الرقم الصافي للعمولة من أجل بوابة ميسر
   const totalUnpaidNumeric = providerBookings
     .filter((b) => b.status === "completed" && !b.is_commission_paid)
     .reduce(
@@ -976,25 +973,26 @@ function MainAppContent() {
     <div
       style={{
         padding: "15px",
-        // 🚀 سحر برمجي: إضافة المساحة الآمنة العلوية لحماية المحتوى من شريط الجوال العلوي
-        paddingTop: "80px",
-        maxWidth: "1200px",
+        paddingTop: "40px" /* 👈 قللنا المساحة العلوية لتناسب الجوال */,
+        maxWidth: "100vw" /* 👈 يمنع تجاوز عرض الشاشة */,
+        width: "100%" /* 👈 إجبار على أخذ مساحة الشاشة فقط */,
+        boxSizing: "border-box" /* 👈 يحسب الحواف ضمن المقاس */,
         margin: "0 auto",
         fontFamily: "system-ui",
         direction: i18n.language === "ar" ? "rtl" : "ltr",
         minHeight: "100vh",
         display: "flex",
         flexDirection: "column",
+        overflowX: "hidden" /* 👈 حماية إضافية */,
       }}
     >
-      {/* 🚀 سحر برمجي: إخفاء شريط التمرير (Scrollbar) المزعج ليصبح التطبيق فخماً */}
       <style>{`
         ::-webkit-scrollbar {
           display: none;
         }
         * {
-          -ms-overflow-style: none;  /* IE and Edge */
-          scrollbar-width: none;  /* Firefox */
+          -ms-overflow-style: none;
+          scrollbar-width: none;
         }
       `}</style>
 
@@ -1315,12 +1313,10 @@ function MainAppContent() {
                   </strong>
                 </p>
 
-                {/* 👈 تم استبدال الواجهة التجريبية بمكون ميسر الاحترافي هنا */}
                 {totalUnpaidNumeric > 0 ? (
                   <MoyasarPayment
                     amount={totalUnpaidNumeric}
                     booking={{
-                      // 🚀 سحر برمجي: جلب أرقام جميع الحجوزات غير المدفوعة ودمجها في رابط واحد
                       id: providerBookings
                         .filter(
                           (b) =>
@@ -1731,19 +1727,22 @@ function MainAppContent() {
       <div
         style={{
           position: "sticky",
-          top: "40px",
+          top: "10px" /* 👈 رفعناه قليلاً لأفضل مظهر */,
           zIndex: 2000,
           backgroundColor: "rgba(255, 255, 255, 0.9)",
           backdropFilter: "blur(20px) saturate(180%)",
           WebkitBackdropFilter: "blur(20px) saturate(180%)",
           border: "1px solid rgba(255, 255, 255, 0.8)",
-          padding: "15px 25px",
+          padding: "15px" /* 👈 قللنا الحشوة الجانبية لمنع القص */,
           borderRadius: "24px",
           boxShadow: "0 10px 40px rgba(0, 0, 0, 0.08)",
           marginBottom: "30px",
           display: "flex",
           flexDirection: "column",
           gap: "20px",
+          width: "100%" /* 👈 إجبار على مقاس الشاشة */,
+          maxWidth: "100%" /* 👈 إجبار على مقاس الشاشة */,
+          boxSizing: "border-box" /* 👈 حساب الحواف */,
         }}
       >
         <div
@@ -2074,16 +2073,20 @@ function MainAppContent() {
           </div>
         </div>
 
+        {/* ✨ قائمة التنقل العلوية (سحب أفقي ذكي) بناءً على طلب الإدارة ✨ */}
         <div
           className="hide-scrollbar"
           style={{
             display: "flex",
-            gap: "6px",
+            gap: "10px",
             overflowX: "auto",
-            paddingBottom: "5px",
+            paddingBottom: "10px",
             WebkitOverflowScrolling: "touch",
-            justifyContent: "center",
-            flexWrap: "wrap",
+            justifyContent: "flex-start",
+            flexWrap: "nowrap",
+            width: "100%",
+            maxWidth: "100%" /* 👈 يمنع التمدد للخارج */,
+            minWidth: 0 /* 👈 الكود السحري لحل مشكلة تمدد الفليكس بوكس! */,
           }}
         >
           <style>{`.hide-scrollbar::-webkit-scrollbar { display: none; } .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; } .nav-tab { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); flex-shrink: 0; } .nav-tab:hover { transform: translateY(-2px); opacity: 0.9; }`}</style>
@@ -2162,7 +2165,7 @@ function MainAppContent() {
                 borderRadius: "12px",
                 cursor: "pointer",
                 fontWeight: "bold",
-                fontSize: "0.85rem",
+                fontSize: "0.95rem",
                 backgroundColor: activeTab === tab.id ? tab.color : "#fff",
                 color: activeTab === tab.id ? "white" : "#475569",
                 boxShadow:
@@ -2171,14 +2174,15 @@ function MainAppContent() {
                     : "0 2px 4px rgba(0,0,0,0.02)",
                 display: "flex",
                 alignItems: "center",
-                gap: "6px",
+                gap: "8px",
                 whiteSpace: "nowrap",
                 transition: "0.2s",
+                flexShrink: 0,
               }}
             >
               <span
                 style={{
-                  fontSize: "1.05rem",
+                  fontSize: "1.2rem",
                   filter: activeTab !== tab.id ? "grayscale(0.5)" : "none",
                 }}
               >
@@ -2247,7 +2251,6 @@ function MainAppContent() {
                       </div>
                     )}
 
-                    {/* تطبيق الـ Lazy Loading والتغليف بـ Suspense */}
                     {activeTab === "invoices" && (
                       <div style={cardS}>
                         <Suspense
@@ -3379,17 +3382,14 @@ function MainAppContent() {
 
 // ✨ بوابة الدخول السرية للمرحلة التجريبية (Beta Gate) ✨
 const BetaGate = ({ children }) => {
-  // للتحقق مما إذا كان المستخدم قد أدخل الرمز مسبقاً
   const [isUnlocked, setIsUnlocked] = useState(
     localStorage.getItem("beta_unlocked") === "true",
   );
 
   const [passcode, setPasscode] = useState("");
 
-  // إذا كان مفتوحاً، اعرض المنصة مباشرة
   if (isUnlocked) return children;
 
-  // إذا كان مغلقاً، اعرض شاشة الرمز السري
   return (
     <div
       style={{
@@ -3459,7 +3459,6 @@ const BetaGate = ({ children }) => {
         />
         <button
           onClick={() => {
-            // 💡 هنا تضع الرقم السري الخاص بك (الآن هو 2030)
             if (passcode === "2030") {
               localStorage.setItem("beta_unlocked", "true");
               setIsUnlocked(true);
@@ -3498,7 +3497,6 @@ export default function AppWrapper() {
   return (
     <HelmetProvider>
       <BrowserRouter>
-        {/* تغليف المنصة بالبوابة السرية */}
         <BetaGate>
           <MainAppContent />
         </BetaGate>
