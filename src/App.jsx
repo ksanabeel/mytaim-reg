@@ -8,8 +8,8 @@ import React, {
 } from "react";
 const InvoicesView = React.lazy(() => import("./components/InvoicesView"));
 const AdminReports = React.lazy(() => import("./components/AdminReports"));
-const PlatformManagement = React.lazy(
-  () => import("./components/PlatformManagement"),
+const PlatformManagement = React.lazy(() =>
+  import("./components/PlatformManagement"),
 );
 import PaymentResult from "./components/PaymentResult";
 import { BrowserRouter, Routes, Route, useNavigate } from "react-router-dom";
@@ -943,7 +943,9 @@ function MainAppContent() {
       (cb) => !providerBookings.some((pb) => pb.id === cb.id),
     ),
   ];
-  const defaultAvatar = `https://ui-avatars.com/api/?name=${userProfile?.full_name || "User"}&background=7c3aed&color=fff`;
+  const defaultAvatar = `https://ui-avatars.com/api/?name=${
+    userProfile?.full_name || "User"
+  }&background=7c3aed&color=fff`;
 
   const myPaidCommissionText = sumByCurrency(
     providerBookings.filter(
@@ -2504,7 +2506,13 @@ function MainAppContent() {
                                   >
                                     {off.is_24_7
                                       ? `🟢 متاح 24 ساعة للعمل`
-                                      : `🕒 دوام: ${off.work_start_time?.substring(0, 5)} - ${off.work_end_time?.substring(0, 5)}`}
+                                      : `🕒 دوام: ${off.work_start_time?.substring(
+                                          0,
+                                          5,
+                                        )} - ${off.work_end_time?.substring(
+                                          0,
+                                          5,
+                                        )}`}
                                   </div>
                                 </div>
                                 <div
@@ -2536,8 +2544,8 @@ function MainAppContent() {
                                       {off.price_upon_agreement
                                         ? "حسب الاتفاق 🤝"
                                         : off.pricing_model === "free"
-                                          ? `💚 عمل تطوعي`
-                                          : `${off.price} ${curr}`}
+                                        ? `💚 عمل تطوعي`
+                                        : `${off.price} ${curr}`}
                                     </span>
                                     {!off.price_upon_agreement && (
                                       <span
@@ -3284,7 +3292,7 @@ function MainAppContent() {
         )}
         <p style={{ margin: 0, fontWeight: "bold", fontSize: "1rem" }}>
           © {new Date().getFullYear()} {platformName}. جميع الحقوق محفوظة لرواد
-          الإبداع.
+          الإبداع email bookonmap@hotmail.com -ترخيص FL-161528534 .
         </p>
         <div
           style={{
