@@ -390,10 +390,20 @@ export default function ClientMarketplace({
       const pad = (num) => String(num).padStart(2, "0");
       setBookingData({
         ...bookingData,
-        startDate: `${foundDate.getFullYear()}-${pad(foundDate.getMonth() + 1)}-${pad(foundDate.getDate())}`,
-        startTime: `${pad(foundDate.getHours())}:${pad(foundDate.getMinutes())}`,
-        endDate: `${new Date(foundDate.getTime() + 60 * 60 * 1000).getFullYear()}-${pad(new Date(foundDate.getTime() + 60 * 60 * 1000).getMonth() + 1)}-${pad(new Date(foundDate.getTime() + 60 * 60 * 1000).getDate())}`,
-        endTime: `${pad(new Date(foundDate.getTime() + 60 * 60 * 1000).getHours())}:${pad(new Date(foundDate.getTime() + 60 * 60 * 1000).getMinutes())}`,
+        startDate: `${foundDate.getFullYear()}-${pad(
+          foundDate.getMonth() + 1,
+        )}-${pad(foundDate.getDate())}`,
+        startTime: `${pad(foundDate.getHours())}:${pad(
+          foundDate.getMinutes(),
+        )}`,
+        endDate: `${new Date(
+          foundDate.getTime() + 60 * 60 * 1000,
+        ).getFullYear()}-${pad(
+          new Date(foundDate.getTime() + 60 * 60 * 1000).getMonth() + 1,
+        )}-${pad(new Date(foundDate.getTime() + 60 * 60 * 1000).getDate())}`,
+        endTime: `${pad(
+          new Date(foundDate.getTime() + 60 * 60 * 1000).getHours(),
+        )}:${pad(new Date(foundDate.getTime() + 60 * 60 * 1000).getMinutes())}`,
       });
     } else {
       alert(
@@ -482,7 +492,10 @@ export default function ClientMarketplace({
       if (normRStart < pStartMins || normRStart > pEndMins)
         return alert(
           isRTL
-            ? `⛔ الوقت المحدد خارج أوقات الدوام! ساعات العمل من ${selected.work_start_time.substring(0, 5)} إلى ${selected.work_end_time.substring(0, 5)}.`
+            ? `⛔ الوقت المحدد خارج أوقات الدوام! ساعات العمل من ${selected.work_start_time.substring(
+                0,
+                5,
+              )} إلى ${selected.work_end_time.substring(0, 5)}.`
             : "⛔ Outside working hours.",
         );
     }
@@ -506,7 +519,10 @@ export default function ClientMarketplace({
     const maxCapacity = selected.max_capacity || 1;
     if (overlappingUsedCapacity + bookingData.manualQuantity > maxCapacity) {
       return alert(
-        `⚠️ نعتذر، السعة المتاحة في هذا الوقت هي ${Math.max(0, maxCapacity - overlappingUsedCapacity)} فقط من أصل ${maxCapacity}. الرجاء تقليل العدد المطلوب أو تغيير الوقت.`,
+        `⚠️ نعتذر، السعة المتاحة في هذا الوقت هي ${Math.max(
+          0,
+          maxCapacity - overlappingUsedCapacity,
+        )} فقط من أصل ${maxCapacity}. الرجاء تقليل العدد المطلوب أو تغيير الوقت.`,
       );
     }
 
@@ -560,7 +576,12 @@ export default function ClientMarketplace({
   };
   const renderStars = (rating) => "⭐ " + (rating ? rating.toFixed(1) : "5.0");
   const defaultAvatar = (name, hexColor = "#7c3aed") =>
-    `https://ui-avatars.com/api/?name=${name || "User"}&background=${hexColor.replace("#", "")}20&color=${hexColor.replace("#", "")}&bold=true`;
+    `https://ui-avatars.com/api/?name=${
+      name || "User"
+    }&background=${hexColor.replace("#", "")}20&color=${hexColor.replace(
+      "#",
+      "",
+    )}&bold=true`;
 
   if (loading)
     return (
@@ -588,6 +609,16 @@ export default function ClientMarketplace({
       <style>{`
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        /* ✨ الكود السحري لترتيب الأقسام في الجوال فقط ✨ */
+        @media (max-width: 768px) {
+          .categories-mobile {
+            flex-wrap: nowrap !important;
+            overflow-x: auto !important;
+            -webkit-overflow-scrolling: touch;
+          }
+        }
+
         .smart-card { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); top: 0; }
         .smart-card:hover { transform: translateY(-5px); box-shadow: 0 15px 30px rgba(0,0,0,0.08); }
         .search-container { position: relative; z-index: 10; margin-top: -35px; margin-bottom: 30px; }
@@ -735,8 +766,8 @@ export default function ClientMarketplace({
                 isStoreMode
                   ? `ابحث في خدمات ${storeProfile?.full_name || "المزود"}...`
                   : isRTL
-                    ? "ابحث بالاسم، الخدمة، أو @يوزر المزود..."
-                    : "Search..."
+                  ? "ابحث بالاسم، الخدمة، أو @يوزر المزود..."
+                  : "Search..."
               }
               style={searchField}
               value={localSearch}
@@ -812,7 +843,12 @@ export default function ClientMarketplace({
                 }
                 const jsDate = date.toDate();
                 setFilterDate(
-                  `${jsDate.getFullYear()}-${String(jsDate.getMonth() + 1).padStart(2, "0")}-${String(jsDate.getDate()).padStart(2, "0")}`,
+                  `${jsDate.getFullYear()}-${String(
+                    jsDate.getMonth() + 1,
+                  ).padStart(2, "0")}-${String(jsDate.getDate()).padStart(
+                    2,
+                    "0",
+                  )}`,
                 );
               }}
               minDate={new Date()}
@@ -866,7 +902,10 @@ export default function ClientMarketplace({
       </div>
 
       {!isStoreMode && (
-        <div className="hide-scrollbar" style={categoryScrollWrapperS}>
+        <div
+          className="hide-scrollbar categories-mobile"
+          style={categoryScrollWrapperS}
+        >
           {displayCategories.map((cat) => {
             const isActive = activeCategory === cat.id;
             return (
@@ -895,7 +934,11 @@ export default function ClientMarketplace({
         <div style={searchAlertS}>
           ✅{" "}
           {isRTL
-            ? `نعرض لك فقط الخدمات المتاحة ${filterDate ? `يوم (${filterDate})` : ""} ${filterStartTime ? `من (${filterStartTime})` : ""} ${filterEndTime ? `إلى (${filterEndTime})` : ""}`
+            ? `نعرض لك فقط الخدمات المتاحة ${
+                filterDate ? `يوم (${filterDate})` : ""
+              } ${filterStartTime ? `من (${filterStartTime})` : ""} ${
+                filterEndTime ? `إلى (${filterEndTime})` : ""
+              }`
             : "Showing available providers for selected date/time."}
         </div>
       )}
@@ -1065,15 +1108,15 @@ export default function ClientMarketplace({
                           color: isAgreement
                             ? "#3b82f6"
                             : isFree
-                              ? "#10b981"
-                              : itemThemeColor,
+                            ? "#10b981"
+                            : itemThemeColor,
                         }}
                       >
                         {isAgreement
                           ? "حسب الاتفاق 🤝"
                           : isFree
-                            ? t("free")
-                            : `${item.price} SAR`}
+                          ? t("free")
+                          : `${item.price} SAR`}
                       </span>
                       {!isAgreement && (
                         <span
@@ -1164,7 +1207,9 @@ export default function ClientMarketplace({
                   height: "70px",
                   borderRadius: "50%",
                   objectFit: "cover",
-                  border: `2px solid ${selected.profiles?.theme_color || "#7c3aed"}`,
+                  border: `2px solid ${
+                    selected.profiles?.theme_color || "#7c3aed"
+                  }`,
                 }}
                 alt="avatar"
               />
@@ -1189,7 +1234,9 @@ export default function ClientMarketplace({
                       fontWeight: "bold",
                       direction: "ltr",
                       display: "inline-block",
-                      backgroundColor: `${selected.profiles?.theme_color || "#7c3aed"}15`,
+                      backgroundColor: `${
+                        selected.profiles?.theme_color || "#7c3aed"
+                      }15`,
                       padding: "2px 8px",
                       borderRadius: "10px",
                       marginBottom: "8px",
@@ -1218,7 +1265,9 @@ export default function ClientMarketplace({
                   {/* زر الواتساب */}
                   {(selected.whatsapp_number || selected.profiles?.phone) && (
                     <a
-                      href={`https://wa.me/${(selected.whatsapp_number || selected.profiles?.phone).replace(/\D/g, "")}`}
+                      href={`https://wa.me/${(
+                        selected.whatsapp_number || selected.profiles?.phone
+                      ).replace(/\D/g, "")}`}
                       target="_blank"
                       rel="noreferrer"
                       style={socialBtn("#25d366")}
@@ -1611,7 +1660,12 @@ export default function ClientMarketplace({
                         return;
                       }
                       const jsDate = date.toDate();
-                      const start = `${jsDate.getFullYear()}-${String(jsDate.getMonth() + 1).padStart(2, "0")}-${String(jsDate.getDate()).padStart(2, "0")}`;
+                      const start = `${jsDate.getFullYear()}-${String(
+                        jsDate.getMonth() + 1,
+                      ).padStart(2, "0")}-${String(jsDate.getDate()).padStart(
+                        2,
+                        "0",
+                      )}`;
                       setBookingData({ ...bookingData, startDate: start });
                     }}
                     minDate={new Date()}
@@ -1636,7 +1690,12 @@ export default function ClientMarketplace({
                         return;
                       }
                       const jsDate = date.toDate();
-                      const end = `${jsDate.getFullYear()}-${String(jsDate.getMonth() + 1).padStart(2, "0")}-${String(jsDate.getDate()).padStart(2, "0")}`;
+                      const end = `${jsDate.getFullYear()}-${String(
+                        jsDate.getMonth() + 1,
+                      ).padStart(2, "0")}-${String(jsDate.getDate()).padStart(
+                        2,
+                        "0",
+                      )}`;
                       setBookingData({ ...bookingData, endDate: end });
                     }}
                     minDate={
@@ -1673,7 +1732,10 @@ export default function ClientMarketplace({
                         return;
                       }
                       const jsDate = date.toDate();
-                      const time = `${String(jsDate.getHours()).padStart(2, "0")}:${String(jsDate.getMinutes()).padStart(2, "0")}`;
+                      const time = `${String(jsDate.getHours()).padStart(
+                        2,
+                        "0",
+                      )}:${String(jsDate.getMinutes()).padStart(2, "0")}`;
                       setBookingData({ ...bookingData, startTime: time });
                     }}
                     containerStyle={{ width: "100%" }}
@@ -1702,7 +1764,10 @@ export default function ClientMarketplace({
                         return;
                       }
                       const jsDate = date.toDate();
-                      const time = `${String(jsDate.getHours()).padStart(2, "0")}:${String(jsDate.getMinutes()).padStart(2, "0")}`;
+                      const time = `${String(jsDate.getHours()).padStart(
+                        2,
+                        "0",
+                      )}:${String(jsDate.getMinutes()).padStart(2, "0")}`;
                       setBookingData({ ...bookingData, endTime: time });
                     }}
                     containerStyle={{ width: "100%" }}
@@ -1720,7 +1785,11 @@ export default function ClientMarketplace({
                   : "#f8fafc",
                 padding: "18px",
                 borderRadius: "16px",
-                border: `1px dashed ${selected.price_upon_agreement ? "#10b981" : selected.profiles?.theme_color || "#7c3aed"}`,
+                border: `1px dashed ${
+                  selected.price_upon_agreement
+                    ? "#10b981"
+                    : selected.profiles?.theme_color || "#7c3aed"
+                }`,
                 marginBottom: "20px",
                 textAlign: "center",
               }}
@@ -1805,14 +1874,16 @@ export default function ClientMarketplace({
               style={{
                 ...confirmBtn,
                 backgroundColor: selected.profiles?.theme_color || "#7c3aed",
-                boxShadow: `0 4px 15px ${selected.profiles?.theme_color || "#7c3aed"}40`,
+                boxShadow: `0 4px 15px ${
+                  selected.profiles?.theme_color || "#7c3aed"
+                }40`,
               }}
             >
               {selected.price_upon_agreement
                 ? "إرسال طلب تسعير للمزود 📨"
                 : isRTL
-                  ? "تأكيد وإرسال الطلب ✅"
-                  : "Confirm Booking ✅"}
+                ? "تأكيد وإرسال الطلب ✅"
+                : "Confirm Booking ✅"}
             </button>
 
             {/* ✨ التقييمات السابقة ✨ */}
