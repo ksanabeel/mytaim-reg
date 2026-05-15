@@ -3403,8 +3403,8 @@ function MainAppContent() {
           </div>
         )}
         <p style={{ margin: 0, fontWeight: "bold", fontSize: "1rem" }}>
-          © {new Date().getFullYear()} {platformName}. جميع الحقوق محفوظة لرواد
-          الإبداع email bookonmap@hotmail.com -ترخيص FL-161528534 .
+          © {new Date().getFullYear()} {platformName} (جميع الحقوق محفوظة )
+          email : bookonmap@hotmail.com -ترخيص FL-161528534 .
         </p>
         <div
           style={{

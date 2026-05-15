@@ -27,6 +27,35 @@ export default function CalendarView({
 
   const [roleFilter, setRoleFilter] = useState("all");
 
+  // ✨ ميزة تبديل التقويم (هجري / ميلادي) ✨
+  const [calendarType, setCalendarType] = useState(() => {
+    // حاول قراءة الاختيار السابق للمستخدم، وإذا ما فيه خله الافتراضي ميلادي
+    return localStorage.getItem("preferredCalendar") || "gregory";
+  });
+
+  // حفظ اختيار المستخدم إذا تغير
+  useEffect(() => {
+    localStorage.setItem("preferredCalendar", calendarType);
+  }, [calendarType]);
+
+  const toggleCalendar = () => {
+    setCalendarType((prev) =>
+      prev === "gregory" ? "islamic-umalqura" : "gregory",
+    );
+  };
+
+  // دالة مخصصة لطباعة التواريخ بالتنسيق المختار
+  const formatDate = (dateObj, options) => {
+    if (!dateObj) return "";
+    return dateObj.toLocaleDateString(
+      i18n.language === "ar" ? "ar-SA" : "en-US",
+      {
+        calendar: calendarType,
+        ...options,
+      },
+    );
+  };
+
   const daysInMonth = (y, m) => new Date(y, m + 1, 0).getDate();
   const firstDay = new Date(curr.getFullYear(), curr.getMonth(), 1).getDay();
 
@@ -44,7 +73,10 @@ export default function CalendarView({
 
   const getDateString = (day) => {
     if (!day) return null;
-    return `${curr.getFullYear()}-${String(curr.getMonth() + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    return `${curr.getFullYear()}-${String(curr.getMonth() + 1).padStart(
+      2,
+      "0",
+    )}-${String(day).padStart(2, "0")}`;
   };
 
   const getLocalDateString = (utcDateString) => {
@@ -122,21 +154,29 @@ export default function CalendarView({
           ? "مؤكد"
           : "Confirmed"
         : b.status === "completed"
-          ? isRTL
-            ? "مكتمل"
-            : "Completed"
-          : b.status === "cancelled"
-            ? isRTL
-              ? "ملغى"
-              : "Cancelled"
-            : isRTL
-              ? "قيد المعالجة"
-              : "Pending";
+        ? isRTL
+          ? "مكتمل"
+          : "Completed"
+        : b.status === "cancelled"
+        ? isRTL
+          ? "ملغى"
+          : "Cancelled"
+        : isRTL
+        ? "قيد المعالجة"
+        : "Pending";
 
     const qty = b.quantity || 1;
     const price = Number(b.offerings?.price) || 0;
     const addCosts = Number(b.additional_costs) || 0;
     const total = price * qty + addCosts;
+
+    // تنسيق التاريخ للطباعة
+    const printDate = new Date(b.appointment_date);
+    const dateStr = formatDate(printDate);
+    const timeStr = printDate.toLocaleTimeString(isRTL ? "ar-SA" : "en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
 
     const printWindow = window.open("", "_blank", "width=800,height=800");
     printWindow.document.write(`
@@ -157,7 +197,7 @@ export default function CalendarView({
             <span style="background: #7c3aed; color: white; padding: 8px 15px; border-radius: 8px; font-weight: bold;">${statusText}</span>
           </div>
           <p><strong>الخدمة:</strong> ${b.offerings?.title || "غير متوفر"}</p>
-          <p><strong>تاريخ ووقت البدء:</strong> ${new Date(b.appointment_date).toLocaleString(isRTL ? "ar-SA" : "en-US")}</p>
+          <p><strong>تاريخ ووقت البدء:</strong> ${dateStr} - ${timeStr}</p>
           <hr style="border: 1px solid #f1f5f9; margin: 20px 0;" />
           <div style="display: flex; justify-content: space-between;">
             <p><strong>التكلفة الأساسية:</strong></p> <p>${price * qty} ر.س</p>
@@ -205,8 +245,8 @@ export default function CalendarView({
     };
   };
 
-  const dateLocale = i18n.language === "ar" ? "ar-SA" : "en-US";
   const isRTL = i18n.language === "ar";
+  const dateLocale = isRTL ? "ar-SA" : "en-US";
   const weekDays = [
     t("sun"),
     t("mon"),
@@ -226,15 +266,63 @@ export default function CalendarView({
         direction: isRTL ? "rtl" : "ltr",
         border: "1px solid #e2e8f0",
         boxShadow: "0 10px 30px rgba(0,0,0,0.03)",
+        position: "relative",
       }}
     >
-      {/* ستايل لعمل تأثيرات الهوفر على أيام التقويم */}
       <style>{`
         .calendar-day-card { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
         .calendar-day-card:hover { transform: translateY(-3px) scale(1.03); box-shadow: 0 8px 20px rgba(0,0,0,0.08); z-index: 10; }
         .filter-group button { transition: all 0.2s; }
         .filter-group button:hover { opacity: 0.9; }
+        .toggle-switch { width: 50px; height: 26px; background-color: #cbd5e1; border-radius: 20px; position: relative; cursor: pointer; transition: 0.3s; margin: 0 10px; }
+        .toggle-switch.hijri { background-color: #7c3aed; }
+        .toggle-circle { width: 22px; height: 22px; background-color: white; border-radius: 50%; position: absolute; top: 2px; transition: 0.3s; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        .toggle-switch.hijri .toggle-circle { transform: translateX(${
+          isRTL ? "-24px" : "24px"
+        }); }
+        .toggle-switch:not(.hijri) .toggle-circle { transform: translateX(0); }
       `}</style>
+
+      {/* ✨ محول التقويم (هجري / ميلادي) ✨ */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          marginBottom: "20px",
+          padding: "10px",
+          backgroundColor: "#f8fafc",
+          borderRadius: "16px",
+          border: "1px dashed #cbd5e1",
+        }}
+      >
+        <span
+          style={{
+            fontSize: "0.9rem",
+            fontWeight: "bold",
+            color: calendarType === "gregory" ? "#0f172a" : "#94a3b8",
+          }}
+        >
+          ميلادي
+        </span>
+        <div
+          className={`toggle-switch ${
+            calendarType === "islamic-umalqura" ? "hijri" : ""
+          }`}
+          onClick={toggleCalendar}
+        >
+          <div className="toggle-circle"></div>
+        </div>
+        <span
+          style={{
+            fontSize: "0.9rem",
+            fontWeight: "bold",
+            color: calendarType === "islamic-umalqura" ? "#7c3aed" : "#94a3b8",
+          }}
+        >
+          هجري
+        </span>
+      </div>
 
       {/* ✨ رأس التقويم (الشهر والأسهم) بتصميم فخم ✨ */}
       <div
@@ -262,7 +350,7 @@ export default function CalendarView({
             fontWeight: "900",
           }}
         >
-          {curr.toLocaleString(dateLocale, { month: "long", year: "numeric" })}
+          {formatDate(curr, { month: "long", year: "numeric" })}
         </h3>
 
         <button
@@ -342,7 +430,10 @@ export default function CalendarView({
           const s = getStatus(d);
           const hasBookings = s !== "free";
           const roles = getDayRoles(d);
-          const isThisDay = isCurrentMonth && d === todayDate; // ✨ هل هذا هو اليوم الحالي؟
+          const isThisDay = isCurrentMonth && d === todayDate;
+
+          // تحويل رقم اليوم ليتوافق مع التقويم المختار إذا أردنا ذلك (للتوضيح: سيبقى رقمياً لسهولة القراءة ولكن عرض الشهر في الأعلى يعكس التقويم المختار)
+          const displayDay = d;
 
           return (
             <div
@@ -360,26 +451,25 @@ export default function CalendarView({
                 fontWeight: "bold",
                 cursor: hasBookings ? "pointer" : "default",
 
-                // ✨ التدرجات اللونية العصرية ✨
                 background:
                   s === "ok"
                     ? "linear-gradient(135deg, #10b981, #059669)"
                     : s === "wait"
-                      ? "linear-gradient(135deg, #f59e0b, #d97706)"
-                      : "#ffffff",
+                    ? "linear-gradient(135deg, #f59e0b, #d97706)"
+                    : "#ffffff",
 
                 color: hasBookings
                   ? "white"
                   : isThisDay
-                    ? "#7c3aed"
-                    : "#334155",
+                  ? "#7c3aed"
+                  : "#334155",
 
                 border: d
                   ? isThisDay && !hasBookings
-                    ? "2px solid #c4b5fd" // تمييز اليوم الحالي
+                    ? "2px solid #c4b5fd"
                     : hasBookings
-                      ? "none"
-                      : "1px solid #f1f5f9"
+                    ? "none"
+                    : "1px solid #f1f5f9"
                   : "none",
 
                 opacity: d ? 1 : 0,
@@ -387,9 +477,10 @@ export default function CalendarView({
               }}
               title={hasBookings ? "اضغط لعرض وإدارة الحجوزات" : ""}
             >
-              <span style={{ position: "relative", zIndex: 2 }}>{d}</span>
+              <span style={{ position: "relative", zIndex: 2 }}>
+                {displayDay}
+              </span>
 
-              {/* نقطة تمييز اليوم الحالي إذا كان فيه حجوزات (لكي لا تختفي مع الخلفية الملونة) */}
               {isThisDay && hasBookings && (
                 <div
                   style={{
@@ -405,7 +496,6 @@ export default function CalendarView({
                 ></div>
               )}
 
-              {/* ✨ الرموز التعبيرية أسفل اليوم ✨ */}
               {d && hasBookings && (
                 <div
                   style={{
@@ -451,7 +541,7 @@ export default function CalendarView({
                 }}
               >
                 <span style={{ fontSize: "1.5rem" }}>📅</span> حجوزات يوم:{" "}
-                {new Date(selectedDate).toLocaleDateString(dateLocale)}
+                <span dir="ltr">{formatDate(new Date(selectedDate))}</span>
               </h3>
               <button
                 onClick={() => setSelectedDate(null)}
@@ -481,6 +571,13 @@ export default function CalendarView({
               {dayBookings.map((b) => {
                 const badge = getStatusBadge(b.status);
                 const isProvider = localUserId === b.offerings?.provider_id;
+                // استخدام دالة التنسيق المخصصة هنا أيضاً
+                const bookingTime = new Date(
+                  b.appointment_date,
+                ).toLocaleTimeString(dateLocale, {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                });
 
                 return (
                   <div
@@ -566,11 +663,7 @@ export default function CalendarView({
                             borderRadius: "6px",
                           }}
                         >
-                          🕒{" "}
-                          {new Date(b.appointment_date).toLocaleTimeString(
-                            dateLocale,
-                            { hour: "2-digit", minute: "2-digit" },
-                          )}
+                          🕒 {bookingTime}
                         </div>
                       </div>
 
@@ -696,7 +789,6 @@ const navB = {
   boxShadow: "0 2px 4px rgba(0,0,0,0.02)",
 };
 
-// تنسيق أزرار الفلترة الأنيقة
 const filterBtn = (active, color, bgLight) => ({
   padding: "8px 16px",
   borderRadius: "12px",
@@ -713,8 +805,8 @@ const filterBtn = (active, color, bgLight) => ({
 const modalOverlay = {
   position: "fixed",
   inset: 0,
-  backgroundColor: "rgba(15, 23, 42, 0.7)", // خلفية داكنة فاخرة
-  backdropFilter: "blur(4px)", // تأثير الغبش (Blur)
+  backgroundColor: "rgba(15, 23, 42, 0.7)",
+  backdropFilter: "blur(4px)",
   display: "flex",
   justifyContent: "center",
   alignItems: "center",
