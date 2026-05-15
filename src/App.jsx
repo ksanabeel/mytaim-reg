@@ -3404,7 +3404,7 @@ function MainAppContent() {
         )}
         <p style={{ margin: 0, fontWeight: "bold", fontSize: "1rem" }}>
           © {new Date().getFullYear()} {platformName} (جميع الحقوق محفوظة )
-          email : bookonmap@hotmail.com -ترخيص FL-161528534 .
+          email:bookonmap@hotmail.com ترخيص FL-161528534
         </p>
         <div
           style={{
