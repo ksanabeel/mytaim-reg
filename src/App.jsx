@@ -3606,9 +3606,10 @@ export default function AppWrapper() {
   return (
     <HelmetProvider>
       <BrowserRouter>
-        <BetaGate>
-          <MainAppContent />
-        </BetaGate>
+        {/* 🚧 تم إيقاف بوابة الاختبار (BetaGate) مؤقتاً لمراجعة المركز السعودي للأعمال 🚧 */}
+        {/* <BetaGate> */}
+        <MainAppContent />
+        {/* </BetaGate> */}
       </BrowserRouter>
     </HelmetProvider>
   );
