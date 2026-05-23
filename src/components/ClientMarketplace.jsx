@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "../lib/supabase";
 import { useTranslation } from "react-i18next";
 import { useParams } from "react-router-dom";
@@ -23,6 +23,7 @@ export default function ClientMarketplace({
   const { storeUsername } = useParams();
   const username = storeUsername ? storeUsername.replace("@", "") : null;
   const isRTL = i18n.language === "ar";
+  const userId = session?.user?.id;
 
   const [liveTime, setLiveTime] = useState(new Date());
   const [offerings, setOfferings] = useState([]);
@@ -41,6 +42,16 @@ export default function ClientMarketplace({
   const [filterEndTime, setFilterEndTime] = useState("");
 
   const [reviews, setReviews] = useState([]);
+
+  // ✨ حالات المفضلة ✨
+  const [favorites, setFavorites] = useState([]);
+
+  // ✨ حالات التحميل اللانهائي ✨
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [isFetchingMore, setIsFetchingMore] = useState(false);
+  const observer = useRef();
+  const ITEMS_PER_PAGE = 12;
 
   // ✨ حالة الحجز تتضمن العدد اليدوي ✨
   const [bookingData, setBookingData] = useState({
@@ -77,39 +88,125 @@ export default function ClientMarketplace({
     return () => clearInterval(timer);
   }, []);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      const { data: cats } = await supabase
-        .from("categories")
+  // دالة جلب البيانات الأساسية
+  const fetchInitialData = async () => {
+    setLoading(true);
+
+    // جلب الفئات
+    const { data: cats } = await supabase
+      .from("categories")
+      .select("*")
+      .order("created_at");
+    if (cats) setDbCategories(cats);
+
+    // جلب بروفايل المتجر إن وجد
+    if (username) {
+      const { data: prof } = await supabase
+        .from("profiles")
         .select("*")
-        .order("created_at");
-      if (cats) setDbCategories(cats);
+        .eq("username", username)
+        .single();
+      if (prof) setStoreProfile(prof);
+    }
 
-      if (username) {
-        const { data: prof } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("username", username)
-          .single();
-        if (prof) setStoreProfile(prof);
-      }
+    // جلب المفضلات للمستخدم المسجل
+    if (userId) {
+      const { data: favs } = await supabase
+        .from("favorites")
+        .select("provider_id")
+        .eq("user_id", userId);
+      if (favs) setFavorites(favs.map((f) => f.provider_id));
+    }
 
-      let query = supabase
-        .from("offerings")
-        .select("*, profiles!inner(*)")
-        .eq("profiles.is_active", true);
-      if (username) query = query.eq("profiles.username", username);
+    // جلب الخدمات (الصفحة الأولى)
+    let query = supabase
+      .from("offerings")
+      .select("*, profiles!inner(*)")
+      .eq("profiles.is_active", true);
+    if (username) query = query.eq("profiles.username", username);
 
-      const { data: offs } = await query.order("rating", {
-        foreignTable: "profiles",
-        ascending: false,
+    const { data: offs, error } = await query
+      .order("rating", { foreignTable: "profiles", ascending: false })
+      .range(0, ITEMS_PER_PAGE - 1);
+
+    if (offs) {
+      setOfferings(offs);
+      if (offs.length < ITEMS_PER_PAGE) setHasMore(false);
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    setPage(0);
+    setHasMore(true);
+    fetchInitialData();
+  }, [username, userId]);
+
+  // ✨ دالة جلب المزيد من الخدمات (التحميل اللانهائي) ✨
+  const fetchMoreData = async () => {
+    if (isFetchingMore || !hasMore) return;
+    setIsFetchingMore(true);
+
+    const nextPage = page + 1;
+    let query = supabase
+      .from("offerings")
+      .select("*, profiles!inner(*)")
+      .eq("profiles.is_active", true);
+    if (username) query = query.eq("profiles.username", username);
+
+    const { data: newOffs } = await query
+      .order("rating", { foreignTable: "profiles", ascending: false })
+      .range(nextPage * ITEMS_PER_PAGE, (nextPage + 1) * ITEMS_PER_PAGE - 1);
+
+    if (newOffs && newOffs.length > 0) {
+      setOfferings((prev) => [...prev, ...newOffs]);
+      setPage(nextPage);
+      if (newOffs.length < ITEMS_PER_PAGE) setHasMore(false);
+    } else {
+      setHasMore(false);
+    }
+    setIsFetchingMore(false);
+  };
+
+  // مراقب الـ Scroll للوصول لنهاية القائمة
+  const lastElementRef = useCallback(
+    (node) => {
+      if (loading || isFetchingMore) return;
+      if (observer.current) observer.current.disconnect();
+      observer.current = new IntersectionObserver((entries) => {
+        if (entries[0].isIntersecting && hasMore) {
+          fetchMoreData();
+        }
       });
-      if (offs) setOfferings(offs);
+      if (node) observer.current.observe(node);
+    },
+    [loading, isFetchingMore, hasMore],
+  );
 
-      setLoading(false);
-    };
-    fetchData();
-  }, [username]);
+  // ✨ دالة التبديل للمفضلة ✨
+  const toggleFavorite = async (e, providerId) => {
+    e.stopPropagation();
+    if (!session)
+      return alert(
+        isRTL
+          ? "يرجى تسجيل الدخول لاستخدام المفضلة 🔐"
+          : "Please login first to use favorites 🔐",
+      );
+
+    if (favorites.includes(providerId)) {
+      setFavorites(favorites.filter((id) => id !== providerId));
+      await supabase
+        .from("favorites")
+        .delete()
+        .eq("user_id", userId)
+        .eq("provider_id", providerId);
+    } else {
+      setFavorites([...favorites, providerId]);
+      await supabase
+        .from("favorites")
+        .insert({ user_id: userId, provider_id: providerId });
+    }
+  };
 
   const displayCategories = [
     { id: "all", label: t("cat_all", "الكل"), icon: "🌟" },
@@ -134,6 +231,7 @@ export default function ClientMarketplace({
     ),
   ];
 
+  // فلترة العرض
   const filtered = offerings.filter((item) => {
     const s = localSearch.toLowerCase();
     const matchesSearch =
@@ -146,10 +244,14 @@ export default function ClientMarketplace({
       (item.description || "").toLowerCase().includes(s);
     const itemCat = item.category || "other";
     const matchesCategory =
-      activeCategory === "all" || itemCat === activeCategory;
+      activeCategory === "all" ||
+      activeCategory === "favorites" ||
+      itemCat === activeCategory;
     const matchesCountry =
       filterCountry === "all" || item.country === filterCountry;
     const matchesCity = filterCity === "all" || item.city === filterCity;
+    const matchesFavorites =
+      activeCategory !== "favorites" || favorites.includes(item.provider_id);
 
     let matchesDate = true;
     if (filterDate) {
@@ -192,7 +294,8 @@ export default function ClientMarketplace({
       matchesCountry &&
       matchesCity &&
       matchesDate &&
-      matchesTime
+      matchesTime &&
+      matchesFavorites
     );
   });
 
@@ -200,7 +303,7 @@ export default function ClientMarketplace({
   useEffect(() => {
     if (!selected) {
       setReviews([]);
-      setBookingData((prev) => ({ ...prev, manualQuantity: 1 })); // إعادة تصفير العدد
+      setBookingData((prev) => ({ ...prev, manualQuantity: 1 }));
       return;
     }
     const fetchReviews = async () => {
@@ -210,7 +313,7 @@ export default function ClientMarketplace({
           "rating, review, review_text, client_review, profiles!bookings_customer_id_fkey(full_name)",
         )
         .eq("offering_id", selected.id)
-        .eq("status", "completed") // جلب التقييمات للطلبات المكتملة فقط
+        .eq("status", "completed")
         .not("rating", "is", null)
         .order("id", { ascending: false })
         .limit(10);
@@ -287,7 +390,6 @@ export default function ClientMarketplace({
       }
     }
 
-    // 🎯 ضرب المدة في العدد المطلوب من العميل
     const requestedCount = bookingData.manualQuantity || 1;
     const finalTotalPrice = basePrice * timeMultiplier * requestedCount;
 
@@ -445,9 +547,8 @@ export default function ClientMarketplace({
       );
     }
 
-    if (bookingData.manualQuantity < 1) {
+    if (bookingData.manualQuantity < 1)
       return alert("الرجاء تحديد عدد صحيح للخدمة.");
-    }
 
     const requestedStart = new Date(
       `${bookingData.startDate}T${bookingData.startTime || "00:00"}:00`,
@@ -506,14 +607,12 @@ export default function ClientMarketplace({
       .select("appointment_date, end_time, quantity")
       .eq("offering_id", selected.id)
       .neq("status", "cancelled");
-
     let overlappingUsedCapacity = 0;
     existing?.forEach((b) => {
       const bStart = new Date(b.appointment_date);
       const bEnd = new Date(b.end_time);
-      if (requestedStart < bEnd && requestedEnd > bStart) {
+      if (requestedStart < bEnd && requestedEnd > bStart)
         overlappingUsedCapacity += b.quantity || 1;
-      }
     });
 
     const maxCapacity = selected.max_capacity || 1;
@@ -533,18 +632,18 @@ export default function ClientMarketplace({
         appointment_date: requestedStart.toISOString(),
         end_time: requestedEnd.toISOString(),
         location: finalLocation,
-        quantity: bookingData.manualQuantity, // حفظ العدد الفعلي الذي طلبه العميل
+        quantity: bookingData.manualQuantity,
         status: selected.price_upon_agreement ? "awaiting_pricing" : "pending",
         client_contact: bookingData.clientContact,
         proposed_price: selected.price_upon_agreement
           ? null
-          : calculatedData.price, // حفظ التكلفة المحسوبة
+          : calculatedData.price,
       },
     ]);
 
     if (!error) {
       const providerId = selected.provider_id || selected.profiles?.id;
-      if (providerId) {
+      if (providerId)
         await supabase.from("notifications").insert([
           {
             user_id: providerId,
@@ -553,7 +652,6 @@ export default function ClientMarketplace({
             is_read: false,
           },
         ]);
-      }
       alert(
         isRTL
           ? selected.price_upon_agreement
@@ -583,7 +681,7 @@ export default function ClientMarketplace({
       "",
     )}&bold=true`;
 
-  if (loading)
+  if (loading && offerings.length === 0)
     return (
       <div
         style={{
@@ -609,16 +707,9 @@ export default function ClientMarketplace({
       <style>{`
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        
-        /* ✨ الكود السحري لترتيب الأقسام في الجوال فقط ✨ */
         @media (max-width: 768px) {
-          .categories-mobile {
-            flex-wrap: nowrap !important;
-            overflow-x: auto !important;
-            -webkit-overflow-scrolling: touch;
-          }
+          .categories-mobile { flex-wrap: nowrap !important; overflow-x: auto !important; -webkit-overflow-scrolling: touch; }
         }
-
         .smart-card { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); top: 0; }
         .smart-card:hover { transform: translateY(-5px); box-shadow: 0 15px 30px rgba(0,0,0,0.08); }
         .search-container { position: relative; z-index: 10; margin-top: -35px; margin-bottom: 30px; }
@@ -741,14 +832,40 @@ export default function ClientMarketplace({
             overflow: "hidden",
           }}
         >
+          {/* ✨ زر إظهار المفضلة ✨ */}
+          {!isStoreMode && (
+            <button
+              onClick={() =>
+                setActiveCategory(
+                  activeCategory === "favorites" ? "all" : "favorites",
+                )
+              }
+              style={{
+                backgroundColor:
+                  activeCategory === "favorites" ? "#fef2f2" : "transparent",
+                color: activeCategory === "favorites" ? "#ef4444" : "#94a3b8",
+                border: "none",
+                padding: "0 20px",
+                cursor: "pointer",
+                fontSize: "1.4rem",
+                transition: "0.2s",
+                borderLeft: isRTL ? "1px solid #f1f5f9" : "none",
+                borderRight: isRTL ? "none" : "1px solid #f1f5f9",
+              }}
+              title={isRTL ? "عرض مفضلتي" : "Show Favorites"}
+            >
+              {activeCategory === "favorites" ? "❤️" : "🤍"}
+            </button>
+          )}
+
           <div
             style={{
-              flex: "2 1 250px",
+              flex: "2 1 200px",
               display: "flex",
               alignItems: "center",
               padding: "12px 20px",
-              borderRight: isRTL ? "none" : "1px solid #f1f5f9",
               borderLeft: isRTL ? "1px solid #f1f5f9" : "none",
+              borderRight: isRTL ? "none" : "1px solid #f1f5f9",
             }}
           >
             <span
@@ -823,7 +940,6 @@ export default function ClientMarketplace({
               </select>
             </div>
           )}
-
           <div
             style={{
               flex: "1.5 1 150px",
@@ -868,13 +984,13 @@ export default function ClientMarketplace({
               }}
             />
           </div>
-
           {(filterDate ||
             filterStartTime ||
             filterEndTime ||
             filterCountry !== "all" ||
             filterCity !== "all" ||
-            localSearch) && (
+            localSearch ||
+            activeCategory === "favorites") && (
             <button
               onClick={() => {
                 setFilterDate("");
@@ -883,6 +999,7 @@ export default function ClientMarketplace({
                 setFilterCountry("all");
                 setFilterCity("all");
                 setLocalSearch("");
+                setActiveCategory("all");
               }}
               style={{
                 backgroundColor: "#fef2f2",
@@ -952,20 +1069,61 @@ export default function ClientMarketplace({
         }}
       >
         {filtered.length > 0 ? (
-          filtered.map((item) => {
+          filtered.map((item, index) => {
             const isFree = item.pricing_model === "free";
             const isAgreement = item.price_upon_agreement;
             const itemThemeColor = item.profiles?.theme_color || "#7c3aed";
+            const isLastElement = filtered.length === index + 1; // لمعرفة آخر عنصر للتحميل اللانهائي
 
             return (
-              <div key={item.id} className="smart-card" style={smartCardS}>
+              <div
+                ref={isLastElement ? lastElementRef : null}
+                key={`${item.id}-${index}`}
+                className="smart-card"
+                style={smartCardS}
+              >
                 <div style={cardCoverS(isFree, itemThemeColor)}>
+                  {/* ✨ زر المفضلة على البطاقة ✨ */}
+                  <button
+                    onClick={(e) => toggleFavorite(e, item.provider_id)}
+                    style={{
+                      position: "absolute",
+                      top: "10px",
+                      right: isRTL ? "auto" : "10px",
+                      left: isRTL ? "10px" : "auto",
+                      backgroundColor: "rgba(255, 255, 255, 0.9)",
+                      border: "none",
+                      borderRadius: "50%",
+                      width: "36px",
+                      height: "36px",
+                      display: "flex",
+                      justifyContent: "center",
+                      alignItems: "center",
+                      cursor: "pointer",
+                      zIndex: 20,
+                      boxShadow: "0 2px 5px rgba(0,0,0,0.15)",
+                      transition: "0.2s",
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: "1.2rem",
+                        transform: favorites.includes(item.provider_id)
+                          ? "scale(1.1)"
+                          : "scale(1)",
+                      }}
+                    >
+                      {favorites.includes(item.provider_id) ? "❤️" : "🤍"}
+                    </span>
+                  </button>
+
                   <div
                     style={{
                       display: "flex",
                       gap: "5px",
                       padding: "12px",
                       flexWrap: "wrap",
+                      width: "80%",
                     }}
                   >
                     {item.profiles?.provider_type === "institution" && (
@@ -1055,7 +1213,6 @@ export default function ClientMarketplace({
                     </div>
                   )}
 
-                  {/* ✨ إظهار المسمى المهني في البطاقة ✨ */}
                   {item.provider_role && (
                     <div
                       style={{
@@ -1158,6 +1315,22 @@ export default function ClientMarketplace({
           </div>
         )}
       </div>
+
+      {/* ✨ مؤشر التحميل اللانهائي ✨ */}
+      {isFetchingMore && (
+        <div
+          style={{
+            textAlign: "center",
+            padding: "20px",
+            color: "#64748b",
+            fontWeight: "bold",
+            width: "100%",
+            marginTop: "20px",
+          }}
+        >
+          جاري تحميل المزيد... ⏳
+        </div>
+      )}
 
       {selected && (
         <div style={modalOverlay}>
@@ -1262,7 +1435,6 @@ export default function ClientMarketplace({
                     flexWrap: "wrap",
                   }}
                 >
-                  {/* زر الواتساب */}
                   {(selected.whatsapp_number || selected.profiles?.phone) && (
                     <a
                       href={`https://wa.me/${(
@@ -1275,7 +1447,6 @@ export default function ClientMarketplace({
                       واتساب
                     </a>
                   )}
-                  {/* زر الاتصال */}
                   {selected.profiles?.phone && (
                     <a
                       href={`tel:${selected.profiles.phone}`}
@@ -1284,7 +1455,6 @@ export default function ClientMarketplace({
                       {t("call")}
                     </a>
                   )}
-                  {/* ✨ أزرار السوشيال ميديا الجديدة ✨ */}
                   {selected.youtube_url && (
                     <a
                       href={selected.youtube_url}
@@ -1475,7 +1645,6 @@ export default function ClientMarketplace({
             >
               📝 نموذج الحجز المباشر:
             </h4>
-
             <div
               style={{
                 display: "flex",
@@ -1586,7 +1755,6 @@ export default function ClientMarketplace({
                 </button>
               </div>
 
-              {/* ✨ الخانة الذكية: إدخال العدد المطلوب وحمايته بالسعة القصوى ✨ */}
               <div
                 style={{
                   marginBottom: "15px",
@@ -1806,7 +1974,6 @@ export default function ClientMarketplace({
                 </span>
               ) : (
                 <>
-                  {/* ✨ تفصيل الحسبة الشفافة ليراها العميل بوضوح ✨ */}
                   <div
                     style={{
                       fontSize: "0.95rem",
@@ -1850,7 +2017,6 @@ export default function ClientMarketplace({
                       {calculatedData.requestedCount} (مطلوب)
                     </span>
                   </div>
-
                   <span
                     style={{
                       fontSize: "1.5rem",
@@ -1886,7 +2052,6 @@ export default function ClientMarketplace({
                 : "Confirm Booking ✅"}
             </button>
 
-            {/* ✨ التقييمات السابقة ✨ */}
             {reviews && reviews.length > 0 && (
               <div
                 style={{
