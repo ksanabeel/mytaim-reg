@@ -315,11 +315,11 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
           booking.appointment_date.includes("T00:00")
             ? "وقت مرن"
             : booking.appointment_date
-              ? new Date(booking.appointment_date).toLocaleTimeString("ar-SA", {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })
-              : "غير محدد"}
+            ? new Date(booking.appointment_date).toLocaleTimeString("ar-SA", {
+                hour: "2-digit",
+                minute: "2-digit",
+              })
+            : "غير محدد"}
         </span>
       </div>
 
@@ -480,7 +480,7 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
 
                 <input
                   type="number"
-                  placeholder="مبلغ التكلفة الإضافية (ريال)"
+                  placeholder="مبلغ التكلفة الإضافية او اعادة تسعير الخدمة (ريال)"
                   value={extraCostAmount}
                   onChange={(e) => setExtraCostAmount(e.target.value)}
                   style={inputS}
