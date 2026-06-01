@@ -409,11 +409,13 @@ export default function ClientMarketplace({
           ? "جهازك لا يدعم تحديد الموقع."
           : "Your device doesn't support geolocation.",
       );
+
     navigator.geolocation.getCurrentPosition(
       (pos) =>
         setBookingData({
           ...bookingData,
-          gpsLocation: `https://googleusercontent.com/maps.google.com/${pos.coords.latitude},${pos.coords.longitude}`,
+          // تم تصحيح الرابط وإضافة علامة $ الناقصة
+          gpsLocation: `https://www.google.com/maps?q=${pos.coords.latitude},${pos.coords.longitude}`,
           manualLocation: "",
         }),
       () =>
