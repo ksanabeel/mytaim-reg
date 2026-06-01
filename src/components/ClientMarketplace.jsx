@@ -413,7 +413,7 @@ export default function ClientMarketplace({
       (pos) =>
         setBookingData({
           ...bookingData,
-          gpsLocation: `http://googleusercontent.com/maps.google.com/${pos.coords.latitude},${pos.coords.longitude}`,
+          gpsLocation: `https://googleusercontent.com/maps.google.com/${pos.coords.latitude},${pos.coords.longitude}`,
           manualLocation: "",
         }),
       () =>
