@@ -29,8 +29,9 @@ export default function MoyasarPayment({ amount, onSuccess, booking }) {
             amount: Math.round(amount * 100),
             currency: "SAR",
             description: `سداد عمولة الحجز رقم: ${booking.id}`,
-            publishable_api_key:
-              "pk_test_zaVuLXdXYTLsKhDYbuoeJHVDvHoTyg8V1sC8vPEP", // ابقه مفتاح الاختبار حالياً
+
+            // ✅ تم استبدال المفتاح المكشوف بمتغير بيئة آمن
+            publishable_api_key: import.meta.env.VITE_MOYASAR_PUBLISHABLE_KEY,
 
             // ✅ التعديل الجوهري: الآن سيتم إرسال رقم الحجز الفعلي في الرابط
             callback_url: `https://www.bookonmap.com/payment-result?booking_id=${booking.id}`,

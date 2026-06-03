@@ -119,35 +119,44 @@ const Login = () => {
     }
   };
 
+  // ✨ دالة إرسال الرمز الفعلي عبر Supabase (معطلة مؤقتاً)
   const handlePhoneSubmit = async (e) => {
     e.preventDefault();
-    if (!phone || phone.length < 9) return alert("الرجاء إدخال رقم جوال صحيح.");
+    if (!phone || phone.length < 9)
+      return alert("الرجاء إدخال رقم جوال صحيح مع رمز الدولة.");
 
     setLoading(true);
     try {
-      alert("وضع الاختبار: استخدم الرمز 123456 للدخول.");
+      const { error } = await supabase.auth.signInWithOtp({
+        phone: phone,
+      });
+      if (error) throw error;
+
+      alert("تم إرسال رمز التحقق لجوالك بنجاح! 📲");
       setAuthMode("phone_otp");
     } catch (error) {
-      alert("خطأ: " + error.message);
+      alert("حدث خطأ أثناء إرسال الرمز: " + error.message);
     } finally {
       setLoading(false);
     }
   };
 
+  // ✨ دالة التحقق من الرمز الفعلي عبر Supabase (معطلة مؤقتاً)
   const handleVerifyOtp = async (e) => {
     e.preventDefault();
     if (!otp) return alert("الرجاء إدخال رمز التحقق.");
 
     setLoading(true);
     try {
-      if (otp === "123456") {
-        alert("نجاح! في البيئة الحقيقية سيتم دخولك الآن.");
-        setAuthMode("email_login");
-      } else {
-        alert("رمز التحقق غير صحيح (استخدم 123456)");
-      }
+      const { error } = await supabase.auth.verifyOtp({
+        phone: phone,
+        token: otp,
+        type: "sms",
+      });
+
+      if (error) throw error;
     } catch (error) {
-      alert("خطأ في التحقق: " + error.message);
+      alert("رمز التحقق غير صحيح أو منتهي الصلاحية ❌");
     } finally {
       setLoading(false);
     }
@@ -191,7 +200,7 @@ const Login = () => {
           </p>
           <input
             type="text"
-            placeholder="أدخل الرمز (123456 للتجربة)"
+            placeholder="أدخل الرمز المكون من 6 أرقام"
             value={otp}
             onChange={(e) => setOtp(e.target.value)}
             style={{
@@ -280,8 +289,8 @@ const Login = () => {
           {loading
             ? "جاري التحقق..."
             : authMode === "email_login"
-              ? "تسجيل الدخول"
-              : "إنشاء حساب"}
+            ? "تسجيل الدخول"
+            : "إنشاء حساب"}
         </button>
 
         <p style={styles.footerText}>
@@ -300,6 +309,7 @@ const Login = () => {
           </span>
         </p>
 
+        {/* 🚧 تم إخفاء زر الدخول برقم الجوال مؤقتاً لحين استخراج السجل التجاري والربط مع المزود المحلي 🚧
         <button
           type="button"
           onClick={() => setAuthMode("phone_login")}
@@ -307,6 +317,7 @@ const Login = () => {
         >
           📱 الدخول برقم الجوال (OTP)
         </button>
+        */}
       </form>
     );
   };

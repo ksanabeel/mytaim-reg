@@ -15,6 +15,7 @@ const SmartTimePicker = TimePicker.default || TimePicker;
 
 export default function ClientMarketplace({
   session,
+  onRequireLogin, // ✨ تم إضافة الخاصية هنا لحل المشكلة
   allowTextReviews = true,
   welcomeMsg = "",
   heroSubtitle = "",
@@ -309,8 +310,9 @@ export default function ClientMarketplace({
     const fetchReviews = async () => {
       const { data } = await supabase
         .from("bookings")
+        // تم تبسيط جلب اسم العميل لتجنب خطأ الـ Foreign Key 400
         .select(
-          "rating, review, review_text, client_review, profiles!bookings_customer_id_fkey(full_name)",
+          "rating, review, review_text, client_review, profiles(full_name)",
         )
         .eq("offering_id", selected.id)
         .eq("status", "completed")
@@ -414,7 +416,7 @@ export default function ClientMarketplace({
       (pos) =>
         setBookingData({
           ...bookingData,
-          // تم تصحيح الرابط وإضافة علامة $ الناقصة
+          // ✨ تم تصحيح رابط قوقل ماب وإضافة علامة $
           gpsLocation: `https://www.google.com/maps?q=${pos.coords.latitude},${pos.coords.longitude}`,
           manualLocation: "",
         }),

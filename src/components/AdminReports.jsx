@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { supabase } from "../lib/supabase";
 
 // --- التنسيقات العامة والجمالية للملف ---
@@ -340,7 +340,12 @@ export default function AdminReports({
       .filter((m) => m.referredUsersList.length > 0)
       .sort((a, b) => b.unpaidEarnings - a.unpaidEarnings);
   };
-  const affiliateStats = getAffiliateStats();
+
+  // ✨ تم إضافة useMemo لزيادة سرعة الصفحة ومنع الحساب المتكرر ✨
+  const affiliateStats = useMemo(
+    () => getAffiliateStats(),
+    [data.users, data.bookings, affiliateRate, commissionRate],
+  );
 
   const handleExecutePayout = async () => {
     if (!payoutModalData) return;
@@ -356,7 +361,9 @@ export default function AdminReports({
       if (error) throw error;
 
       alert(
-        `تم تسجيل سداد مبلغ ${payoutModalData.unpaidEarnings.toFixed(2)} بنجاح للمسوق ${payoutModalData.full_name} ✅`,
+        `تم تسجيل سداد مبلغ ${payoutModalData.unpaidEarnings.toFixed(
+          2,
+        )} بنجاح للمسوق ${payoutModalData.full_name} ✅`,
       );
       setPayoutModalData(null);
       fetchStats();
@@ -427,18 +434,33 @@ export default function AdminReports({
 
                   return `
                   <tr>
-                    <td style="font-family:monospace; font-weight:bold;">${b.id.substring(0, 8)}</td>
+                    <td style="font-family:monospace; font-weight:bold;">${b.id.substring(
+                      0,
+                      8,
+                    )}</td>
                     <td style="text-align:right;">
-                      <strong>${b.offerings?.profiles?.full_name || "غير محدد"}</strong> ${pUser}<br>
-                      <small style="color:#475569; font-weight:bold; display:block; margin-top:5px;">الخدمة: ${b.offerings?.title}</small>
+                      <strong>${
+                        b.offerings?.profiles?.full_name || "غير محدد"
+                      }</strong> ${pUser}<br>
+                      <small style="color:#475569; font-weight:bold; display:block; margin-top:5px;">الخدمة: ${
+                        b.offerings?.title
+                      }</small>
                       <small style="background:#f8fafc; padding:3px; border-radius:4px; display:inline-block; margin-top:5px; font-weight:bold;">${locString}</small>
                     </td>
                     <td style="text-align:right;">
-                      <strong>${b.profiles?.full_name || "غير محدد"}</strong> ${cUser}<br>
-                      <small dir="ltr" style="display:block; margin-top:5px; font-weight:bold;">📞 ${b.profiles?.phone}</small>
+                      <strong>${
+                        b.profiles?.full_name || "غير محدد"
+                      }</strong> ${cUser}<br>
+                      <small dir="ltr" style="display:block; margin-top:5px; font-weight:bold;">📞 ${
+                        b.profiles?.phone
+                      }</small>
                     </td>
-                    <td style="font-weight:bold; direction:ltr;">${fin.baseTotal.toFixed(2)} ${curr}</td>
-                    <td style="color:#10b981; font-weight:bold; direction:ltr;">${fin.providerNet.toFixed(2)} ${curr}</td>
+                    <td style="font-weight:bold; direction:ltr;">${fin.baseTotal.toFixed(
+                      2,
+                    )} ${curr}</td>
+                    <td style="color:#10b981; font-weight:bold; direction:ltr;">${fin.providerNet.toFixed(
+                      2,
+                    )} ${curr}</td>
                     <td style="color:${commissionColor}; font-weight:bold; direction:ltr;">
                       ${fin.platformCommission.toFixed(2)} ${curr}<br>
                       ${commissionBadge}
@@ -460,7 +482,20 @@ export default function AdminReports({
   const printUsersReport = () => {
     const printWindow = window.open("", "_blank");
     printWindow.document.write(
-      `<html dir="rtl"><head><title>تقرير المستخدمين</title><style>body{font-family:system-ui; padding:30px; color:#1e293b;} table{width:100%; border-collapse:collapse; margin-top:20px; text-align:center;} th, td{padding:10px; border:1px solid #cbd5e1;}</style></head><body><h1 style="color:#7c3aed; border-bottom:3px solid #7c3aed; padding-bottom:10px;">تقرير المستخدمين - ${platName}</h1><p><strong>العدد المطبوع:</strong> ${filteredUsers.length} مستخدم</p><table><thead><tr><th>الاسم (اليوزر)</th><th>رقم التواصل</th><th>النوع</th><th>الحالة</th></tr></thead><tbody>${filteredUsers.map((u) => `<tr><td>${u.full_name || "بدون اسم"}</td><td dir="ltr">${u.phone || "-"}</td><td>${u.provider_type === "institution" ? "مؤسسة" : "فرد"}</td><td>${u.is_active ? "نشط" : "موقوف"}</td></tr>`).join("")}</tbody></table><script>window.onload=()=>window.print();</script></body></html>`,
+      `<html dir="rtl"><head><title>تقرير المستخدمين</title><style>body{font-family:system-ui; padding:30px; color:#1e293b;} table{width:100%; border-collapse:collapse; margin-top:20px; text-align:center;} th, td{padding:10px; border:1px solid #cbd5e1;}</style></head><body><h1 style="color:#7c3aed; border-bottom:3px solid #7c3aed; padding-bottom:10px;">تقرير المستخدمين - ${platName}</h1><p><strong>العدد المطبوع:</strong> ${
+        filteredUsers.length
+      } مستخدم</p><table><thead><tr><th>الاسم (اليوزر)</th><th>رقم التواصل</th><th>النوع</th><th>الحالة</th></tr></thead><tbody>${filteredUsers
+        .map(
+          (u) =>
+            `<tr><td>${u.full_name || "بدون اسم"}</td><td dir="ltr">${
+              u.phone || "-"
+            }</td><td>${
+              u.provider_type === "institution" ? "مؤسسة" : "فرد"
+            }</td><td>${u.is_active ? "نشط" : "موقوف"}</td></tr>`,
+        )
+        .join(
+          "",
+        )}</tbody></table><script>window.onload=()=>window.print();</script></body></html>`,
     );
     printWindow.document.close();
   };
@@ -468,7 +503,20 @@ export default function AdminReports({
   const printAffiliatesReport = () => {
     const printWindow = window.open("", "_blank");
     printWindow.document.write(
-      `<html dir="rtl"><head><title>تقرير المسوقين</title><style>body{font-family:system-ui; padding:30px; color:#1e293b;} table{width:100%; border-collapse:collapse; margin-top:20px; text-align:center;} th, td{padding:10px; border:1px solid #cbd5e1;}</style></head><body><h1 style="color:#7c3aed; border-bottom:3px solid #7c3aed; padding-bottom:10px;">تقرير المسوقين والأرباح - ${platName}</h1><table><thead><tr><th>المسوق</th><th>عدد العملاء</th><th>أرباح المنصة</th><th>أرباح المسوق (المستحقة)</th></tr></thead><tbody>${affiliateStats.map((a) => `<tr><td>${a.full_name} (@${a.username})</td><td>${a.referredCount} عملاء</td><td>${a.totalPlatformCommission.toFixed(2)} SAR</td><td style="color:#10b981; font-weight:bold;">${a.unpaidEarnings.toFixed(2)} SAR</td></tr>`).join("")}</tbody></table><script>window.onload=()=>window.print();</script></body></html>`,
+      `<html dir="rtl"><head><title>تقرير المسوقين</title><style>body{font-family:system-ui; padding:30px; color:#1e293b;} table{width:100%; border-collapse:collapse; margin-top:20px; text-align:center;} th, td{padding:10px; border:1px solid #cbd5e1;}</style></head><body><h1 style="color:#7c3aed; border-bottom:3px solid #7c3aed; padding-bottom:10px;">تقرير المسوقين والأرباح - ${platName}</h1><table><thead><tr><th>المسوق</th><th>عدد العملاء</th><th>أرباح المنصة</th><th>أرباح المسوق (المستحقة)</th></tr></thead><tbody>${affiliateStats
+        .map(
+          (a) =>
+            `<tr><td>${a.full_name} (@${a.username})</td><td>${
+              a.referredUsersList.length
+            } عملاء</td><td>${a.totalPlatformCommission.toFixed(
+              2,
+            )} SAR</td><td style="color:#10b981; font-weight:bold;">${a.unpaidEarnings.toFixed(
+              2,
+            )} SAR</td></tr>`,
+        )
+        .join(
+          "",
+        )}</tbody></table><script>window.onload=()=>window.print();</script></body></html>`,
     );
     printWindow.document.close();
   };
@@ -1583,8 +1631,17 @@ export default function AdminReports({
                           >
                             {/* 1. زر الواتساب المباشر */}
                             <a
-                              href={`https://wa.me/${(b.offerings?.profiles?.phone || "").replace(/\D/g, "")}?text=${encodeURIComponent(
-                                `مرحباً ${b.offerings?.profiles?.full_name || "مزود الخدمة"}،\n\nنود تذكيركم بضرورة سداد عمولة المنصة المستحقة بمبلغ *${fin.platformCommission.toFixed(2)} ${currency}*\nلرقم الحجز: #${b.id.substring(0, 8).toUpperCase()}\n\nوشكراً لتعاونكم.`,
+                              href={`https://wa.me/${(
+                                b.offerings?.profiles?.phone || ""
+                              ).replace(/\D/g, "")}?text=${encodeURIComponent(
+                                `مرحباً ${
+                                  b.offerings?.profiles?.full_name ||
+                                  "مزود الخدمة"
+                                }،\n\nنود تذكيركم بضرورة سداد عمولة المنصة المستحقة بمبلغ *${fin.platformCommission.toFixed(
+                                  2,
+                                )} ${currency}*\nلرقم الحجز: #${b.id
+                                  .substring(0, 8)
+                                  .toUpperCase()}\n\nوشكراً لتعاونكم.`,
                               )}`}
                               target="_blank"
                               rel="noopener noreferrer"
@@ -1690,7 +1747,9 @@ export default function AdminReports({
                                 onClick={() => {
                                   setActiveMsgId(b.id);
                                   setSysMsgText(
-                                    `تذكير ودي: نرجو منكم المبادرة بسداد عمولة المنصة (${fin.platformCommission.toFixed(2)} ${currency}) للحجز المكتمل لضمان استمرار تقديم الخدمات.`,
+                                    `تذكير ودي: نرجو منكم المبادرة بسداد عمولة المنصة (${fin.platformCommission.toFixed(
+                                      2,
+                                    )} ${currency}) للحجز المكتمل لضمان استمرار تقديم الخدمات.`,
                                   );
                                 }}
                                 style={{
@@ -1735,21 +1794,21 @@ export default function AdminReports({
                               b.status === "completed"
                                 ? "#d1fae5"
                                 : b.status === "cancelled"
-                                  ? "#fee2e2"
-                                  : "#fef3c7",
+                                ? "#fee2e2"
+                                : "#fef3c7",
                             color:
                               b.status === "completed"
                                 ? "#047857"
                                 : b.status === "cancelled"
-                                  ? "#b91c1c"
-                                  : "#b45309",
+                                ? "#b91c1c"
+                                : "#b45309",
                           }}
                         >
                           {b.status === "completed"
                             ? "منفذ"
                             : b.status === "cancelled"
-                              ? "ملغى"
-                              : "معلق"}
+                            ? "ملغى"
+                            : "معلق"}
                         </span>
                       </td>
                       <td style={{ ...tdS }}>

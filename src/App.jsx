@@ -928,9 +928,8 @@ function MainAppContent() {
     );
   };
 
-  const isSuperAdmin =
-    userProfile?.role === "admin" ||
-    session?.user?.email === "ksanabeel@hotmail.com";
+  // ✅ التعديل الأمني الجوهري: ربط الصلاحيات بقاعدة البيانات بدلاً من نص صريح
+  const isSuperAdmin = userProfile?.role === "admin";
   const isSupervisor = userProfile?.role === "supervisor";
   const canManagePlatform = isSuperAdmin || isSupervisor;
   const canViewReports = isSuperAdmin || isSupervisor;
@@ -996,8 +995,11 @@ function MainAppContent() {
         }
       `}</style>
 
+      {/* ✨ نافذة تسجيل الدخول (تم رفع طبقة Z-Index لتظهر فوق النوافذ الأخرى) ✨ */}
       {showLoginModal && !session && (
-        <div style={modalOverlay}>
+        <div style={{ ...modalOverlay, zIndex: 99999 }}>
+          {" "}
+          {/* 👈 التعديل السحري هنا */}
           <div
             style={{
               ...modalContent,
@@ -1071,7 +1073,7 @@ function MainAppContent() {
       )}
 
       {mustAcceptTerms && (
-        <div style={{ ...modalOverlay, zIndex: 9999 }}>
+        <div style={{ ...modalOverlay, zIndex: 99999 }}>
           <div
             style={{ ...modalContent, maxWidth: "600px", textAlign: "center" }}
           >
@@ -1134,7 +1136,7 @@ function MainAppContent() {
       )}
 
       {showAddModal && (
-        <div style={modalOverlay}>
+        <div style={{ ...modalOverlay, zIndex: 99999 }}>
           <div style={modalContent}>
             <AddOffering
               session={session}
@@ -1150,7 +1152,7 @@ function MainAppContent() {
       )}
 
       {showPaymentModal && (
-        <div style={{ ...modalOverlay, zIndex: 4000 }}>
+        <div style={{ ...modalOverlay, zIndex: 99999 }}>
           <div style={{ ...modalContent, maxWidth: "550px" }}>
             <div
               style={{
@@ -1345,7 +1347,7 @@ function MainAppContent() {
       )}
 
       {showContactModal && (
-        <div style={{ ...modalOverlay, zIndex: 4000 }}>
+        <div style={{ ...modalOverlay, zIndex: 99999 }}>
           <div style={{ ...modalContent, maxWidth: "500px" }}>
             <div
               style={{
@@ -1470,7 +1472,7 @@ function MainAppContent() {
       )}
 
       {activeLegalDoc && (
-        <div style={{ ...modalOverlay, zIndex: 4000 }}>
+        <div style={{ ...modalOverlay, zIndex: 99999 }}>
           <div style={{ ...modalContent, padding: "30px", maxWidth: "700px" }}>
             <div
               style={{
@@ -1552,7 +1554,7 @@ function MainAppContent() {
         <div
           style={{
             ...modalOverlay,
-            zIndex: 5000,
+            zIndex: 99999,
             alignItems: "flex-start",
             paddingTop: "80px",
           }}
@@ -3568,7 +3570,8 @@ const BetaGate = ({ children }) => {
         />
         <button
           onClick={() => {
-            if (passcode === "2030") {
+            // ✨ التعديل האمني: مقارنة الرمز بمتغير البيئة المشفر
+            if (passcode === import.meta.env.VITE_BETA_PASSCODE) {
               localStorage.setItem("beta_unlocked", "true");
               setIsUnlocked(true);
             } else {
