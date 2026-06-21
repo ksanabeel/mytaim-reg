@@ -16,6 +16,7 @@ import { BrowserRouter, Routes, Route, useNavigate } from "react-router-dom";
 import { supabase } from "./lib/supabase";
 import Login from "./components/Login";
 import BookingRow from "./components/BookingRow";
+import ProviderSchedule from "./components/ProviderSchedule";
 import ClientMarketplace from "./components/ClientMarketplace";
 import ProfileSettings from "./components/ProfileSettings";
 import AddOffering from "./components/AddOffering";
@@ -199,6 +200,12 @@ function MainAppContent() {
     document.documentElement.dir = i18n.language === "ar" ? "rtl" : "ltr";
   }, [i18n.language]);
 
+  const [announcementText, setAnnouncementText] = useState("");
+  const [announcementLink, setAnnouncementLink] = useState("");
+  const [isAnnouncementActive, setIsAnnouncementActive] = useState(false);
+  const [appleStoreLink, setAppleStoreLink] = useState("");
+  const [playStoreLink, setPlayStoreLink] = useState("");
+
   const [session, setSession] = useState(null);
   const [activeTab, setActiveTab] = useState("market");
   const [loading, setLoading] = useState(true);
@@ -278,6 +285,16 @@ function MainAppContent() {
       let currentAffRate = 0.2;
 
       if (settingsData) {
+        if (settingsData.announcement_text !== undefined)
+          setAnnouncementText(settingsData.announcement_text);
+        if (settingsData.announcement_link !== undefined)
+          setAnnouncementLink(settingsData.announcement_link);
+        if (settingsData.is_announcement_active !== undefined)
+          setIsAnnouncementActive(settingsData.is_announcement_active);
+        if (settingsData.apple_store_link !== undefined)
+          setAppleStoreLink(settingsData.apple_store_link);
+        if (settingsData.play_store_link !== undefined)
+          setPlayStoreLink(settingsData.play_store_link);
         if (settingsData.commission_rate !== undefined) {
           setCommissionRate(settingsData.commission_rate);
           currentCommRate = settingsData.commission_rate;
@@ -408,11 +425,18 @@ function MainAppContent() {
       });
 
       setMyOfferings(enrichedOfferings.filter((o) => o.provider_id === userId));
+
+      // ✨ التعديل السحري للأرشفة المزدوجة (تصفية الطلبات المؤرشفة من المصدر) ✨
       setProviderBookings(
-        enrichedBookings.filter((b) => b.offerings?.provider_id === userId),
+        enrichedBookings.filter(
+          (b) =>
+            b.offerings?.provider_id === userId && !b.is_archived_by_provider,
+        ),
       );
       setClientBookings(
-        enrichedBookings.filter((b) => b.customer_id === userId),
+        enrichedBookings.filter(
+          (b) => b.customer_id === userId && !b.is_archived_by_client,
+        ),
       );
     } catch (err) {
       console.error("Error fetching app data:", err);
@@ -928,7 +952,6 @@ function MainAppContent() {
     );
   };
 
-  // ✅ التعديل الأمني الجوهري: ربط الصلاحيات بقاعدة البيانات بدلاً من نص صريح
   const isSuperAdmin = userProfile?.role === "admin";
   const isSupervisor = userProfile?.role === "supervisor";
   const canManagePlatform = isSuperAdmin || isSupervisor;
@@ -972,17 +995,17 @@ function MainAppContent() {
     <div
       style={{
         padding: "15px",
-        paddingTop: "40px" /* 👈 قللنا المساحة العلوية لتناسب الجوال */,
-        maxWidth: "100vw" /* 👈 يمنع تجاوز عرض الشاشة */,
-        width: "100%" /* 👈 إجبار على أخذ مساحة الشاشة فقط */,
-        boxSizing: "border-box" /* 👈 يحسب الحواف ضمن المقاس */,
+        paddingTop: "40px",
+        maxWidth: "100vw",
+        width: "100%",
+        boxSizing: "border-box",
         margin: "0 auto",
         fontFamily: "system-ui",
         direction: i18n.language === "ar" ? "rtl" : "ltr",
         minHeight: "100vh",
         display: "flex",
         flexDirection: "column",
-        overflowX: "hidden" /* 👈 حماية إضافية */,
+        overflowX: "hidden",
       }}
     >
       <style>{`
@@ -995,11 +1018,8 @@ function MainAppContent() {
         }
       `}</style>
 
-      {/* ✨ نافذة تسجيل الدخول (تم رفع طبقة Z-Index لتظهر فوق النوافذ الأخرى) ✨ */}
       {showLoginModal && !session && (
         <div style={{ ...modalOverlay, zIndex: 99999 }}>
-          {" "}
-          {/* 👈 التعديل السحري هنا */}
           <div
             style={{
               ...modalContent,
@@ -1747,16 +1767,10 @@ function MainAppContent() {
           boxSizing: "border-box",
         }}
       >
-        {/* 🚀 سحر البرمجة: فصل تصميم الجوال عن الكمبيوتر */}
         <style>{`
-          /* الافتراضي: إخفاء سطر الجوال */
           .mobile-user-row { display: none !important; }
-          
           @media (max-width: 768px) {
-            /* في الجوال: إخفاء عناصر الكمبيوتر */
             .desktop-user-group { display: none !important; }
-            
-            /* في الجوال: إظهار السطر الجديد (الاسم + إضافة خدمة) */
             .mobile-user-row { 
               display: flex !important; 
               justify-content: space-between; 
@@ -1774,7 +1788,6 @@ function MainAppContent() {
           }
         `}</style>
 
-        {/* 🥇 الصف الأول (يظهر للكمبيوتر كاملاً، وفي الجوال يظهر الشعار والإشعارات فقط) */}
         <div
           style={{
             display: "flex",
@@ -1805,7 +1818,6 @@ function MainAppContent() {
               (e.currentTarget.style.backgroundColor = "transparent")
             }
           >
-            {/* الشعار */}
             {platformLogo?.includes("http") ||
             platformLogo?.startsWith("data:image") ? (
               <img
@@ -1888,7 +1900,6 @@ function MainAppContent() {
           <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
             {session ? (
               <>
-                {/* 💻 مجموعة أزرار الكمبيوتر (تختفي في الجوال تلقائياً) */}
                 <div
                   className="desktop-user-group"
                   style={{ display: "flex", alignItems: "center", gap: "15px" }}
@@ -1996,7 +2007,6 @@ function MainAppContent() {
                   </div>
                 </div>
 
-                {/* 🔔 الإشعارات وزر الخروج (تظهر للجميع كمبيوتر وجوال) */}
                 <div
                   style={{
                     position: "relative",
@@ -2094,7 +2104,6 @@ function MainAppContent() {
           </div>
         </div>
 
-        {/* 📱 السطر الثاني (يظهر في الجوال فقط ويختفي في الكمبيوتر تماماً) */}
         {session && (
           <div className="mobile-user-row">
             <div
@@ -2165,7 +2174,6 @@ function MainAppContent() {
                 )}
               </div>
             </div>
-
             <button
               className="add-btn"
               onClick={() => {
@@ -2184,7 +2192,6 @@ function MainAppContent() {
           </div>
         )}
 
-        {/* 🥉 الصف الثالث: التبويبات الساحبة (تظهر للكل) */}
         <div
           className="hide-scrollbar"
           style={{
@@ -2305,7 +2312,6 @@ function MainAppContent() {
         </div>
       </div>
 
-      {/* منطقة الروابط والتنقل لمحتوى الصفحات */}
       <div
         style={{
           flex: 1,
@@ -2327,6 +2333,11 @@ function MainAppContent() {
                   i18n.language === "ar" ? welcomeMsgAr : welcomeMsgEn
                 }
                 heroSubtitle={i18n.language === "ar" ? subtitleAr : subtitleEn}
+                announcementText={announcementText}
+                announcementLink={announcementLink}
+                isAnnouncementActive={isAnnouncementActive}
+                appleStoreLink={appleStoreLink}
+                playStoreLink={playStoreLink}
               />
             }
           />
@@ -2347,6 +2358,11 @@ function MainAppContent() {
                     heroSubtitle={
                       i18n.language === "ar" ? subtitleAr : subtitleEn
                     }
+                    announcementText={announcementText}
+                    announcementLink={announcementLink}
+                    isAnnouncementActive={isAnnouncementActive}
+                    appleStoreLink={appleStoreLink}
+                    playStoreLink={playStoreLink}
                   />
                 )}
 
@@ -2465,6 +2481,16 @@ function MainAppContent() {
                           setLicenseNumber={setLicenseNumber}
                           licenseLink={licenseLink}
                           setLicenseLink={setLicenseLink}
+                          announcementText={announcementText}
+                          setAnnouncementText={setAnnouncementText}
+                          announcementLink={announcementLink}
+                          setAnnouncementLink={setAnnouncementLink}
+                          isAnnouncementActive={isAnnouncementActive}
+                          setIsAnnouncementActive={setIsAnnouncementActive}
+                          appleStoreLink={appleStoreLink}
+                          setAppleStoreLink={setAppleStoreLink}
+                          playStoreLink={playStoreLink}
+                          setPlayStoreLink={setPlayStoreLink}
                         />
                       </Suspense>
                     )}
@@ -2756,7 +2782,6 @@ function MainAppContent() {
                           gap: "35px",
                         }}
                       >
-                        {/* ✨ زر نسخ رابط المتجر الخاص بالمزود ✨ */}
                         <div
                           style={{
                             display: "flex",
@@ -2868,7 +2893,6 @@ function MainAppContent() {
                             gap: "25px",
                           }}
                         >
-                          {/* 1. بطاقة إجمالي الأرباح الصافية */}
                           <div
                             style={{
                               background:
@@ -2949,7 +2973,6 @@ function MainAppContent() {
                             </div>
                           </div>
 
-                          {/* 2. بطاقة الخدمات المكتملة */}
                           <div
                             style={{
                               background: "#fff",
@@ -3034,7 +3057,6 @@ function MainAppContent() {
                             </div>
                           </div>
 
-                          {/* 3. ✨ بطاقة أرباح التسويق ✨ */}
                           <div
                             style={{
                               background:
@@ -3336,15 +3358,12 @@ function MainAppContent() {
                               </p>
                             </div>
                           </div>
-                          {[
-                            "pending",
-                            "awaiting_pricing",
-                            "awaiting_client_approval",
-                            "negotiating",
-                            "confirmed",
-                            "completed",
-                            "cancelled",
-                          ].map((s) => renderTable(clientBookings, s, false))}
+                          <ProviderSchedule
+                            bookings={clientBookings}
+                            session={session}
+                            fetchBookings={() => fetchAllData(session.user.id)}
+                            isProviderView={false}
+                          />
                         </section>
                       </div>
                     )}
@@ -3570,7 +3589,7 @@ const BetaGate = ({ children }) => {
         />
         <button
           onClick={() => {
-            // ✨ التعديل האمني: مقارنة الرمز بمتغير البيئة المشفر
+            // ✨ التعديل الأمني: مقارنة الرمز بمتغير البيئة المشفر
             if (passcode === import.meta.env.VITE_BETA_PASSCODE) {
               localStorage.setItem("beta_unlocked", "true");
               setIsUnlocked(true);

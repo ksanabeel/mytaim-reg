@@ -117,6 +117,17 @@ export default function PlatformManagement({
   setLicenseNumber,
   licenseLink,
   setLicenseLink,
+  // ✨ المتغيرات الجديدة الخاصة بالشريط الإعلاني وروابط التطبيقات ✨
+  announcementText,
+  setAnnouncementText,
+  announcementLink,
+  setAnnouncementLink,
+  isAnnouncementActive,
+  setIsAnnouncementActive,
+  appleStoreLink,
+  setAppleStoreLink,
+  playStoreLink,
+  setPlayStoreLink,
 }) {
   const [activeAdminTab, setActiveAdminTab] = useState("settings");
   const [users, setUsers] = useState([]);
@@ -142,6 +153,19 @@ export default function PlatformManagement({
     licenseNumber || "",
   );
   const [inputLicenseLink, setInputLicenseLink] = useState(licenseLink || "");
+
+  // حقول الميزات الجديدة للإدارة
+  const [inputAnnouncementText, setInputAnnouncementText] = useState(
+    announcementText || "",
+  );
+  const [inputAnnouncementLink, setInputAnnouncementLink] = useState(
+    announcementLink || "",
+  );
+  const [inputIsAnnouncementActive, setInputIsAnnouncementActive] = useState(
+    isAnnouncementActive || false,
+  );
+  const [inputAppleStore, setInputAppleStore] = useState(appleStoreLink || "");
+  const [inputPlayStore, setInputPlayStore] = useState(playStoreLink || "");
 
   const [inputTerms, setInputTerms] = useState("");
   const [inputPrivacy, setInputPrivacy] = useState("");
@@ -194,6 +218,12 @@ export default function PlatformManagement({
         setInputTerms(settsData.terms_text || "");
         setInputPrivacy(settsData.privacy_text || "");
         setInputRefund(settsData.refund_text || "");
+
+        setInputAnnouncementText(settsData.announcement_text || "");
+        setInputAnnouncementLink(settsData.announcement_link || "");
+        setInputIsAnnouncementActive(settsData.is_announcement_active || false);
+        setInputAppleStore(settsData.apple_store_link || "");
+        setInputPlayStore(settsData.play_store_link || "");
       }
 
       let allReviews = [];
@@ -303,6 +333,12 @@ export default function PlatformManagement({
           license_name: inputLicenseName,
           license_number: inputLicenseNumber,
           license_link: inputLicenseLink,
+          // التحديث الجديد للمتغيرات في الداتابيس
+          announcement_text: inputAnnouncementText,
+          announcement_link: inputAnnouncementLink,
+          is_announcement_active: inputIsAnnouncementActive,
+          apple_store_link: inputAppleStore,
+          play_store_link: inputPlayStore,
         })
         .eq("id", 1);
       if (!error) {
@@ -318,7 +354,15 @@ export default function PlatformManagement({
         setLicenseName(inputLicenseName);
         setLicenseNumber(inputLicenseNumber);
         setLicenseLink(inputLicenseLink);
-        alert("تم حفظ الإعدادات بنجاح ✅");
+
+        // تحديث المتغيرات المرفوعة للتطبيق (App.jsx)
+        setAnnouncementText(inputAnnouncementText);
+        setAnnouncementLink(inputAnnouncementLink);
+        setIsAnnouncementActive(inputIsAnnouncementActive);
+        setAppleStoreLink(inputAppleStore);
+        setPlayStoreLink(inputPlayStore);
+
+        alert("تم حفظ الإعدادات والتعديلات بنجاح ✅");
       }
     } catch (err) {
       alert("حدث خطأ أثناء الحفظ.");
@@ -712,6 +756,7 @@ export default function PlatformManagement({
             border: "1px solid #e2e8f0",
           }}
         >
+          {/* قسم الهوية البصرية */}
           <div
             style={{
               display: "grid",
@@ -889,6 +934,169 @@ export default function PlatformManagement({
               </div>
             </div>
           </div>
+
+          {/* ✨ القسم الجديد: الشريط الإعلاني وروابط التطبيقات ✨ */}
+          <div
+            style={{
+              backgroundColor: "#fff",
+              padding: "20px",
+              borderRadius: "16px",
+              border: "1px solid #cbd5e1",
+              display: "flex",
+              flexDirection: "column",
+              gap: "15px",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <h3 style={{ margin: 0, color: "#f59e0b", fontSize: "1.1rem" }}>
+                📢 الشريط الإعلاني الذكي
+              </h3>
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  cursor: "pointer",
+                  fontWeight: "bold",
+                  color: inputIsAnnouncementActive ? "#10b981" : "#94a3b8",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={inputIsAnnouncementActive}
+                  onChange={(e) =>
+                    setInputIsAnnouncementActive(e.target.checked)
+                  }
+                  style={{ transform: "scale(1.2)" }}
+                />
+                {inputIsAnnouncementActive
+                  ? "مفعل (يظهر للزوار)"
+                  : "معطل (مخفي)"}
+              </label>
+            </div>
+            <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+              <div style={{ flex: 2, minWidth: "200px" }}>
+                <strong
+                  style={{
+                    color: "#475569",
+                    display: "block",
+                    marginBottom: "5px",
+                    fontSize: "0.85rem",
+                  }}
+                >
+                  نص الإعلان أو التنبيه:
+                </strong>
+                <input
+                  type="text"
+                  value={inputAnnouncementText}
+                  onChange={(e) => setInputAnnouncementText(e.target.value)}
+                  placeholder="مثال: حمل تطبيق دعوة الآن واستمتع بالخصومات.."
+                  style={{ ...smInput, width: "100%", boxSizing: "border-box" }}
+                />
+              </div>
+              <div style={{ flex: 1, minWidth: "200px" }}>
+                <strong
+                  style={{
+                    color: "#475569",
+                    display: "block",
+                    marginBottom: "5px",
+                    fontSize: "0.85rem",
+                  }}
+                >
+                  رابط الإعلان (اختياري):
+                </strong>
+                <input
+                  type="text"
+                  value={inputAnnouncementLink}
+                  onChange={(e) => setInputAnnouncementLink(e.target.value)}
+                  placeholder="https://..."
+                  style={{
+                    ...smInput,
+                    width: "100%",
+                    boxSizing: "border-box",
+                    direction: "ltr",
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div
+            style={{
+              backgroundColor: "#fff",
+              padding: "20px",
+              borderRadius: "16px",
+              border: "1px solid #cbd5e1",
+              display: "flex",
+              flexDirection: "column",
+              gap: "15px",
+            }}
+          >
+            <h3 style={{ margin: 0, color: "#1e293b", fontSize: "1.1rem" }}>
+              📱 روابط تحميل التطبيقات
+            </h3>
+            <div style={{ display: "flex", gap: "15px", flexWrap: "wrap" }}>
+              <div style={{ flex: 1, minWidth: "200px" }}>
+                <strong
+                  style={{
+                    color: "#475569",
+                    display: "block",
+                    marginBottom: "5px",
+                    fontSize: "0.85rem",
+                  }}
+                >
+                  رابط (App Store):
+                </strong>
+                <input
+                  type="text"
+                  value={inputAppleStore}
+                  onChange={(e) => setInputAppleStore(e.target.value)}
+                  placeholder="https://apps.apple.com/..."
+                  style={{
+                    ...smInput,
+                    width: "100%",
+                    boxSizing: "border-box",
+                    direction: "ltr",
+                  }}
+                />
+              </div>
+              <div style={{ flex: 1, minWidth: "200px" }}>
+                <strong
+                  style={{
+                    color: "#475569",
+                    display: "block",
+                    marginBottom: "5px",
+                    fontSize: "0.85rem",
+                  }}
+                >
+                  رابط (Google Play):
+                </strong>
+                <input
+                  type="text"
+                  value={inputPlayStore}
+                  onChange={(e) => setInputPlayStore(e.target.value)}
+                  placeholder="https://play.google.com/..."
+                  style={{
+                    ...smInput,
+                    width: "100%",
+                    boxSizing: "border-box",
+                    direction: "ltr",
+                  }}
+                />
+              </div>
+            </div>
+            <span style={{ fontSize: "0.75rem", color: "#94a3b8" }}>
+              * اترك الحقل فارغاً إذا كنت لا ترغب بظهور زر التحميل في الشاشة
+              الرئيسية.
+            </span>
+          </div>
+
           <div
             style={{
               display: "grid",
@@ -1640,14 +1848,14 @@ export default function PlatformManagement({
                             u.role === "admin"
                               ? "#fef2f2"
                               : u.role === "supervisor"
-                                ? "#eff6ff"
-                                : "#f8fafc",
+                              ? "#eff6ff"
+                              : "#f8fafc",
                           color:
                             u.role === "admin"
                               ? "#dc2626"
                               : u.role === "supervisor"
-                                ? "#2563eb"
-                                : "#475569",
+                              ? "#2563eb"
+                              : "#475569",
                           fontWeight: "bold",
                           outline: "none",
                           cursor: "pointer",
@@ -2293,26 +2501,32 @@ export default function PlatformManagement({
                               m.type === "complaint"
                                 ? "#fef2f2"
                                 : m.type === "suggestion"
-                                  ? "#fef3c7"
-                                  : "#f1f5f9",
+                                ? "#fef3c7"
+                                : "#f1f5f9",
                             color:
                               m.type === "complaint"
                                 ? "#dc2626"
                                 : m.type === "suggestion"
-                                  ? "#d97706"
-                                  : "#475569",
+                                ? "#d97706"
+                                : "#475569",
                             padding: "6px 12px",
                             borderRadius: "10px",
                             fontWeight: "bold",
                             fontSize: "0.85rem",
-                            border: `1px solid ${m.type === "complaint" ? "#fecaca" : m.type === "suggestion" ? "#fde68a" : "#cbd5e1"}`,
+                            border: `1px solid ${
+                              m.type === "complaint"
+                                ? "#fecaca"
+                                : m.type === "suggestion"
+                                ? "#fde68a"
+                                : "#cbd5e1"
+                            }`,
                           }}
                         >
                           {m.type === "complaint"
                             ? "🚨 شكوى"
                             : m.type === "suggestion"
-                              ? "💡 اقتراح"
-                              : "❓ استفسار"}
+                            ? "💡 اقتراح"
+                            : "❓ استفسار"}
                         </span>
                       </td>
                       <td style={tdS}>

@@ -15,10 +15,16 @@ const SmartTimePicker = TimePicker.default || TimePicker;
 
 export default function ClientMarketplace({
   session,
-  onRequireLogin, // ✨ تم إضافة الخاصية هنا لحل المشكلة
+  onRequireLogin,
   allowTextReviews = true,
   welcomeMsg = "",
   heroSubtitle = "",
+  // ✨ المتغيرات الجديدة الخاصة بالشريط والتطبيقات ✨
+  announcementText,
+  announcementLink,
+  isAnnouncementActive,
+  appleStoreLink,
+  playStoreLink,
 }) {
   const { t, i18n } = useTranslation();
   const { storeUsername } = useParams();
@@ -44,17 +50,17 @@ export default function ClientMarketplace({
 
   const [reviews, setReviews] = useState([]);
 
-  // ✨ حالات المفضلة ✨
+  // حالات المفضلة
   const [favorites, setFavorites] = useState([]);
 
-  // ✨ حالات التحميل اللانهائي ✨
+  // حالات التحميل اللانهائي
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
   const observer = useRef();
   const ITEMS_PER_PAGE = 12;
 
-  // ✨ حالة الحجز تتضمن العدد اليدوي ✨
+  // حالة الحجز تتضمن العدد اليدوي ورسالة العميل
   const [bookingData, setBookingData] = useState({
     startDate: "",
     startTime: "",
@@ -64,6 +70,7 @@ export default function ClientMarketplace({
     gpsLocation: "",
     manualQuantity: 1,
     clientContact: "",
+    clientMessage: "", // ✨ الحقل الجديد لحفظ الرسالة
   });
 
   const [calculatedData, setCalculatedData] = useState({
@@ -89,18 +96,15 @@ export default function ClientMarketplace({
     return () => clearInterval(timer);
   }, []);
 
-  // دالة جلب البيانات الأساسية
   const fetchInitialData = async () => {
     setLoading(true);
 
-    // جلب الفئات
     const { data: cats } = await supabase
       .from("categories")
       .select("*")
       .order("created_at");
     if (cats) setDbCategories(cats);
 
-    // جلب بروفايل المتجر إن وجد
     if (username) {
       const { data: prof } = await supabase
         .from("profiles")
@@ -110,7 +114,6 @@ export default function ClientMarketplace({
       if (prof) setStoreProfile(prof);
     }
 
-    // جلب المفضلات للمستخدم المسجل
     if (userId) {
       const { data: favs } = await supabase
         .from("favorites")
@@ -119,14 +122,13 @@ export default function ClientMarketplace({
       if (favs) setFavorites(favs.map((f) => f.provider_id));
     }
 
-    // جلب الخدمات (الصفحة الأولى)
     let query = supabase
       .from("offerings")
       .select("*, profiles!inner(*)")
       .eq("profiles.is_active", true);
     if (username) query = query.eq("profiles.username", username);
 
-    const { data: offs, error } = await query
+    const { data: offs } = await query
       .order("rating", { foreignTable: "profiles", ascending: false })
       .range(0, ITEMS_PER_PAGE - 1);
 
@@ -143,7 +145,6 @@ export default function ClientMarketplace({
     fetchInitialData();
   }, [username, userId]);
 
-  // ✨ دالة جلب المزيد من الخدمات (التحميل اللانهائي) ✨
   const fetchMoreData = async () => {
     if (isFetchingMore || !hasMore) return;
     setIsFetchingMore(true);
@@ -169,7 +170,6 @@ export default function ClientMarketplace({
     setIsFetchingMore(false);
   };
 
-  // مراقب الـ Scroll للوصول لنهاية القائمة
   const lastElementRef = useCallback(
     (node) => {
       if (loading || isFetchingMore) return;
@@ -184,7 +184,6 @@ export default function ClientMarketplace({
     [loading, isFetchingMore, hasMore],
   );
 
-  // ✨ دالة التبديل للمفضلة ✨
   const toggleFavorite = async (e, providerId) => {
     e.stopPropagation();
     if (!session)
@@ -207,6 +206,37 @@ export default function ClientMarketplace({
         .from("favorites")
         .insert({ user_id: userId, provider_id: providerId });
     }
+  };
+
+  // 🪄 دالة ذكية لتحويل أي رابط نصي إلى رابط قابل للضغط بنفس النص الذي أدخله الإدارة
+  const renderTextWithLinks = (text) => {
+    if (!text) return text;
+    // كود البحث عن الروابط
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+
+    return text.split(urlRegex).map((part, index) => {
+      if (part.match(urlRegex)) {
+        return (
+          <a
+            key={index}
+            href={part}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              color: "#fef08a", // لون أصفر فاتح يبرز على البنفسجي
+              textDecoration: "underline",
+              fontWeight: "bold",
+              margin: "0 4px",
+              direction: "ltr",
+              display: "inline-block",
+            }}
+          >
+            {part}
+          </a>
+        );
+      }
+      return part;
+    });
   };
 
   const displayCategories = [
@@ -232,7 +262,6 @@ export default function ClientMarketplace({
     ),
   ];
 
-  // فلترة العرض
   const filtered = offerings.filter((item) => {
     const s = localSearch.toLowerCase();
     const matchesSearch =
@@ -300,17 +329,19 @@ export default function ClientMarketplace({
     );
   });
 
-  // ✨ جلب التقييمات السابقة بمجرد فتح تفاصيل الخدمة ✨
   useEffect(() => {
     if (!selected) {
       setReviews([]);
-      setBookingData((prev) => ({ ...prev, manualQuantity: 1 }));
+      setBookingData((prev) => ({
+        ...prev,
+        manualQuantity: 1,
+        clientMessage: "",
+      }));
       return;
     }
     const fetchReviews = async () => {
       const { data } = await supabase
         .from("bookings")
-        // تم تبسيط جلب اسم العميل لتجنب خطأ الـ Foreign Key 400
         .select(
           "rating, review, review_text, client_review, profiles(full_name)",
         )
@@ -324,7 +355,6 @@ export default function ClientMarketplace({
     fetchReviews();
   }, [selected]);
 
-  // 🚀 الخوارزمية الذكية المحدثة (السعر × المدة × العدد) 🚀
   useEffect(() => {
     if (!selected) return;
     const model = selected.pricing_model || "fixed";
@@ -416,8 +446,7 @@ export default function ClientMarketplace({
       (pos) =>
         setBookingData({
           ...bookingData,
-          // ✨ تم تصحيح رابط قوقل ماب وإضافة علامة $
-          gpsLocation: `https://www.google.com/maps?q=${pos.coords.latitude},${pos.coords.longitude}`,
+          gpsLocation: `https://maps.google.com/?q=${pos.coords.latitude},${pos.coords.longitude}`,
           manualLocation: "",
         }),
       () =>
@@ -605,7 +634,7 @@ export default function ClientMarketplace({
         );
     }
 
-    // 🛡️ حماية الطاقة الاستيعابية
+    // حماية الطاقة الاستيعابية
     const { data: existing } = await supabase
       .from("bookings")
       .select("appointment_date, end_time, quantity")
@@ -629,24 +658,44 @@ export default function ClientMarketplace({
       );
     }
 
-    const { error } = await supabase.from("bookings").insert([
-      {
-        offering_id: selected.id,
-        customer_id: session.user.id,
-        appointment_date: requestedStart.toISOString(),
-        end_time: requestedEnd.toISOString(),
-        location: finalLocation,
-        quantity: bookingData.manualQuantity,
-        status: selected.price_upon_agreement ? "awaiting_pricing" : "pending",
-        client_contact: bookingData.clientContact,
-        proposed_price: selected.price_upon_agreement
-          ? null
-          : calculatedData.price,
-      },
-    ]);
+    // ✨ استخراج رقم الحجز (ID) مباشرة بعد الإنشاء
+    const { data: bookingResult, error } = await supabase
+      .from("bookings")
+      .insert([
+        {
+          offering_id: selected.id,
+          customer_id: session.user.id,
+          appointment_date: requestedStart.toISOString(),
+          end_time: requestedEnd.toISOString(),
+          location: finalLocation,
+          quantity: bookingData.manualQuantity,
+          status: selected.price_upon_agreement
+            ? "awaiting_pricing"
+            : "pending",
+          client_contact: bookingData.clientContact,
+          proposed_price: selected.price_upon_agreement
+            ? null
+            : calculatedData.price,
+        },
+      ])
+      .select();
 
-    if (!error) {
+    if (!error && bookingResult) {
       const providerId = selected.provider_id || selected.profiles?.id;
+      const newBookingId = bookingResult[0].id;
+
+      // إرسال الرسالة إلى جدول messages
+      if (bookingData.clientMessage.trim() && providerId) {
+        await supabase.from("messages").insert([
+          {
+            booking_id: newBookingId,
+            sender_id: session.user.id,
+            receiver_id: providerId,
+            text_content: bookingData.clientMessage.trim(),
+          },
+        ]);
+      }
+
       if (providerId)
         await supabase.from("notifications").insert([
           {
@@ -656,6 +705,7 @@ export default function ClientMarketplace({
             is_read: false,
           },
         ]);
+
       alert(
         isRTL
           ? selected.price_upon_agreement
@@ -721,6 +771,38 @@ export default function ClientMarketplace({
         .rmdp-input { width: 100% !important; padding: 12px !important; border-radius: 12px !important; border: 1px solid #cbd5e1 !important; font-family: inherit !important; font-size: 0.95rem !important; outline: none; box-sizing: border-box; background: #fff; cursor: pointer; color: #1e293b; font-weight: bold; }
         .rmdp-input::placeholder { color: #94a3b8; font-weight: normal; }
       `}</style>
+
+      {/* ✨ الشريط الإعلاني الذكي ✨ */}
+      {isAnnouncementActive && announcementText && (
+        <div
+          style={{
+            backgroundColor: "#f59e0b",
+            color: "#fff",
+            textAlign: "center",
+            padding: "12px",
+            fontSize: "1rem",
+            fontWeight: "bold",
+            position: "relative",
+            zIndex: 100,
+            borderRadius: "16px",
+            marginBottom: "15px",
+            boxShadow: "0 4px 15px rgba(245, 158, 11, 0.3)",
+          }}
+        >
+          {announcementLink ? (
+            <a
+              href={announcementLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: "#fff", textDecoration: "underline" }}
+            >
+              {announcementText} 🚀
+            </a>
+          ) : (
+            <span>{announcementText}</span>
+          )}
+        </div>
+      )}
 
       <div
         style={{
@@ -819,7 +901,67 @@ export default function ClientMarketplace({
         ) : (
           <>
             <h1 style={heroTitleS}>{welcomeMsg}</h1>
-            <p style={heroSubTitleS}>{heroSubtitle}</p>
+            <p style={heroSubTitleS}>{renderTextWithLinks(heroSubtitle)}</p>
+
+            {/* 📱 أزرار تحميل التطبيقات */}
+            {(appleStoreLink || playStoreLink) && (
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "center",
+                  gap: "15px",
+                  marginTop: "25px",
+                  flexWrap: "wrap",
+                }}
+              >
+                {appleStoreLink && (
+                  <a
+                    href={appleStoreLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "10px",
+                      backgroundColor: "#000",
+                      color: "#fff",
+                      padding: "10px 20px",
+                      borderRadius: "14px",
+                      textDecoration: "none",
+                      fontWeight: "bold",
+                      fontSize: "1.1rem",
+                      boxShadow: "0 4px 15px rgba(0,0,0,0.3)",
+                      transition: "0.2s",
+                    }}
+                  >
+                    <span style={{ fontSize: "1.5rem" }}>🍏</span> App Store
+                  </a>
+                )}
+                {playStoreLink && (
+                  <a
+                    href={playStoreLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "10px",
+                      backgroundColor: "#fff",
+                      color: "#000",
+                      padding: "10px 20px",
+                      borderRadius: "14px",
+                      textDecoration: "none",
+                      fontWeight: "bold",
+                      fontSize: "1.1rem",
+                      boxShadow: "0 4px 15px rgba(0,0,0,0.1)",
+                      transition: "0.2s",
+                    }}
+                  >
+                    <span style={{ fontSize: "1.5rem" }}>▶️</span> Google Play
+                  </a>
+                )}
+              </div>
+            )}
           </>
         )}
       </div>
@@ -836,7 +978,6 @@ export default function ClientMarketplace({
             overflow: "hidden",
           }}
         >
-          {/* ✨ زر إظهار المفضلة ✨ */}
           {!isStoreMode && (
             <button
               onClick={() =>
@@ -1077,7 +1218,7 @@ export default function ClientMarketplace({
             const isFree = item.pricing_model === "free";
             const isAgreement = item.price_upon_agreement;
             const itemThemeColor = item.profiles?.theme_color || "#7c3aed";
-            const isLastElement = filtered.length === index + 1; // لمعرفة آخر عنصر للتحميل اللانهائي
+            const isLastElement = filtered.length === index + 1;
 
             return (
               <div
@@ -1087,7 +1228,6 @@ export default function ClientMarketplace({
                 style={smartCardS}
               >
                 <div style={cardCoverS(isFree, itemThemeColor)}>
-                  {/* ✨ زر المفضلة على البطاقة ✨ */}
                   <button
                     onClick={(e) => toggleFavorite(e, item.provider_id)}
                     style={{
@@ -1320,7 +1460,6 @@ export default function ClientMarketplace({
         )}
       </div>
 
-      {/* ✨ مؤشر التحميل اللانهائي ✨ */}
       {isFetchingMore && (
         <div
           style={{
@@ -1710,6 +1849,35 @@ export default function ClientMarketplace({
                     📍 {isRTL ? "استخدام موقعي الحالي" : "Use current location"}
                   </button>
                 )}
+              </div>
+
+              {/* ✨ مربع الرسائل الجديد للعميل ✨ */}
+              <div style={{ textAlign: isRTL ? "right" : "left" }}>
+                <label style={labelS}>
+                  {isRTL
+                    ? "رسالة أو ملاحظة لمزود الخدمة (اختياري):"
+                    : "Message to Provider (Optional):"}
+                </label>
+                <textarea
+                  placeholder={
+                    isRTL
+                      ? "اكتب استفسارك أو تفاصيل إضافية لطلبك هنا..."
+                      : "Write your inquiry or extra details..."
+                  }
+                  style={{
+                    ...inputS,
+                    resize: "vertical",
+                    minHeight: "80px",
+                    backgroundColor: "#f8fafc",
+                  }}
+                  value={bookingData.clientMessage}
+                  onChange={(e) =>
+                    setBookingData({
+                      ...bookingData,
+                      clientMessage: e.target.value,
+                    })
+                  }
+                />
               </div>
             </div>
 
