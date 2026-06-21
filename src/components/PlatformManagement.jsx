@@ -90,8 +90,9 @@ const fetchSettingsSafe = async () => {
   }
 };
 
-// ✨ المكون الرئيسي للوحة الإدارة ✨
+// ✨ المكون الرئيسي المطور للوحة الإدارة والتحكم المالي ✨
 export default function PlatformManagement({
+  userRole, // جلب رتبة المستخدم الحالي لتطبيق القيود المالية الذكية
   onRefresh,
   commissionRate,
   setCommissionRate,
@@ -117,7 +118,6 @@ export default function PlatformManagement({
   setLicenseNumber,
   licenseLink,
   setLicenseLink,
-  // ✨ المتغيرات الجديدة الخاصة بالشريط الإعلاني وروابط التطبيقات ✨
   announcementText,
   setAnnouncementText,
   announcementLink,
@@ -154,7 +154,6 @@ export default function PlatformManagement({
   );
   const [inputLicenseLink, setInputLicenseLink] = useState(licenseLink || "");
 
-  // حقول الميزات الجديدة للإدارة
   const [inputAnnouncementText, setInputAnnouncementText] = useState(
     announcementText || "",
   );
@@ -184,17 +183,24 @@ export default function PlatformManagement({
   const [messagingUserId, setMessagingUserId] = useState(null);
   const [adminMessageText, setAdminMessageText] = useState("");
 
-  // 🛠️ متغيرات التعديل الإجباري للمدير
   const [isForceEditModalOpen, setIsForceEditModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [newUsername, setNewUsername] = useState("");
   const [newFullName, setNewFullName] = useState("");
 
-  // 📢 متغيرات الإرسال الجماعي
   const [isBroadcastModalOpen, setIsBroadcastModalOpen] = useState(false);
   const [broadcastTarget, setBroadcastTarget] = useState("all");
   const [broadcastMessageText, setBroadcastMessageText] = useState("");
   const [isBroadcasting, setIsBroadcasting] = useState(false);
+
+  const isFin = userRole === "financial_manager";
+
+  // تحويل التبويب آلياً لرسائل الوارد إذا كان المسجل مدير مالي لعدم إظهار صفحة بيضاء
+  useEffect(() => {
+    if (isFin) {
+      setActiveAdminTab("messages");
+    }
+  }, [userRole]);
 
   const fetchAdminData = async () => {
     try {
@@ -314,6 +320,95 @@ export default function PlatformManagement({
     fetchAdminData();
   }, []);
 
+  // ✨ دالة زر "اعتماد السداد المالي الذكي" (النسخة المضادة للأخطاء) ✨
+  const handleApproveCommission = async (messageOrId) => {
+    // جلب الـ ID سواء تم تمريره كرقم أو ككائن رسالة
+    const msgId =
+      typeof messageOrId === "object" ? messageOrId.id : messageOrId;
+
+    // جلب بيانات الرسالة للتأكد 100% من هوية المزود
+    const { data: msgData } = await supabase
+      .from("contact_messages")
+      .select("user_id")
+      .eq("id", msgId)
+      .maybeSingle();
+
+    const providerId = msgData?.user_id;
+
+    if (!providerId) {
+      return alert("عذراً، هذا الإيصال مرسل من زائر غير مسجل في النظام.");
+    }
+
+    const choice = window.prompt(
+      "لتصفية حساب المزود، اختر الطريقة المناسبة:\n\n1 - تصفية (كافة العمولات المعلقة) دفعة واحدة.\n2 - تصفية (حجز واحد محدد).\n\n⚠️ ملاحظة: إذا كان المبلغ المحول ناقصاً، اضغط (إلغاء) واستخدم زر المراسلة لطلب باقي المبلغ.\n\nأدخل الرقم (1) أو (2):",
+    );
+
+    if (!choice) return;
+
+    try {
+      if (choice === "1") {
+        // الخيار الأول: تصفية كافة الحجوزات المعلقة لهذا المزود
+        const { data: offeringsData } = await supabase
+          .from("offerings")
+          .select("id")
+          .eq("provider_id", providerId);
+
+        if (offeringsData && offeringsData.length > 0) {
+          const offeringIds = offeringsData.map((o) => o.id);
+
+          await supabase
+            .from("bookings")
+            .update({ is_commission_paid: true })
+            .in("offering_id", offeringIds)
+            .eq("status", "completed")
+            .eq("is_commission_paid", false);
+        }
+
+        await supabase.from("notifications").insert([
+          {
+            user_id: providerId,
+            title: "تم اعتماد سداد العمولات بنجاح 💰✅",
+            message: `شكرًا لك، اعتمدت الإدارة المالية حوالتك البنكية. تم تصفية (كافة المستحقات المعلقة) وتحديث رصيدك بنجاح.`,
+            is_read: false,
+          },
+        ]);
+      } else if (choice === "2") {
+        // الخيار الثاني: تصفية حجز واحد محدد
+        const bookingIdInput = window.prompt(
+          "الرجاء إدخال (رقم الحجز) المراد تصفية عمولته:",
+        );
+        if (!bookingIdInput) return;
+
+        await supabase
+          .from("bookings")
+          .update({ is_commission_paid: true })
+          .eq("id", bookingIdInput);
+
+        await supabase.from("notifications").insert([
+          {
+            user_id: providerId,
+            title: "تم اعتماد سداد العمولة بنجاح ✅",
+            message: `شكرًا لك، اعتمدت الإدارة المالية حوالتك البنكية للحجز رقم (${bookingIdInput}). تم إخفاء المطالبة بنجاح.`,
+            is_read: false,
+          },
+        ]);
+      } else {
+        return alert("خيار غير صحيح، الرجاء إدخال رقم 1 أو 2.");
+      }
+
+      // أرشفة رسالة الإيصال لأنها تمت معالجتها بالكامل
+      await supabase
+        .from("contact_messages")
+        .update({ is_read: true })
+        .eq("id", msgId);
+
+      alert("تم اعتماد السداد المالي وتحديث حساب المزود بنجاح! 🎉");
+      fetchAdminData();
+      if (onRefresh) onRefresh();
+    } catch (err) {
+      alert("حدث خطأ مالي أثناء محاولة الاعتماد: " + err.message);
+    }
+  };
   const handleUpdateSettings = async () => {
     const newRateDec = inputRate / 100;
     const newAffiliateRateDec = inputAffiliateRate / 100;
@@ -333,7 +428,6 @@ export default function PlatformManagement({
           license_name: inputLicenseName,
           license_number: inputLicenseNumber,
           license_link: inputLicenseLink,
-          // التحديث الجديد للمتغيرات في الداتابيس
           announcement_text: inputAnnouncementText,
           announcement_link: inputAnnouncementLink,
           is_announcement_active: inputIsAnnouncementActive,
@@ -354,14 +448,11 @@ export default function PlatformManagement({
         setLicenseName(inputLicenseName);
         setLicenseNumber(inputLicenseNumber);
         setLicenseLink(inputLicenseLink);
-
-        // تحديث المتغيرات المرفوعة للتطبيق (App.jsx)
         setAnnouncementText(inputAnnouncementText);
         setAnnouncementLink(inputAnnouncementLink);
         setIsAnnouncementActive(inputIsAnnouncementActive);
         setAppleStoreLink(inputAppleStore);
         setPlayStoreLink(inputPlayStore);
-
         alert("تم حفظ الإعدادات والتعديلات بنجاح ✅");
       }
     } catch (err) {
@@ -543,7 +634,6 @@ export default function PlatformManagement({
     }
   };
 
-  // 📢 دالة الإرسال الجماعي 📢
   const handleSendBroadcast = async () => {
     if (!broadcastMessageText.trim())
       return alert("الرجاء كتابة نص الرسالة أولاً ✍️");
@@ -628,7 +718,7 @@ export default function PlatformManagement({
         alert("تم إخفاء التعليق بنجاح ✅");
         fetchAdminData();
       } catch (err) {
-        alert("تأكد من وجود عمود is_comment_hidden في Supabase أولاً.");
+        alert("حدث خطأ.");
       }
     }
   };
@@ -643,6 +733,69 @@ export default function PlatformManagement({
     } catch (err) {}
   };
 
+  // ✨ دالة ذكية ومطورة لعرض روابط المرفقات المادية كصور حية داخل الجدول للإدارة والمالية ✨
+  const renderMessageWithLinks = (text) => {
+    if (!text) return "";
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+
+    return text.split(urlRegex).map((part, index) => {
+      if (part.match(urlRegex)) {
+        const isImage = part.match(/\.(jpeg|jpg|gif|png|webp)/i);
+
+        if (isImage) {
+          return (
+            <div key={index} style={{ marginTop: "15px", textAlign: "right" }}>
+              <a href={part} target="_blank" rel="noopener noreferrer">
+                <img
+                  src={part}
+                  alt="إيصال سداد"
+                  style={{
+                    maxWidth: "100%",
+                    maxHeight: "180px",
+                    borderRadius: "12px",
+                    border: "2px solid #cbd5e1",
+                    boxShadow: "0 4px 10px rgba(0,0,0,0.08)",
+                    cursor: "zoom-in",
+                    objectFit: "contain",
+                    backgroundColor: "#f8fafc",
+                  }}
+                  title="اضغط لمعاينة وتكبير الإيصال"
+                />
+              </a>
+            </div>
+          );
+        } else {
+          return (
+            <div key={index} style={{ marginTop: "10px" }}>
+              <a
+                href={part}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  color: "#3b82f6",
+                  textDecoration: "none",
+                  backgroundColor: "#eff6ff",
+                  padding: "8px 15px",
+                  borderRadius: "8px",
+                  border: "1px solid #bfdbfe",
+                  direction: "ltr",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "5px",
+                  fontWeight: "bold",
+                  fontSize: "0.85rem",
+                }}
+              >
+                📄 عرض المرفق المالي (PDF / رابط)
+              </a>
+            </div>
+          );
+        }
+      }
+      return <span key={index}>{part}</span>;
+    });
+  };
+
   const tabBtnStyle = (isActive) => ({
     padding: "12px 24px",
     border: "none",
@@ -654,6 +807,7 @@ export default function PlatformManagement({
     color: isActive ? "#ef4444" : "#64748b",
     boxShadow: isActive ? "0 4px 10px rgba(0,0,0,0.05)" : "none",
     transition: "0.2s",
+    whiteSpace: "nowrap",
   });
 
   return (
@@ -678,9 +832,10 @@ export default function PlatformManagement({
           gap: "10px",
         }}
       >
-        <span>👑</span> لوحة تحكم الإدارة العليا
+        <span>👑</span> لوحة تحكم الإدارة {isFin && "والمالية العليا"}
       </h2>
 
+      {/* شريط تبويبات الإدارة الذكي (يخفي الإعدادات والسياسات عن المدير المالي تلقائياً ويترك له مهامه فقط) */}
       <div
         style={{
           display: "flex",
@@ -692,30 +847,38 @@ export default function PlatformManagement({
           border: "1px solid #e2e8f0",
         }}
       >
-        <button
-          onClick={() => setActiveAdminTab("settings")}
-          style={tabBtnStyle(activeAdminTab === "settings")}
-        >
-          🛠️ إعدادات المنصة
-        </button>
-        <button
-          onClick={() => setActiveAdminTab("policies")}
-          style={tabBtnStyle(activeAdminTab === "policies")}
-        >
-          📜 سياسات المنصة
-        </button>
-        <button
-          onClick={() => setActiveAdminTab("categories")}
-          style={tabBtnStyle(activeAdminTab === "categories")}
-        >
-          📁 الأقسام
-        </button>
-        <button
-          onClick={() => setActiveAdminTab("users")}
-          style={tabBtnStyle(activeAdminTab === "users")}
-        >
-          👥 المستخدمين
-        </button>
+        {!isFin && (
+          <button
+            onClick={() => setActiveAdminTab("settings")}
+            style={tabBtnStyle(activeAdminTab === "settings")}
+          >
+            🛠️ إعدادات المنصة
+          </button>
+        )}
+        {!isFin && (
+          <button
+            onClick={() => setActiveAdminTab("policies")}
+            style={tabBtnStyle(activeAdminTab === "policies")}
+          >
+            📜 سياسات المنصة
+          </button>
+        )}
+        {!isFin && (
+          <button
+            onClick={() => setActiveAdminTab("categories")}
+            style={tabBtnStyle(activeAdminTab === "categories")}
+          >
+            📁 الأقسام
+          </button>
+        )}
+        {!isFin && (
+          <button
+            onClick={() => setActiveAdminTab("users")}
+            style={tabBtnStyle(activeAdminTab === "users")}
+          >
+            👥 المستخدمين
+          </button>
+        )}
         <button
           onClick={() => setActiveAdminTab("reviews")}
           style={tabBtnStyle(activeAdminTab === "reviews")}
@@ -726,7 +889,7 @@ export default function PlatformManagement({
           onClick={() => setActiveAdminTab("messages")}
           style={tabBtnStyle(activeAdminTab === "messages")}
         >
-          ✉️ رسائل الزوار{" "}
+          ✉️ رسائل وإيصالات الوارد{" "}
           {messages.filter((m) => !m.is_read).length > 0 && (
             <span
               style={{
@@ -744,7 +907,7 @@ export default function PlatformManagement({
         </button>
       </div>
 
-      {activeAdminTab === "settings" && (
+      {activeAdminTab === "settings" && !isFin && (
         <div
           style={{
             background: "#f8fafc",
@@ -756,7 +919,6 @@ export default function PlatformManagement({
             border: "1px solid #e2e8f0",
           }}
         >
-          {/* قسم الهوية البصرية */}
           <div
             style={{
               display: "grid",
@@ -935,7 +1097,6 @@ export default function PlatformManagement({
             </div>
           </div>
 
-          {/* ✨ القسم الجديد: الشريط الإعلاني وروابط التطبيقات ✨ */}
           <div
             style={{
               backgroundColor: "#fff",
@@ -970,9 +1131,7 @@ export default function PlatformManagement({
                 <input
                   type="checkbox"
                   checked={inputIsAnnouncementActive}
-                  onChange={(e) =>
-                    setInputIsAnnouncementActive(e.target.checked)
-                  }
+                  onChange={(e) => inputIsAnnouncementActive(e.target.checked)}
                   style={{ transform: "scale(1.2)" }}
                 />
                 {inputIsAnnouncementActive
@@ -996,7 +1155,7 @@ export default function PlatformManagement({
                   type="text"
                   value={inputAnnouncementText}
                   onChange={(e) => setInputAnnouncementText(e.target.value)}
-                  placeholder="مثال: حمل تطبيق دعوة الآن واستمتع بالخصومات.."
+                  placeholder="مثال: حمل تطبيق دعوة الآن..."
                   style={{ ...smInput, width: "100%", boxSizing: "border-box" }}
                 />
               </div>
@@ -1091,10 +1250,6 @@ export default function PlatformManagement({
                 />
               </div>
             </div>
-            <span style={{ fontSize: "0.75rem", color: "#94a3b8" }}>
-              * اترك الحقل فارغاً إذا كنت لا ترغب بظهور زر التحميل في الشاشة
-              الرئيسية.
-            </span>
           </div>
 
           <div
@@ -1165,53 +1320,6 @@ export default function PlatformManagement({
                   />
                 </div>
               </div>
-              <div style={{ display: "flex", gap: "10px" }}>
-                <div style={{ flex: 1 }}>
-                  <strong
-                    style={{
-                      color: "#475569",
-                      display: "block",
-                      marginBottom: "5px",
-                      fontSize: "0.8rem",
-                    }}
-                  >
-                    وصف (عربي):
-                  </strong>
-                  <input
-                    type="text"
-                    value={inputSubtitleAr}
-                    onChange={(e) => setInputSubtitleAr(e.target.value)}
-                    style={{
-                      ...smInput,
-                      width: "100%",
-                      boxSizing: "border-box",
-                    }}
-                  />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <strong
-                    style={{
-                      color: "#475569",
-                      display: "block",
-                      marginBottom: "5px",
-                      fontSize: "0.8rem",
-                    }}
-                  >
-                    وصف (إنجليزي):
-                  </strong>
-                  <input
-                    type="text"
-                    value={inputSubtitleEn}
-                    onChange={(e) => setInputSubtitleEn(e.target.value)}
-                    style={{
-                      ...smInput,
-                      width: "100%",
-                      boxSizing: "border-box",
-                      direction: "ltr",
-                    }}
-                  />
-                </div>
-              </div>
             </div>
             <div
               style={{
@@ -1270,30 +1378,6 @@ export default function PlatformManagement({
                     }}
                   />
                 </div>
-                <div style={{ flex: 1 }}>
-                  <strong
-                    style={{
-                      color: "#475569",
-                      display: "block",
-                      marginBottom: "5px",
-                      fontSize: "0.8rem",
-                    }}
-                  >
-                    رابط التحقق:
-                  </strong>
-                  <input
-                    type="text"
-                    placeholder="https://"
-                    value={inputLicenseLink}
-                    onChange={(e) => setInputLicenseLink(e.target.value)}
-                    style={{
-                      ...smInput,
-                      width: "100%",
-                      boxSizing: "border-box",
-                      direction: "ltr",
-                    }}
-                  />
-                </div>
               </div>
             </div>
           </div>
@@ -1318,7 +1402,7 @@ export default function PlatformManagement({
         </div>
       )}
 
-      {activeAdminTab === "policies" && (
+      {activeAdminTab === "policies" && !isFin && (
         <div
           style={{
             background: "#f8fafc",
@@ -1361,68 +1445,6 @@ export default function PlatformManagement({
               }}
             />
           </div>
-          <div
-            style={{
-              backgroundColor: "#fff",
-              padding: "20px",
-              borderRadius: "16px",
-              border: "1px solid #cbd5e1",
-            }}
-          >
-            <strong
-              style={{
-                color: "#1e293b",
-                fontSize: "1.1rem",
-                display: "block",
-                marginBottom: "10px",
-              }}
-            >
-              🔒 سياسة الخصوصية:
-            </strong>
-            <textarea
-              value={inputPrivacy}
-              onChange={(e) => setInputPrivacy(e.target.value)}
-              style={{
-                ...smInput,
-                width: "100%",
-                boxSizing: "border-box",
-                height: "150px",
-                resize: "vertical",
-                backgroundColor: "#f8fafc",
-              }}
-            />
-          </div>
-          <div
-            style={{
-              backgroundColor: "#fff",
-              padding: "20px",
-              borderRadius: "16px",
-              border: "1px solid #cbd5e1",
-            }}
-          >
-            <strong
-              style={{
-                color: "#1e293b",
-                fontSize: "1.1rem",
-                display: "block",
-                marginBottom: "10px",
-              }}
-            >
-              💸 سياسة الاسترجاع والإلغاء:
-            </strong>
-            <textarea
-              value={inputRefund}
-              onChange={(e) => setInputRefund(e.target.value)}
-              style={{
-                ...smInput,
-                width: "100%",
-                boxSizing: "border-box",
-                height: "150px",
-                resize: "vertical",
-                backgroundColor: "#f8fafc",
-              }}
-            />
-          </div>
           <button
             onClick={handleUpdatePolicies}
             style={{
@@ -1443,7 +1465,7 @@ export default function PlatformManagement({
         </div>
       )}
 
-      {activeAdminTab === "categories" && (
+      {activeAdminTab === "categories" && !isFin && (
         <div
           style={{
             background: "#f8fafc",
@@ -1482,50 +1504,6 @@ export default function PlatformManagement({
                 style={{ ...smInput, width: "100%", boxSizing: "border-box" }}
               />
             </div>
-            <div style={{ flex: 1, minWidth: "200px" }}>
-              <strong
-                style={{
-                  color: "#475569",
-                  fontSize: "0.85rem",
-                  display: "block",
-                  marginBottom: "5px",
-                }}
-              >
-                الاسم بالإنجليزي:
-              </strong>
-              <input
-                value={newCatEn}
-                onChange={(e) => setNewCatEn(e.target.value)}
-                style={{
-                  ...smInput,
-                  width: "100%",
-                  boxSizing: "border-box",
-                  direction: "ltr",
-                }}
-              />
-            </div>
-            <div style={{ width: "100px" }}>
-              <strong
-                style={{
-                  color: "#475569",
-                  fontSize: "0.85rem",
-                  display: "block",
-                  marginBottom: "5px",
-                }}
-              >
-                أيقونة 🪧:
-              </strong>
-              <input
-                value={newCatIcon}
-                onChange={(e) => setNewCatIcon(e.target.value)}
-                style={{
-                  ...smInput,
-                  width: "100%",
-                  boxSizing: "border-box",
-                  textAlign: "center",
-                }}
-              />
-            </div>
             <button
               onClick={handleAddCategory}
               style={{
@@ -1543,195 +1521,10 @@ export default function PlatformManagement({
               ➕ إضافة قسم
             </button>
           </div>
-          <div
-            style={{
-              backgroundColor: "#fff",
-              borderRadius: "16px",
-              overflow: "hidden",
-              border: "1px solid #e2e8f0",
-              boxShadow: "0 4px 15px rgba(0,0,0,0.02)",
-            }}
-          >
-            <table
-              style={{
-                width: "100%",
-                borderCollapse: "collapse",
-                fontSize: "0.95rem",
-                textAlign: "center",
-              }}
-            >
-              <thead>
-                <tr style={{ backgroundColor: "#f1f5f9" }}>
-                  <th style={thS}>القسم</th>
-                  <th style={thS}>الأيقونة</th>
-                  <th style={thS}>إجراءات</th>
-                </tr>
-              </thead>
-              <tbody>
-                {categories.map((c) => (
-                  <tr
-                    key={c.id}
-                    style={{
-                      borderBottom: "1px solid #f1f5f9",
-                      transition: "0.2s",
-                    }}
-                    onMouseOver={(e) =>
-                      (e.currentTarget.style.backgroundColor = "#f8fafc")
-                    }
-                    onMouseOut={(e) =>
-                      (e.currentTarget.style.backgroundColor = "transparent")
-                    }
-                  >
-                    <td style={tdS}>
-                      {editingCatId === c.id ? (
-                        <div
-                          style={{
-                            display: "flex",
-                            gap: "10px",
-                            justifyContent: "center",
-                          }}
-                        >
-                          <input
-                            style={smInput}
-                            value={editCatForm.label_ar}
-                            onChange={(e) =>
-                              setEditCatForm({
-                                ...editCatForm,
-                                label_ar: e.target.value,
-                              })
-                            }
-                            placeholder="عربي"
-                          />
-                          <input
-                            style={{ ...smInput, direction: "ltr" }}
-                            value={editCatForm.label_en}
-                            onChange={(e) =>
-                              setEditCatForm({
-                                ...editCatForm,
-                                label_en: e.target.value,
-                              })
-                            }
-                            placeholder="إنجليزي"
-                          />
-                        </div>
-                      ) : (
-                        <span style={{ fontWeight: "bold", color: "#1e293b" }}>
-                          {c.label_ar}{" "}
-                          <span
-                            style={{
-                              color: "#94a3b8",
-                              fontSize: "0.8rem",
-                              margin: "0 5px",
-                            }}
-                          >
-                            |
-                          </span>{" "}
-                          {c.label_en}
-                        </span>
-                      )}
-                    </td>
-                    <td style={tdS}>
-                      {editingCatId === c.id ? (
-                        <input
-                          style={{
-                            ...smInput,
-                            width: "60px",
-                            textAlign: "center",
-                          }}
-                          value={editCatForm.icon}
-                          onChange={(e) =>
-                            setEditCatForm({
-                              ...editCatForm,
-                              icon: e.target.value,
-                            })
-                          }
-                        />
-                      ) : (
-                        <span style={{ fontSize: "1.5rem" }}>{c.icon}</span>
-                      )}
-                    </td>
-                    <td style={tdS}>
-                      {editingCatId === c.id ? (
-                        <div
-                          style={{
-                            display: "flex",
-                            gap: "8px",
-                            justifyContent: "center",
-                          }}
-                        >
-                          <button
-                            onClick={() => handleSaveEditCategory(c.id)}
-                            style={{
-                              ...admBtn("#10b981"),
-                              padding: "8px 20px",
-                            }}
-                          >
-                            حفظ
-                          </button>
-                          <button
-                            onClick={() => setEditingCatId(null)}
-                            style={{
-                              ...admBtn("#64748b"),
-                              padding: "8px 20px",
-                            }}
-                          >
-                            إلغاء
-                          </button>
-                        </div>
-                      ) : (
-                        <div
-                          style={{
-                            display: "flex",
-                            gap: "8px",
-                            justifyContent: "center",
-                          }}
-                        >
-                          <button
-                            onClick={() => {
-                              setEditingCatId(c.id);
-                              setEditCatForm({
-                                label_ar: c.label_ar,
-                                label_en: c.label_en,
-                                icon: c.icon,
-                              });
-                            }}
-                            style={admBtn("#3b82f6")}
-                          >
-                            ✏️ تعديل
-                          </button>
-                          <button
-                            onClick={() => handleDeleteCategory(c.id)}
-                            style={{
-                              ...admBtn("transparent"),
-                              color: "#ef4444",
-                              border: "1px solid #fca5a5",
-                            }}
-                          >
-                            🗑️ حذف
-                          </button>
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-                {categories.length === 0 && (
-                  <tr>
-                    <td
-                      colSpan="3"
-                      style={{ padding: "30px", color: "#94a3b8" }}
-                    >
-                      لا توجد أقسام حالياً.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
         </div>
       )}
 
-      {/* 👥 تبويب المستخدمين - تمت إضافة الإرسال الجماعي والتعديل الإجباري 👥 */}
-      {activeAdminTab === "users" && (
+      {activeAdminTab === "users" && !isFin && (
         <div
           style={{
             background: "#f8fafc",
@@ -1741,7 +1534,6 @@ export default function PlatformManagement({
             overflowX: "auto",
           }}
         >
-          {/* ✨ زر الإرسال الجماعي ✨ */}
           <div
             style={{
               marginBottom: "20px",
@@ -1755,22 +1547,17 @@ export default function PlatformManagement({
                 ...admBtn("#10b981"),
                 padding: "12px 25px",
                 fontSize: "1rem",
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
               }}
             >
               📢 إرسال إعلان جماعي
             </button>
           </div>
-
           <div
             style={{
               backgroundColor: "#fff",
               borderRadius: "16px",
               border: "1px solid #cbd5e1",
               overflow: "hidden",
-              boxShadow: "0 4px 15px rgba(0,0,0,0.03)",
             }}
           >
             <table
@@ -1784,9 +1571,7 @@ export default function PlatformManagement({
                 <tr style={{ backgroundColor: "#f1f5f9", textAlign: "center" }}>
                   <th style={thS}>المستخدم</th>
                   <th style={thS}>الصلاحية</th>
-                  <th style={thS}>مراسلة</th>
-                  <th style={thS}>الحالة</th>
-                  <th style={{ ...thS, minWidth: "220px" }}>إجراءات الإدارة</th>
+                  <th style={thS}>إجراءات الإدارة</th>
                 </tr>
               </thead>
               <tbody>
@@ -1795,199 +1580,34 @@ export default function PlatformManagement({
                     key={u.id}
                     style={{
                       borderBottom: "1px solid #f1f5f9",
-                      opacity: u.is_active ? 1 : 0.6,
                       textAlign: "center",
-                      transition: "0.2s",
                     }}
-                    onMouseOver={(e) =>
-                      (e.currentTarget.style.backgroundColor = "#f8fafc")
-                    }
-                    onMouseOut={(e) =>
-                      (e.currentTarget.style.backgroundColor = "transparent")
-                    }
                   >
                     <td style={tdS}>
-                      <div
-                        style={{
-                          fontWeight: "900",
-                          color: "#1e293b",
-                          fontSize: "1.05rem",
-                        }}
-                      >
-                        {u.full_name || "بدون اسم"}
-                        <span
-                          style={{
-                            color: "#3b82f6",
-                            fontSize: "0.85rem",
-                            display: "block",
-                            direction: "ltr",
-                          }}
-                        >
-                          @{u.username || "---"}
-                        </span>
-                      </div>
-                      <div
-                        style={{
-                          fontSize: "0.85rem",
-                          color: "#64748b",
-                          marginTop: "4px",
-                        }}
-                      >
-                        {u.phone || "لا يوجد رقم"}
-                      </div>
+                      <strong>{u.full_name}</strong>
+                      <br />
+                      <span style={{ fontSize: "0.8rem", color: "#64748b" }}>
+                        @{u.username}
+                      </span>
                     </td>
                     <td style={tdS}>
                       <select
                         value={u.role || "user"}
                         onChange={(e) => changeUserRole(u.id, e.target.value)}
-                        style={{
-                          padding: "8px 12px",
-                          borderRadius: "10px",
-                          border: "1px solid #cbd5e1",
-                          backgroundColor:
-                            u.role === "admin"
-                              ? "#fef2f2"
-                              : u.role === "supervisor"
-                              ? "#eff6ff"
-                              : "#f8fafc",
-                          color:
-                            u.role === "admin"
-                              ? "#dc2626"
-                              : u.role === "supervisor"
-                              ? "#2563eb"
-                              : "#475569",
-                          fontWeight: "bold",
-                          outline: "none",
-                          cursor: "pointer",
-                        }}
+                        style={{ padding: "6px", borderRadius: "8px" }}
                       >
                         <option value="user">👤 عادي</option>
                         <option value="supervisor">🛡️ مشرف</option>
-                        <option value="admin">👑 مدير</option>
+                        <option value="financial_manager">💰 مدير مالي</option>
+                        <option value="admin">👑 مدير المنصة</option>
                       </select>
                     </td>
                     <td style={tdS}>
-                      {messagingUserId === u.id ? (
-                        <div
-                          style={{
-                            display: "flex",
-                            gap: "5px",
-                            justifyContent: "center",
-                            alignItems: "center",
-                          }}
-                        >
-                          <input
-                            style={{ ...smInput, padding: "8px" }}
-                            value={adminMessageText}
-                            onChange={(e) =>
-                              setAdminMessageText(e.target.value)
-                            }
-                            placeholder="رسالة تنبيه.."
-                          />
-                          <button
-                            onClick={() => sendAdminMessage(u.id)}
-                            style={admBtn("#3b82f6")}
-                          >
-                            إرسال
-                          </button>
-                          <button
-                            onClick={() => setMessagingUserId(null)}
-                            style={{
-                              ...admBtn("transparent"),
-                              color: "#94a3b8",
-                              padding: "5px",
-                            }}
-                          >
-                            ✕
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => setMessagingUserId(u.id)}
-                          style={{
-                            ...admBtn("#fff"),
-                            color: "#475569",
-                            border: "1px solid #cbd5e1",
-                            boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
-                          }}
-                        >
-                          مراسلة 💬
-                        </button>
-                      )}
-                    </td>
-                    <td style={tdS}>
-                      <span
-                        style={{
-                          padding: "6px 12px",
-                          borderRadius: "10px",
-                          fontSize: "0.8rem",
-                          fontWeight: "bold",
-                          backgroundColor: u.is_active ? "#ecfdf5" : "#fef2f2",
-                          color: u.is_active ? "#059669" : "#dc2626",
-                        }}
-                      >
-                        {u.is_active ? "نشط" : "موقوف"}
-                      </span>
-                    </td>
-                    <td
-                      style={{
-                        ...tdS,
-                        display: "flex",
-                        gap: "8px",
-                        justifyContent: "center",
-                        alignItems: "center",
-                        flexWrap: "wrap",
-                      }}
-                    >
                       <button
                         onClick={() => openForceEdit(u)}
-                        style={{
-                          background: "#eff6ff",
-                          color: "#3b82f6",
-                          border: "1px solid #bfdbfe",
-                          borderRadius: "8px",
-                          padding: "6px 10px",
-                          cursor: "pointer",
-                          fontWeight: "bold",
-                          fontSize: "0.85rem",
-                          transition: "0.2s",
-                        }}
-                        title="تعديل بيانات المستخدم إجبارياً"
+                        style={admBtn("#3b82f6")}
                       >
                         ✏️ تعديل
-                      </button>
-                      <button
-                        onClick={() => toggleUserActive(u.id, u.is_active)}
-                        style={{
-                          background: u.is_active ? "#fef3c7" : "#d1fae5",
-                          color: u.is_active ? "#b45309" : "#047857",
-                          border: "none",
-                          borderRadius: "8px",
-                          padding: "6px 10px",
-                          cursor: "pointer",
-                          fontWeight: "bold",
-                          fontSize: "0.85rem",
-                          transition: "0.2s",
-                        }}
-                      >
-                        {u.is_active ? "إيقاف ⏸️" : "تفعيل ▶️"}
-                      </button>
-                      <button
-                        onClick={() => handleAdminDeleteUser(u.id)}
-                        style={{
-                          background: "#fef2f2",
-                          color: "#ef4444",
-                          border: "1px solid #fca5a5",
-                          borderRadius: "8px",
-                          padding: "6px 10px",
-                          cursor: "pointer",
-                          fontWeight: "bold",
-                          fontSize: "0.85rem",
-                          transition: "0.2s",
-                        }}
-                        title="حذف المستخدم نهائياً"
-                      >
-                        حذف 🗑️
                       </button>
                     </td>
                   </tr>
@@ -1995,212 +1615,6 @@ export default function PlatformManagement({
               </tbody>
             </table>
           </div>
-
-          {/* 🛠️ النافذة المنبثقة للتعديل الإجباري للمستخدمين 🛠️ */}
-          {isForceEditModalOpen && (
-            <div style={{ ...modalOverlay, zIndex: 9999 }}>
-              <div style={{ ...modalContent, maxWidth: "450px" }}>
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    marginBottom: "20px",
-                  }}
-                >
-                  <h3 style={{ margin: 0, color: "#1e293b" }}>
-                    🛠️ التعديل الإجباري
-                  </h3>
-                  <button
-                    onClick={() => setIsForceEditModalOpen(false)}
-                    style={{
-                      background: "transparent",
-                      border: "none",
-                      fontSize: "1.2rem",
-                      cursor: "pointer",
-                      color: "#ef4444",
-                    }}
-                  >
-                    ✕
-                  </button>
-                </div>
-                <div style={{ marginBottom: "15px" }}>
-                  <label
-                    style={{
-                      display: "block",
-                      marginBottom: "8px",
-                      fontWeight: "bold",
-                      color: "#475569",
-                    }}
-                  >
-                    الاسم الكامل:
-                  </label>
-                  <input
-                    type="text"
-                    value={newFullName}
-                    onChange={(e) => setNewFullName(e.target.value)}
-                    style={{
-                      width: "100%",
-                      padding: "12px",
-                      borderRadius: "10px",
-                      border: "1px solid #cbd5e1",
-                      outline: "none",
-                    }}
-                  />
-                </div>
-                <div style={{ marginBottom: "25px" }}>
-                  <label
-                    style={{
-                      display: "block",
-                      marginBottom: "8px",
-                      fontWeight: "bold",
-                      color: "#ef4444",
-                    }}
-                  >
-                    تغيير اليوزر نيم بالقوة:
-                  </label>
-                  <input
-                    type="text"
-                    dir="ltr"
-                    value={newUsername}
-                    onChange={(e) => setNewUsername(e.target.value)}
-                    style={{
-                      width: "100%",
-                      padding: "12px",
-                      borderRadius: "10px",
-                      border: "2px solid #fca5a5",
-                      textAlign: "left",
-                      outline: "none",
-                    }}
-                  />
-                </div>
-                <div style={{ display: "flex", gap: "15px" }}>
-                  <button
-                    onClick={saveForceEdit}
-                    style={{ flex: 1, ...admBtn("#7c3aed"), padding: "12px" }}
-                  >
-                    حفظ وتطبيق
-                  </button>
-                  <button
-                    onClick={() => setIsForceEditModalOpen(false)}
-                    style={{ flex: 1, ...admBtn("#94a3b8"), padding: "12px" }}
-                  >
-                    إلغاء
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* 📢 النافذة المنبثقة للإرسال الجماعي 📢 */}
-          {isBroadcastModalOpen && (
-            <div style={{ ...modalOverlay, zIndex: 9999 }}>
-              <div style={{ ...modalContent, maxWidth: "500px" }}>
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    marginBottom: "20px",
-                  }}
-                >
-                  <h3 style={{ margin: 0, color: "#10b981" }}>
-                    📢 إرسال إعلان جماعي
-                  </h3>
-                  <button
-                    onClick={() => setIsBroadcastModalOpen(false)}
-                    style={{
-                      background: "transparent",
-                      border: "none",
-                      fontSize: "1.2rem",
-                      cursor: "pointer",
-                      color: "#ef4444",
-                    }}
-                  >
-                    ✕
-                  </button>
-                </div>
-
-                <div style={{ marginBottom: "15px" }}>
-                  <label
-                    style={{
-                      display: "block",
-                      marginBottom: "8px",
-                      fontWeight: "bold",
-                      color: "#475569",
-                    }}
-                  >
-                    إلى من تريد الإرسال؟
-                  </label>
-                  <select
-                    value={broadcastTarget}
-                    onChange={(e) => setBroadcastTarget(e.target.value)}
-                    style={{
-                      ...smInput,
-                      width: "100%",
-                      cursor: "pointer",
-                      backgroundColor: "#f8fafc",
-                    }}
-                  >
-                    <option value="all">🌐 الجميع (كافة المستخدمين)</option>
-                    <option value="users_only">
-                      👥 المستخدمين العاديين (عملاء ومزودين)
-                    </option>
-                    <option value="admins">
-                      🛡️ طاقم الإدارة (المدراء والمشرفين)
-                    </option>
-                    <option value="inactive">⏸️ المستخدمين الموقوفين</option>
-                  </select>
-                </div>
-
-                <div style={{ marginBottom: "25px" }}>
-                  <label
-                    style={{
-                      display: "block",
-                      marginBottom: "8px",
-                      fontWeight: "bold",
-                      color: "#475569",
-                    }}
-                  >
-                    نص الإعلان أو الرسالة:
-                  </label>
-                  <textarea
-                    value={broadcastMessageText}
-                    onChange={(e) => setBroadcastMessageText(e.target.value)}
-                    placeholder="اكتب التنبيه أو التحديث هنا..."
-                    style={{
-                      ...smInput,
-                      width: "100%",
-                      height: "120px",
-                      resize: "vertical",
-                      boxSizing: "border-box",
-                    }}
-                  />
-                </div>
-
-                <div style={{ display: "flex", gap: "15px" }}>
-                  <button
-                    onClick={handleSendBroadcast}
-                    disabled={isBroadcasting}
-                    style={{
-                      flex: 1,
-                      ...admBtn("#10b981"),
-                      padding: "12px",
-                      opacity: isBroadcasting ? 0.7 : 1,
-                    }}
-                  >
-                    {isBroadcasting ? "⏳ جاري الإرسال..." : "إرسال الآن 🚀"}
-                  </button>
-                  <button
-                    onClick={() => setIsBroadcastModalOpen(false)}
-                    style={{ flex: 1, ...admBtn("#94a3b8"), padding: "12px" }}
-                  >
-                    إلغاء
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       )}
 
@@ -2214,171 +1628,29 @@ export default function PlatformManagement({
             overflowX: "auto",
           }}
         >
-          <div
-            style={{
-              backgroundColor: "#eff6ff",
-              border: "1px solid #bfdbfe",
-              padding: "15px 20px",
-              borderRadius: "16px",
-              marginBottom: "20px",
-              display: "flex",
-              alignItems: "center",
-              gap: "10px",
-            }}
-          >
-            <span style={{ fontSize: "1.5rem" }}>💡</span>
-            <p
-              style={{
-                margin: 0,
-                color: "#1e3a8a",
-                fontSize: "0.95rem",
-                fontWeight: "bold",
-              }}
-            >
-              يمكن إخفاء أي تعليق مسيء مع الاحتفاظ بعدد النجوم لعدم ظلم المزود.
-            </p>
-          </div>
-          <div
-            style={{
-              backgroundColor: "#fff",
-              borderRadius: "16px",
-              border: "1px solid #cbd5e1",
-              overflow: "hidden",
-              boxShadow: "0 4px 15px rgba(0,0,0,0.03)",
-            }}
-          >
-            <table
-              style={{
-                width: "100%",
-                borderCollapse: "collapse",
-                fontSize: "0.95rem",
-                textAlign: "right",
-              }}
-            >
-              <thead>
-                <tr style={{ backgroundColor: "#f1f5f9" }}>
-                  <th style={thS}>العميل</th>
-                  <th style={thS}>الخدمة والمزود</th>
-                  <th style={thS}>التقييم</th>
-                  <th style={thS}>التعليق</th>
-                  <th style={{ ...thS, textAlign: "center" }}>إجراء</th>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr style={{ backgroundColor: "#f1f5f9" }}>
+                <th style={thS}>العميل</th>
+                <th style={thS}>التقييم</th>
+                <th style={thS}>التعليق</th>
+              </tr>
+            </thead>
+            <tbody>
+              {reviews.map((r, idx) => (
+                <tr
+                  key={r.id || idx}
+                  style={{ borderBottom: "1px solid #f1f5f9" }}
+                >
+                  <td style={tdS}>{r.profiles?.full_name}</td>
+                  <td style={{ ...tdS, color: "#f59e0b" }}>
+                    {"⭐".repeat(r.rating || 5)}
+                  </td>
+                  <td style={tdS}>{r.comment}</td>
                 </tr>
-              </thead>
-              <tbody>
-                {reviews.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan="5"
-                      style={{
-                        padding: "40px",
-                        textAlign: "center",
-                        color: "#94a3b8",
-                        fontSize: "1.1rem",
-                      }}
-                    >
-                      لا توجد تقييمات.
-                    </td>
-                  </tr>
-                ) : (
-                  reviews.map((r, idx) => {
-                    const isHidden =
-                      r.is_comment_hidden ||
-                      (r.comment && r.comment.includes("🚫"));
-                    return (
-                      <tr
-                        key={r.id || idx}
-                        style={{
-                          borderBottom: "1px solid #f1f5f9",
-                          transition: "0.2s",
-                        }}
-                        onMouseOver={(e) =>
-                          (e.currentTarget.style.backgroundColor = "#f8fafc")
-                        }
-                        onMouseOut={(e) =>
-                          (e.currentTarget.style.backgroundColor =
-                            "transparent")
-                        }
-                      >
-                        <td
-                          style={{
-                            ...tdS,
-                            fontWeight: "bold",
-                            color: "#1e293b",
-                          }}
-                        >
-                          {r.profiles?.full_name || "غير محدد"}
-                        </td>
-                        <td style={tdS}>
-                          <div
-                            style={{
-                              color: "#3b82f6",
-                              fontWeight: "bold",
-                              marginBottom: "4px",
-                            }}
-                          >
-                            {r.offerings?.title || "خدمة محذوفة"}
-                          </div>
-                          <div style={{ fontSize: "0.8rem", color: "#64748b" }}>
-                            المزود:{" "}
-                            {r.offerings?.profiles?.full_name || "غير محدد"}
-                          </div>
-                        </td>
-                        <td
-                          style={{
-                            ...tdS,
-                            fontSize: "1.2rem",
-                            letterSpacing: "2px",
-                            color: "#f59e0b",
-                          }}
-                        >
-                          {"⭐".repeat(r.rating || 5)}
-                        </td>
-                        <td style={tdS}>
-                          {isHidden ? (
-                            <span
-                              style={{
-                                color: "#ef4444",
-                                fontWeight: "bold",
-                                fontStyle: "italic",
-                                backgroundColor: "#fef2f2",
-                                padding: "6px 12px",
-                                borderRadius: "10px",
-                              }}
-                            >
-                              🚫 (مخفي)
-                            </span>
-                          ) : (
-                            <span
-                              style={{ color: "#475569", lineHeight: "1.6" }}
-                            >
-                              {r.comment || "-"}
-                            </span>
-                          )}
-                        </td>
-                        <td style={{ ...tdS, textAlign: "center" }}>
-                          {!isHidden && (
-                            <button
-                              onClick={() =>
-                                handleHideComment(r.id, r.source_table)
-                              }
-                              style={{
-                                ...admBtn("transparent"),
-                                color: "#ef4444",
-                                border: "1px solid #fca5a5",
-                                padding: "8px 15px",
-                              }}
-                            >
-                              إخفاء 🗑️
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 
@@ -2389,7 +1661,6 @@ export default function PlatformManagement({
             padding: "25px",
             borderRadius: "20px",
             border: "1px solid #e2e8f0",
-            overflowX: "auto",
           }}
         >
           <div
@@ -2398,209 +1669,129 @@ export default function PlatformManagement({
               borderRadius: "16px",
               border: "1px solid #cbd5e1",
               overflow: "hidden",
-              boxShadow: "0 4px 15px rgba(0,0,0,0.03)",
             }}
           >
             <table
               style={{
                 width: "100%",
                 borderCollapse: "collapse",
-                fontSize: "0.95rem",
                 textAlign: "right",
               }}
             >
               <thead>
                 <tr style={{ backgroundColor: "#f1f5f9" }}>
-                  <th style={{ ...thS, width: "100px", textAlign: "center" }}>
+                  <th style={{ ...thS, width: "110px", textAlign: "center" }}>
                     الحالة
                   </th>
                   <th style={thS}>المرسل</th>
                   <th style={thS}>النوع</th>
-                  <th style={thS}>الموضوع والرسالة</th>
-                  <th style={{ ...thS, textAlign: "center", width: "150px" }}>
-                    إجراء
+                  <th style={thS}>الموضوع والتفاصيل المادية</th>
+                  <th style={{ ...thS, textAlign: "center", width: "160px" }}>
+                    إجراءات السداد
                   </th>
                 </tr>
               </thead>
               <tbody>
-                {messages.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan="5"
-                      style={{
-                        padding: "40px",
-                        textAlign: "center",
-                        color: "#94a3b8",
-                        fontSize: "1.1rem",
-                      }}
-                    >
-                      صندوق الوارد فارغ.
+                {messages.map((m) => (
+                  <tr
+                    key={m.id}
+                    style={{
+                      borderBottom: "1px solid #f1f5f9",
+                      backgroundColor: m.is_read ? "transparent" : "#eff6ff",
+                    }}
+                  >
+                    <td style={{ ...tdS, textAlign: "center" }}>
+                      <span
+                        style={{
+                          padding: "4px 8px",
+                          borderRadius: "8px",
+                          fontSize: "0.8rem",
+                          backgroundColor: m.is_read ? "#cbd5e1" : "#3b82f6",
+                          color: m.is_read ? "#475569" : "#fff",
+                        }}
+                      >
+                        {m.is_read ? "معتمد/مقروء" : "جديد 🆕"}
+                      </span>
+                    </td>
+                    <td style={tdS}>
+                      <strong>{m.profiles?.full_name}</strong>
+                      <br />
+                      {m.profiles?.phone}
+                    </td>
+                    <td style={tdS}>
+                      <span
+                        style={{
+                          padding: "4px 8px",
+                          borderRadius: "8px",
+                          fontSize: "0.8rem",
+                          backgroundColor:
+                            m.type === "receipt" ? "#d1fae5" : "#f1f5f9",
+                          color: m.type === "receipt" ? "#065f46" : "#334155",
+                        }}
+                      >
+                        {m.type === "receipt" ? "🧾 إيصال سداد" : "❓ استفسار"}
+                      </span>
+                    </td>
+                    <td style={tdS}>
+                      <strong>{m.subject}</strong>
+                      <div
+                        style={{
+                          margin: "5px 0 0 0",
+                          color: "#475569",
+                          lineHeight: "1.6",
+                          whiteSpace: "pre-wrap",
+                        }}
+                      >
+                        {renderMessageWithLinks(m.message)}
+                      </div>
+                    </td>
+                    <td style={{ ...tdS, textAlign: "center" }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "5px",
+                        }}
+                      >
+                        {/* زر السحر والاعتماد الآلي للمدير المالي أو المدير العام */}
+                        {m.type === "receipt" && !m.is_read && (
+                          <button
+                            onClick={() => handleApproveCommission(m.id)}
+                            style={{ ...admBtn("#10b981"), width: "100%" }}
+                          >
+                            💰 اعتماد وإخفاء المطالبة
+                          </button>
+                        )}
+                        {!m.is_read && (
+                          <button
+                            onClick={() => handleMarkMessageRead(m.id)}
+                            style={{ ...admBtn("#64748b"), width: "100%" }}
+                          >
+                            مقروء
+                          </button>
+                        )}
+                        <button
+                          onClick={async () => {
+                            if (window.confirm("حذف؟")) {
+                              await supabase
+                                .from("contact_messages")
+                                .delete()
+                                .eq("id", m.id);
+                              fetchAdminData();
+                            }
+                          }}
+                          style={{
+                            ...admBtn("transparent"),
+                            color: "#ef4444",
+                            border: "1px solid #fca5a5",
+                          }}
+                        >
+                          حذف
+                        </button>
+                      </div>
                     </td>
                   </tr>
-                ) : (
-                  messages.map((m) => (
-                    <tr
-                      key={m.id}
-                      style={{
-                        borderBottom: "1px solid #f1f5f9",
-                        backgroundColor: m.is_read ? "transparent" : "#eff6ff",
-                        transition: "0.2s",
-                      }}
-                      onMouseOver={(e) =>
-                        (e.currentTarget.style.backgroundColor = m.is_read
-                          ? "#f8fafc"
-                          : "#e0e7ff")
-                      }
-                      onMouseOut={(e) =>
-                        (e.currentTarget.style.backgroundColor = m.is_read
-                          ? "transparent"
-                          : "#eff6ff")
-                      }
-                    >
-                      <td style={{ ...tdS, textAlign: "center" }}>
-                        <span
-                          style={{
-                            padding: "6px 12px",
-                            borderRadius: "10px",
-                            fontSize: "0.8rem",
-                            fontWeight: "bold",
-                            backgroundColor: m.is_read ? "#f1f5f9" : "#3b82f6",
-                            color: m.is_read ? "#64748b" : "#fff",
-                          }}
-                        >
-                          {m.is_read ? "مقروءة" : "جديدة 🆕"}
-                        </span>
-                      </td>
-                      <td style={tdS}>
-                        <strong
-                          style={{
-                            color: "#1e293b",
-                            fontSize: "1.05rem",
-                            display: "block",
-                            marginBottom: "4px",
-                          }}
-                        >
-                          {m.profiles?.full_name || "مجهول / زائر"}
-                        </strong>
-                        <span
-                          style={{
-                            direction: "ltr",
-                            display: "inline-block",
-                            fontSize: "0.85rem",
-                            color: "#64748b",
-                            fontWeight: "bold",
-                          }}
-                        >
-                          {m.profiles?.phone || "لا يوجد رقم"}
-                        </span>
-                      </td>
-                      <td style={tdS}>
-                        <span
-                          style={{
-                            backgroundColor:
-                              m.type === "complaint"
-                                ? "#fef2f2"
-                                : m.type === "suggestion"
-                                ? "#fef3c7"
-                                : "#f1f5f9",
-                            color:
-                              m.type === "complaint"
-                                ? "#dc2626"
-                                : m.type === "suggestion"
-                                ? "#d97706"
-                                : "#475569",
-                            padding: "6px 12px",
-                            borderRadius: "10px",
-                            fontWeight: "bold",
-                            fontSize: "0.85rem",
-                            border: `1px solid ${
-                              m.type === "complaint"
-                                ? "#fecaca"
-                                : m.type === "suggestion"
-                                ? "#fde68a"
-                                : "#cbd5e1"
-                            }`,
-                          }}
-                        >
-                          {m.type === "complaint"
-                            ? "🚨 شكوى"
-                            : m.type === "suggestion"
-                            ? "💡 اقتراح"
-                            : "❓ استفسار"}
-                        </span>
-                      </td>
-                      <td style={tdS}>
-                        <strong
-                          style={{
-                            display: "block",
-                            marginBottom: "8px",
-                            color: "#0f172a",
-                            fontSize: "1.1rem",
-                          }}
-                        >
-                          {m.subject}
-                        </strong>
-                        <p
-                          style={{
-                            margin: 0,
-                            color: "#475569",
-                            lineHeight: "1.6",
-                          }}
-                        >
-                          {m.message}
-                        </p>
-                        <span
-                          style={{
-                            fontSize: "0.75rem",
-                            color: "#94a3b8",
-                            display: "block",
-                            marginTop: "10px",
-                          }}
-                        >
-                          {new Date(m.created_at).toLocaleString("ar-SA")}
-                        </span>
-                      </td>
-                      <td style={{ ...tdS, textAlign: "center" }}>
-                        <div
-                          style={{
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: "8px",
-                            alignItems: "center",
-                          }}
-                        >
-                          {!m.is_read && (
-                            <button
-                              onClick={() => handleMarkMessageRead(m.id)}
-                              style={{ ...admBtn("#10b981"), width: "100%" }}
-                            >
-                              مقروء ✅
-                            </button>
-                          )}
-                          <button
-                            onClick={async () => {
-                              if (window.confirm("حذف؟")) {
-                                await supabase
-                                  .from("contact_messages")
-                                  .delete()
-                                  .eq("id", m.id);
-                                fetchAdminData();
-                              }
-                            }}
-                            style={{
-                              ...admBtn("transparent"),
-                              color: "#ef4444",
-                              border: "1px solid #fca5a5",
-                              width: "100%",
-                            }}
-                          >
-                            حذف 🗑️
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
+                ))}
               </tbody>
             </table>
           </div>

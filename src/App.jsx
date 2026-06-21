@@ -261,6 +261,11 @@ function MainAppContent() {
     subject: "",
     message: "",
   });
+
+  // ✨ المتغيرات الجديدة المضافة لرفع الفاتورة والإيصال المالي ✨
+  const [bookingRef, setBookingRef] = useState("");
+  const [receiptFile, setReceiptFile] = useState(null);
+
   const [isSendingContact, setIsSendingContact] = useState(false);
 
   const dynamicLegalDocs = {
@@ -426,7 +431,6 @@ function MainAppContent() {
 
       setMyOfferings(enrichedOfferings.filter((o) => o.provider_id === userId));
 
-      // ✨ التعديل السحري للأرشفة المزدوجة (تصفية الطلبات المؤرشفة من المصدر) ✨
       setProviderBookings(
         enrichedBookings.filter(
           (b) =>
@@ -600,17 +604,55 @@ function MainAppContent() {
     setIsAccepting(false);
   };
 
+  // ✨ دالة إرسال رسائل التواصل المحدثة لتدعم نظام رفع الإيصالات للمدير المالي آلياً ✨
   const handleSubmitContact = async () => {
     if (!contactForm.subject || !contactForm.message)
       return alert("الرجاء تعبئة العنوان والرسالة.");
-    setIsSendingContact(true);
+
+    let finalMessage = contactForm.message;
+
+    if (contactForm.type === "receipt") {
+      if (!bookingRef)
+        return alert("الرجاء إدخال رقم الحجز أو الخدمة المرتبطة بالعمولة.");
+      if (!receiptFile)
+        return alert("الرجاء رفع صورة الإيصال لإتمام المطابقة.");
+
+      setIsSendingContact(true);
+
+      const fileExt = receiptFile.name.split(".").pop();
+      const fileName = `${Date.now()}-${Math.floor(
+        Math.random() * 1000,
+      )}.${fileExt}`;
+      const filePath = `receipts/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("receipts")
+        .upload(filePath, receiptFile);
+
+      if (uploadError) {
+        setIsSendingContact(false);
+        return alert(
+          "حدث خطأ في رفع الإيصال المالي! الرجاء المحاولة مرة أخرى.",
+        );
+      }
+
+      const { data: publicUrlData } = supabase.storage
+        .from("receipts")
+        .getPublicUrl(filePath);
+      const receiptUrl = publicUrlData.publicUrl;
+
+      finalMessage = `ℹ️ رقم الحجز / الخدمة: ${bookingRef}\n\n📝 تفاصيل المرسل: ${contactForm.message}\n\n🔗 رابط الإيصال المرفق:\n${receiptUrl}`;
+    } else {
+      setIsSendingContact(true);
+    }
+
     try {
       await supabase.from("contact_messages").insert([
         {
           user_id: session?.user?.id || null,
           type: contactForm.type,
           subject: contactForm.subject,
-          message: contactForm.message,
+          message: finalMessage,
         },
       ]);
       alert(
@@ -618,6 +660,8 @@ function MainAppContent() {
       );
       setShowContactModal(false);
       setContactForm({ type: "complaint", subject: "", message: "" });
+      setBookingRef("");
+      setReceiptFile(null);
     } catch (err) {
       alert("حدث خطأ غير متوقع أثناء الإرسال.");
     }
@@ -952,10 +996,12 @@ function MainAppContent() {
     );
   };
 
+  // ✨ الترقية الذكية لنظام الصلاحيات والأمان ليدعم دور "المدير المالي" المخصص ✨
   const isSuperAdmin = userProfile?.role === "admin";
   const isSupervisor = userProfile?.role === "supervisor";
-  const canManagePlatform = isSuperAdmin || isSupervisor;
-  const canViewReports = isSuperAdmin || isSupervisor;
+  const isFinancialManager = userProfile?.role === "financial_manager";
+  const canManagePlatform = isSuperAdmin || isSupervisor || isFinancialManager;
+  const canViewReports = isSuperAdmin || isSupervisor || isFinancialManager;
 
   const allUserBookings = [
     ...providerBookings,
@@ -1276,22 +1322,69 @@ function MainAppContent() {
                   {bankAccounts ||
                     "لم تقم الإدارة بإضافة حسابات بنكية حتى الآن."}
                 </div>
-                <p
+
+                {/* ✨ التحديث الذكي والمهني للملاحظة المالية المباشرة وتوجيه الحوالات للإيميل الرسمي للمحاسبة ✨ */}
+                <div
                   style={{
                     marginTop: "20px",
-                    fontSize: "0.9rem",
-                    color: "#b91c1c",
-                    fontWeight: "bold",
-                    backgroundColor: "#fef2f2",
                     padding: "15px",
+                    backgroundColor: "#fef2f2",
                     borderRadius: "12px",
                     border: "1px dashed #fca5a5",
+                    textAlign: "center",
                   }}
                 >
-                  * الرجاء تحويل المبلغ المستحق لأحد الحسابات أعلاه، ثم التواصل
-                  مع إدارة المنصة (عبر زر تواصل معنا) لإرفاق إيصال التحويل
-                  وتأكيد السداد لتحديث رصيدك.
-                </p>
+                  <p
+                    style={{
+                      marginTop: "0",
+                      marginBottom: "15px",
+                      fontSize: "0.95rem",
+                      color: "#b91c1c",
+                      fontWeight: "bold",
+                      lineHeight: "1.6",
+                    }}
+                  >
+                    * الرجاء تحويل المبلغ المستحق لأحد الحسابات أعلاه، ثم إرفاق
+                    الإيصال المالي بالزر أدناه ليقوم المدير المالي باعتماد رصيدك
+                    فوراً.
+                    <br />
+                    📬 للتأكيد أو للاستفسارات المالية السريعة:{" "}
+                    <a
+                      href="mailto:finance@bookonmap.com"
+                      style={{ color: "#2563eb", textDecoration: "underline" }}
+                    >
+                      finance@bookonmap.com
+                    </a>
+                  </p>
+                  <button
+                    onClick={() => {
+                      setShowPaymentModal(false);
+                      setContactForm({ ...contactForm, type: "receipt" });
+                      setShowContactModal(true);
+                    }}
+                    style={{
+                      background: "#3b82f6",
+                      color: "#fff",
+                      border: "none",
+                      padding: "12px 25px",
+                      borderRadius: "10px",
+                      fontWeight: "bold",
+                      fontSize: "1rem",
+                      cursor: "pointer",
+                      width: "100%",
+                      boxShadow: "0 4px 10px rgba(59, 130, 246, 0.3)",
+                      transition: "0.2s",
+                    }}
+                    onMouseOver={(e) =>
+                      (e.currentTarget.style.background = "#2563eb")
+                    }
+                    onMouseOut={(e) =>
+                      (e.currentTarget.style.background = "#3b82f6")
+                    }
+                  >
+                    📤 أرفق إيصال الحوالة البنكية الآن
+                  </button>
+                </div>
               </div>
             )}
             {paymentMethod === "gateway" && (
@@ -1421,9 +1514,79 @@ function MainAppContent() {
                 >
                   <option value="complaint">🚨 لدي مشكلة أو شكوى</option>
                   <option value="suggestion">💡 لدي فكرة أو اقتراح</option>
-                  <option value="inquiry">❓ استفسار عام / إرفاق إيصال</option>
+                  <option value="receipt">🧾 إرفاق إيصال سداد عمولة</option>
+                  <option value="inquiry">❓ استفسار عام</option>
                 </select>
               </div>
+
+              {/* ✨ حقول رفع الإيصال الذكية تظهر فقط عند اختيار "إرفاق إيصال" ليتلقاها المدير المالي ✨ */}
+              {contactForm.type === "receipt" && (
+                <div
+                  style={{
+                    padding: "15px",
+                    backgroundColor: "#f0fdf4",
+                    border: "1px solid #bbf7d0",
+                    borderRadius: "12px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "12px",
+                  }}
+                >
+                  <div>
+                    <strong
+                      style={{
+                        color: "#166534",
+                        display: "block",
+                        marginBottom: "8px",
+                        fontSize: "0.9rem",
+                      }}
+                    >
+                      رقم الحجز أو اسم الخدمة:
+                    </strong>
+                    <input
+                      type="text"
+                      placeholder="مثال: حجز رقم 1234..."
+                      value={bookingRef}
+                      onChange={(e) => setBookingRef(e.target.value)}
+                      style={{
+                        ...smInput,
+                        width: "100%",
+                        boxSizing: "border-box",
+                        borderColor: "#86efac",
+                        backgroundColor: "#fff",
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <strong
+                      style={{
+                        color: "#166534",
+                        display: "block",
+                        marginBottom: "8px",
+                        fontSize: "0.9rem",
+                      }}
+                    >
+                      صورة الإيصال البنكي (إلزامي):
+                    </strong>
+                    <input
+                      type="file"
+                      accept="image/*,.pdf"
+                      onChange={(e) => setReceiptFile(e.target.files[0])}
+                      style={{
+                        width: "100%",
+                        fontSize: "0.85rem",
+                        padding: "10px",
+                        backgroundColor: "#fff",
+                        borderRadius: "8px",
+                        border: "1px dashed #10b981",
+                        cursor: "pointer",
+                        boxSizing: "border-box",
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+
               <div>
                 <strong
                   style={{
@@ -1441,7 +1604,11 @@ function MainAppContent() {
                   onChange={(e) =>
                     setContactForm({ ...contactForm, subject: e.target.value })
                   }
-                  placeholder="اكتب عنواناً مختصراً (مثال: إيصال سداد عمولة)"
+                  placeholder={
+                    contactForm.type === "receipt"
+                      ? "مثال: إيصال سداد عمولة حجز"
+                      : "اكتب عنواناً مختصراً للرسالة..."
+                  }
                   style={{ ...smInput, width: "100%", boxSizing: "border-box" }}
                 />
               </div>
@@ -1461,7 +1628,11 @@ function MainAppContent() {
                   onChange={(e) =>
                     setContactForm({ ...contactForm, message: e.target.value })
                   }
-                  placeholder="اكتب تفاصيل رسالتك أو استفسارك هنا بوضوح..."
+                  placeholder={
+                    contactForm.type === "receipt"
+                      ? "اكتب قيمة الحوالة وأي ملاحظات إضافية هنا لتسهيل المطابقة..."
+                      : "اكتب تفاصيل رسالتك أو استفسارك هنا بوضوح..."
+                  }
                   style={{
                     ...smInput,
                     width: "100%",
@@ -1483,7 +1654,7 @@ function MainAppContent() {
                 }}
               >
                 {isSendingContact
-                  ? "جاري الإرسال..."
+                  ? "جاري الرفع والإرسال المشفر للمالية..."
                   : "إرسال الرسالة للإدارة 🚀"}
               </button>
             </div>
@@ -1959,7 +2130,7 @@ function MainAppContent() {
                       >
                         {userProfile?.full_name || "المستخدم"}
                       </div>
-                      {(isSuperAdmin || isSupervisor) && (
+                      {(isSuperAdmin || isSupervisor || isFinancialManager) && (
                         <div style={{ marginTop: "4px" }}>
                           {isSuperAdmin && (
                             <span
@@ -1987,6 +2158,20 @@ function MainAppContent() {
                               }}
                             >
                               🛡️ مشرف عام
+                            </span>
+                          )}
+                          {isFinancialManager && (
+                            <span
+                              style={{
+                                fontSize: "0.65rem",
+                                color: "#fff",
+                                backgroundColor: "#10b981",
+                                padding: "3px 8px",
+                                borderRadius: "10px",
+                                fontWeight: "bold",
+                              }}
+                            >
+                              💰 مدير مالي
                             </span>
                           )}
                         </div>
@@ -2140,7 +2325,7 @@ function MainAppContent() {
                 >
                   {userProfile?.full_name || "المستخدم"}
                 </div>
-                {(isSuperAdmin || isSupervisor) && (
+                {(isSuperAdmin || isSupervisor || isFinancialManager) && (
                   <div style={{ marginTop: "2px" }}>
                     {isSuperAdmin && (
                       <span
@@ -2168,6 +2353,20 @@ function MainAppContent() {
                         }}
                       >
                         🛡️ مشرف
+                      </span>
+                    )}
+                    {isFinancialManager && (
+                      <span
+                        style={{
+                          fontSize: "0.6rem",
+                          color: "#fff",
+                          backgroundColor: "#10b981",
+                          padding: "2px 6px",
+                          borderRadius: "8px",
+                          fontWeight: "bold",
+                        }}
+                      >
+                        💰 مالي
                       </span>
                     )}
                   </div>
@@ -2456,6 +2655,7 @@ function MainAppContent() {
                         }
                       >
                         <PlatformManagement
+                          userRole={userProfile?.role}
                           onRefresh={() => fetchAllData(session.user.id)}
                           commissionRate={commissionRate}
                           setCommissionRate={setCommissionRate}
@@ -3482,7 +3682,10 @@ function MainAppContent() {
           </span>{" "}
           <span style={{ color: "#cbd5e1" }}>|</span>
           <span
-            onClick={() => setShowContactModal(true)}
+            onClick={() => {
+              setContactForm({ ...contactForm, type: "general" });
+              setShowContactModal(true);
+            }}
             style={{
               cursor: "pointer",
               color: "#d97706",
@@ -3589,7 +3792,6 @@ const BetaGate = ({ children }) => {
         />
         <button
           onClick={() => {
-            // ✨ التعديل الأمني: مقارنة الرمز بمتغير البيئة المشفر
             if (passcode === import.meta.env.VITE_BETA_PASSCODE) {
               localStorage.setItem("beta_unlocked", "true");
               setIsUnlocked(true);
@@ -3628,7 +3830,6 @@ export default function AppWrapper() {
   return (
     <HelmetProvider>
       <BrowserRouter>
-        {/* 🚧 تم إيقاف بوابة الاختبار (BetaGate) مؤقتاً لمراجعة المركز السعودي للأعمال 🚧 */}
         {/* <BetaGate> */}
         <MainAppContent />
         {/* </BetaGate> */}
