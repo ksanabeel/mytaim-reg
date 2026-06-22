@@ -109,6 +109,7 @@ export default function ProfileSettings({ session, onUpdate }) {
     loadProfile();
   }, [session]);
 
+  // ✨ دالة فحص اسم المستخدم الذكية والمحدثة بشرط الـ 4 خانات لحفظ اليوزرات الثمينة ✨
   const handleUsernameChange = (e) => {
     const val = e.target.value.toLowerCase().trim();
     setUsername(val);
@@ -123,6 +124,12 @@ export default function ProfileSettings({ session, onUpdate }) {
     const isValidFormat = /^[a-z0-9_]+$/.test(val);
     if (!isValidFormat) {
       setUsernameStatus("invalid");
+      return;
+    }
+
+    // القفل الأمني المحدث: منع استخدام أقل من 4 خانات لحماية الحسابات النادرة والمميزة مستقبلاً
+    if (val.length < 4) {
+      setUsernameStatus("too_short");
       return;
     }
 
@@ -153,7 +160,9 @@ export default function ProfileSettings({ session, onUpdate }) {
       if (!event.target.files || event.target.files.length === 0)
         throw new Error("يجب اختيار صورة.");
       const file = event.target.files[0];
-      const fileName = `${session.user.id}-${Math.random()}.${file.name.split(".").pop()}`;
+      const fileName = `${session.user.id}-${Math.random()}.${file.name
+        .split(".")
+        .pop()}`;
       let { error: uploadError } = await supabase.storage
         .from("avatars")
         .upload(fileName, file);
@@ -200,15 +209,18 @@ export default function ProfileSettings({ session, onUpdate }) {
     }
   };
 
-  // ✨ دالة الحفظ المحدثة والمنفصلة بحرفية ✨
+  // ✨ دالة الحفظ المحدثة والمحمية ضد اليوزرات القصيرة لمنع تجاوز القيود المادية ✨
   const handleUpdate = async (e) => {
     e.preventDefault();
     if (
       usernameStatus === "taken" ||
       usernameStatus === "checking" ||
-      usernameStatus === "invalid"
+      usernameStatus === "invalid" ||
+      usernameStatus === "too_short" // منع الحفظ الصارم إذا كان اسم المستخدم المسجل غير مستوف للطول المطلوب
     ) {
-      alert("يرجى اختيار اسم مستخدم (Username) صحيح ومتاح قبل الحفظ 🛑");
+      alert(
+        "يرجى اختيار اسم مستخدم (Username) صحيح ومتاح ومكون من 4 خانات على الأقل قبل الحفظ 🛑",
+      );
       return;
     }
 
@@ -217,7 +229,7 @@ export default function ProfileSettings({ session, onUpdate }) {
     let authUpdateError = null;
     let emailConfirmationSent = false;
 
-    // 1️⃣ تحديث كلمة المرور (مفصولة عن الإيميل لتجنب التداخل)
+    // 1️⃣ تحديث كلمة المرور
     if (newPassword && newPassword.trim().length > 0) {
       const { error } = await supabase.auth.updateUser({
         password: newPassword,
@@ -234,7 +246,7 @@ export default function ProfileSettings({ session, onUpdate }) {
       }
     }
 
-    // 2️⃣ تحديث الإيميل (يتطلب إرسال رابط تأكيد)
+    // 2️⃣ تحديث الإيميل
     if (!authUpdateError && email && email.trim() !== session.user.email) {
       const { error } = await supabase.auth.updateUser({ email: email.trim() });
       if (error) {
@@ -244,7 +256,6 @@ export default function ProfileSettings({ session, onUpdate }) {
       }
     }
 
-    // إيقاف العملية إذا حدث خطأ في المصادقة
     if (authUpdateError) {
       setIsSubmitting(false);
       alert("حدث خطأ أثناء تحديث بيانات الدخول: " + authUpdateError.message);
@@ -282,9 +293,8 @@ export default function ProfileSettings({ session, onUpdate }) {
 
     if (!error) {
       setOriginalUsername(username);
-      setNewPassword(""); // تفريغ الخانة بعد النجاح
+      setNewPassword("");
 
-      // التنبيه الذكي للمستخدم
       if (emailConfirmationSent) {
         alert(
           "تم حفظ البيانات الشاملة بنجاح ✅\n\n⚠️ تنبيه بخصوص الإيميل:\nلقد تم إرسال رابط تأكيد إلى بريدك الجديد.\nيجب عليك فتحه والضغط على الرابط ليتم التغيير الفعلي، وإلا سيبقى حسابك على الإيميل القديم.",
@@ -311,7 +321,9 @@ export default function ProfileSettings({ session, onUpdate }) {
       </div>
     );
 
-  const defaultAvatar = `https://ui-avatars.com/api/?name=${fullName || "User"}&background=${themeColor.replace("#", "")}&color=fff&size=100`;
+  const defaultAvatar = `https://ui-avatars.com/api/?name=${
+    fullName || "User"
+  }&background=${themeColor.replace("#", "")}&color=fff&size=100`;
 
   return (
     <div
@@ -414,7 +426,8 @@ export default function ProfileSettings({ session, onUpdate }) {
         </h3>
         {username &&
           usernameStatus !== "taken" &&
-          usernameStatus !== "invalid" && (
+          usernameStatus !== "invalid" &&
+          usernameStatus !== "too_short" && (
             <div
               style={{
                 color: themeColor,
@@ -491,7 +504,7 @@ export default function ProfileSettings({ session, onUpdate }) {
 
       <form
         onSubmit={handleUpdate}
-        autoComplete="off" // ✨ منع الملء التلقائي للنموذج ككل
+        autoComplete="off"
         style={{ display: "flex", flexDirection: "column", gap: "25px" }}
       >
         {/* 🚀 قسم الهوية الرقمية والتسويق 🚀 */}
@@ -516,7 +529,6 @@ export default function ProfileSettings({ session, onUpdate }) {
           </h3>
 
           <div style={{ marginBottom: "20px" }}>
-            {/* ✨ التعديل: نقل رسائل التحذير لتكون بجانب العنوان فوق الحقل ✨ */}
             <div
               style={{
                 display: "flex",
@@ -570,6 +582,18 @@ export default function ProfileSettings({ session, onUpdate }) {
                     ⚠️ حروف إنجليزية وأرقام فقط
                   </span>
                 )}
+                {/* ✨ التنبيه الفوري الجديد المضاف لواجهة التسجيل لتعريف الطول الأدنى للمستخدم المادي */}
+                {usernameStatus === "too_short" && (
+                  <span
+                    style={{
+                      fontSize: "0.85rem",
+                      color: "#ef4444",
+                      fontWeight: "bold",
+                    }}
+                  >
+                    ⚠️ يجب أن يتكون من 4 خانات على الأقل
+                  </span>
+                )}
               </div>
             </div>
 
@@ -595,16 +619,17 @@ export default function ProfileSettings({ session, onUpdate }) {
                   ...inpS,
                   paddingRight: "35px",
                   borderColor:
-                    usernameStatus === "taken" || usernameStatus === "invalid"
+                    usernameStatus === "taken" ||
+                    usernameStatus === "invalid" ||
+                    usernameStatus === "too_short"
                       ? "#ef4444"
                       : usernameStatus === "available"
-                        ? "#10b981"
-                        : "#cbd5e1",
+                      ? "#10b981"
+                      : "#cbd5e1",
                 }}
               />
             </div>
 
-            {/* رسالة التحذير تظهر فقط إذا قام بتغيير اليوزر نيم */}
             {username !== originalUsername ? (
               <div
                 style={{
@@ -784,7 +809,7 @@ export default function ProfileSettings({ session, onUpdate }) {
           </div>
         </div>
 
-        {/* 🛡️ التوثيق المالي */}
+        {/* 🛡️التوثيق المالي */}
         <div
           style={{
             background:
@@ -821,6 +846,7 @@ export default function ProfileSettings({ session, onUpdate }) {
               }}
             >
               <span style={{ fontSize: "1.5rem" }}>🛡️</span> التوثيق المالي
+              (اختياري)
             </h3>
             {verificationStatus === "verified" && (
               <span style={badgeS("#10b981")}>✅ موثق رسمياً</span>
@@ -933,7 +959,7 @@ export default function ProfileSettings({ session, onUpdate }) {
           }}
         >
           <div style={sectionS}>
-            <h3 style={secTitle}>الضرائب والتراخيص</h3>
+            <h3 style={secTitle}>الضرائب والتراخيص (اختياري)</h3>
             <div
               style={{ display: "flex", flexDirection: "column", gap: "15px" }}
             >
@@ -985,7 +1011,7 @@ export default function ProfileSettings({ session, onUpdate }) {
               gap: "10px",
             }}
           >
-            🔒 بيانات الدخول والأمان
+            🔒 بيانات الدخول والأمان (اذا اردت تغيير البريد او كلمة المرور)
           </h3>
 
           <div
@@ -1041,7 +1067,7 @@ export default function ProfileSettings({ session, onUpdate }) {
               </small>
             </div>
 
-            {/* ✨ حقل كلمة المرور (مع منع الملء التلقائي) ✨ */}
+            {/* ✨ حقل كلمة المرور */}
             <div>
               <label
                 style={{
@@ -1138,7 +1164,7 @@ export default function ProfileSettings({ session, onUpdate }) {
   );
 }
 
-// التنسيقات
+// التنسيقات العامة والثابتة
 const sectionS = {
   backgroundColor: "#fff",
   padding: "25px",
