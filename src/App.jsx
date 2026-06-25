@@ -1350,10 +1350,11 @@ function MainAppContent() {
                     <br />
                     📬 للتأكيد أو للاستفسارات المالية السريعة:{" "}
                     <a
-                      href="mailto:finance@bookonmap.com"
+                      href="mailto:finance@bookonmap.com   bookonmap@hotmail.com"
                       style={{ color: "#2563eb", textDecoration: "underline" }}
                     >
-                      finance@bookonmap.com
+                      finance@bookonmap.com . الادارة المالية لbookonmap او وكيل
+                      خدمات العملاء bookonmap@hotmail.com
                     </a>
                   </p>
                   <button
