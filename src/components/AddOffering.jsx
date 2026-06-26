@@ -437,7 +437,7 @@ export default function AddOffering({
                 style={{ ...inputS, fontSize: "1.05rem", fontWeight: "bold" }}
                 placeholder={t(
                   "title_placeholder",
-                  "مثال: صيانة مكيفات سبليت احترافية",
+                  "مثال: مباشرين - منشدين -مصورين ",
                 )}
               />
             </div>
