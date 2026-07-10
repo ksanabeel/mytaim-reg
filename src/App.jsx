@@ -3048,12 +3048,53 @@ function MainAppContent() {
                                 );
                                 return;
                               }
-                              const storeUrl = `${window.location.origin}/@${userProfile.username}`;
-                              navigator.clipboard.writeText(storeUrl);
-                              alert(
-                                "رائع! تم نسخ رابط متجرك بنجاح 📋✨\nالرابط هو:\n" +
-                                  storeUrl,
-                              );
+
+                              // ✅ التعديل هنا: استخدام الرابط المباشر للمنصة لحل مشكلة لوكال هوست
+                              const platformDomain =
+                                "https://www.bookonmap.com";
+                              const storeUrl = `${platformDomain}/@${userProfile.username}`;
+
+                              if (
+                                navigator &&
+                                navigator.clipboard &&
+                                navigator.clipboard.writeText
+                              ) {
+                                navigator.clipboard
+                                  .writeText(storeUrl)
+                                  .then(() => {
+                                    alert(
+                                      "رائع! تم نسخ رابط متجرك بنجاح 📋✨\nالرابط هو:\n" +
+                                        storeUrl,
+                                    );
+                                  })
+                                  .catch((err) => {
+                                    // الحل البديل (Fallback)
+                                    const textArea =
+                                      document.createElement("textarea");
+                                    textArea.value = storeUrl;
+                                    document.body.appendChild(textArea);
+                                    textArea.select();
+                                    document.execCommand("copy");
+                                    document.body.removeChild(textArea);
+                                    alert(
+                                      "رائع! تم نسخ رابط متجرك بنجاح 📋✨\nالرابط هو:\n" +
+                                        storeUrl,
+                                    );
+                                  });
+                              } else {
+                                // الحل البديل للأجهزة القديمة
+                                const textArea =
+                                  document.createElement("textarea");
+                                textArea.value = storeUrl;
+                                document.body.appendChild(textArea);
+                                textArea.select();
+                                document.execCommand("copy");
+                                document.body.removeChild(textArea);
+                                alert(
+                                  "رائع! تم نسخ رابط متجرك بنجاح 📋✨\nالرابط هو:\n" +
+                                    storeUrl,
+                                );
+                              }
                             }}
                             style={{
                               background:
