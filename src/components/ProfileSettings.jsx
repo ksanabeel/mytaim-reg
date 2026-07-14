@@ -42,6 +42,10 @@ export default function ProfileSettings({ session, onUpdate }) {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+
+  // 🚨 متطلبات Apple الإجبارية للخصوصية (Guideline 5.1.1) 🚨
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false); // ✨ متغير حالة حذف الحساب
+
   const fileInputRef = useRef(null);
 
   const typingTimeoutRef = useRef(null);
@@ -311,6 +315,46 @@ export default function ProfileSettings({ session, onUpdate }) {
       } else {
         alert("خطأ في تحديث البيانات: " + error.message);
       }
+    }
+  };
+
+  // 🚨 دالة حذف الحساب الإلزامية لاستيفاء Guideline 5.1.1 🚨
+  const handleDeleteAccount = async () => {
+    if (
+      !window.confirm(
+        "⚠️ هل أنت متأكد تماماً من حذف حسابك؟ هذا الإجراء نهائي ولا يمكن التراجع عنه سيتم حذف جميع بياناتك وحجوزاتك نهائياً!",
+      )
+    ) {
+      return;
+    }
+
+    setIsDeletingAccount(true);
+
+    try {
+      // *** تنبيه هام للمطور نبيل ***
+      // نظام Supabase لا يسمح للمستخدم بحذف حسابه من جدول auth.users مباشرة باستخدام مفتاح الأمان العام.
+      // يجب عليك إنشاء وظيفة (RPC) في قاعة البيانات أو خادم خلفي (Backend) يستخدم مفتاح "Service Role" لإتمام الحذف الفعلي من جدول Auth و Profiles.
+      // الكود التالي هو استدعاء افتراضي لوظيفة RPC قمت أنت بإنشائها مسبقاً (مثلاً باسم process_user_deletion).
+
+      // الكود الافتراضي لطلب API الخاص بك (استبدله برابط الـ Backend الفعلي الخاص بك):
+      const { error } = await supabase.rpc("process_user_deletion", {
+        user_id_param: session.user.id,
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      // إذا تم حذف البيانات بنجاح، نقوم بتسجيل الخروج من الجلسة في الواجهة
+      await supabase.auth.signOut();
+      alert(
+        "تم حذف حسابك وبياناتك بنجاح. نأسف لمغادرتك، ونتمنى رؤيتك مرة أخرى! 👋",
+      );
+      // يمكنك إضافة توجيه (Redirect) هنا إذا لزم الأمر، أو الاعتماد على تحديث حالة الجلسة (Session State).
+    } catch (error) {
+      alert("حدث خطأ أثناء محاولة حذف الحساب: " + error.message);
+    } finally {
+      setIsDeletingAccount(false);
     }
   };
 
@@ -1111,6 +1155,101 @@ export default function ProfileSettings({ session, onUpdate }) {
                 * اترك الحقل فارغاً إذا لم ترغب في تغيير كلمة المرور.
               </small>
             </div>
+          </div>
+        </div>
+
+        {/* 🚨 قسم منطقة الخطر - حذف الحساب (متطلب Apple إجباري) 🚨 */}
+        <div
+          style={{
+            ...sectionS,
+            border: `1px solid #ef444450`, // استخدام لون الخطر الأحمر (للحدود)
+            backgroundColor: `#fef2f2`, // استخدام لون الخطر الأحمر الخفيف (للخلفية)
+            marginTop: "30px", // مسافة إضافية لفصله عن باقي الإعدادات
+          }}
+        >
+          <h3
+            style={{
+              ...secTitle,
+              color: "#dc2626", // لون خطر غامق للعيدوان
+              borderBottomColor: "#fee2e2",
+              display: "flex",
+              alignItems: "center",
+              gap: "10px",
+            }}
+          >
+            <span style={{ fontSize: "1.5rem" }}>⚠️</span> منطقة الخطر - حذف
+            الحساب
+          </h3>
+
+          <div
+            style={{
+              padding: "20px",
+              backgroundColor: "#fff",
+              borderRadius: "12px",
+              border: "1px solid #fee2e2",
+            }}
+          >
+            <p
+              style={{
+                fontSize: "1rem",
+                fontWeight: "bold",
+                color: "#1e293b",
+                margin: "0 0 10px 0",
+              }}
+            >
+              ⚠️ تحذير نهائي وحاسم:
+            </p>
+            <ul
+              style={{
+                margin: 0,
+                paddingRight: "20px",
+                color: "#475569",
+                fontSize: "0.9rem",
+                lineHeight: "1.6",
+                listStyleType: "disc",
+              }}
+            >
+              <li>
+                سيتم حذف جميع بياناتك الشخصية وحجوزاتك وملفك التعريفي نهائياً.
+              </li>
+              <li>
+                لن تتمكن من استعادة بياناتك أو الوصول إلى حسابك مرة أخرى بعد هذه
+                الخطوة.
+              </li>
+              <li>
+                هذا الإجراء ضروري لاستيفاء شروط متجر تطبيقات آبل للخصوصية
+                (Guideline 5.1.1).
+              </li>
+            </ul>
+
+            <button
+              type="button"
+              onClick={handleDeleteAccount}
+              disabled={isDeletingAccount || isSubmitting} // منع الضغط أثناء الحذف أو الحفظ العادي
+              style={{
+                marginTop: "20px",
+                backgroundColor:
+                  isDeletingAccount || isSubmitting ? "#cbd5e1" : "#dc2626", // أحمر للخطر
+                color: "white",
+                border: "none",
+                padding: "14px 24px",
+                borderRadius: "10px",
+                fontWeight: "900",
+                fontSize: "1rem",
+                cursor:
+                  isDeletingAccount || isSubmitting ? "not-allowed" : "pointer",
+                transition: "0.2s",
+                boxShadow:
+                  isDeletingAccount || isSubmitting
+                    ? "none"
+                    : `0 4px 10px rgba(220, 38, 38, 0.2)`,
+                width: "auto", // ليظهر كزر محدد وليس بعرض الصفحة
+              }}
+            >
+              {isDeletingAccount
+                ? "⏳ جاري حذف الحساب..."
+                : "تأكيد حذف حسابي نهائياً 🗑️"}
+            </button>
           </div>
         </div>
 

@@ -1,6 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 import { useTranslation } from "react-i18next";
+
+// 🚀 تهيئة Capacitor لضمان الدخول داخل التطبيق (Native/In-App UX)
+import { Browser } from "@capacitor/browser";
+import { App } from "@capacitor/app";
 
 // نصوص الصفحات القانونية (تمت صياغتها بشكل احترافي)
 const legalDocs = {
@@ -37,6 +41,27 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const [activeLegalDoc, setActiveLegalDoc] = useState(null);
 
+  // ✨ إعداد دائم داخل التطبيق لاستلام الرابط العميق (Deep Link Callback)
+  useEffect(() => {
+    // 1. استماع للرابط العميق لإنهاء الدخول بـ Supabase
+    const handleUrlOpener = (event) => {
+      if (event.url.includes("com.bookonmap.app://auth-callback")) {
+        const url = new URL(event.url);
+        if (url.hash && url.hash.includes("#access_token")) {
+          // Supabase JS سيقوم تلقائياً بإنشاء الجلسة إذا كان التوكين موجوداً في الهاش
+          console.log("Deep link received, session should create...");
+        }
+      }
+    };
+
+    App.addListener("appUrlOpen", handleUrlOpener);
+
+    // تنظيف المستمع عند مسح الـ Component
+    return () => {
+      App.removeAllListeners("appUrlOpen");
+    };
+  }, []);
+
   // تبديل اللغة
   const toggleLanguage = () => {
     const newLang = i18n.language === "ar" ? "en" : "ar";
@@ -44,11 +69,16 @@ const Login = () => {
     document.documentElement.dir = newLang === "ar" ? "rtl" : "ltr";
   };
 
+  // ✨ تعديل تسجيل دخول جوجل ليعمل داخل التطبيق عبر Deep Link
   const handleGoogleLogin = async () => {
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
-        options: { redirectTo: window.location.origin },
+        options: {
+          // 🚨 قم بتغيير com.bookonmap.app إلى الـ Bundle ID الحقيقي الخاص بك في Xcode
+          // redirectTo: window.location.origin -> MUST CHANGE
+          redirectTo: "com.bookonmap.app://auth-callback",
+        },
       });
       if (error) throw error;
     } catch (error) {
@@ -56,15 +86,19 @@ const Login = () => {
     }
   };
 
+  // ✨ تعديل تسجيل دخول أبل ليعمل داخل التطبيق عبر Deep Link
   const handleAppleLogin = async () => {
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "apple",
-        options: { redirectTo: window.location.origin },
+        options: {
+          // 🚨 قم بتغيير com.bookonmap.app إلى الـ Bundle ID الحقيقي الخاص بك في Xcode
+          redirectTo: "com.bookonmap.app://auth-callback",
+        },
       });
       if (error) throw error;
     } catch (error) {
-      alert("لم يتم تفعيل الدخول بحساب أبل بعد في إعدادات الخادم.");
+      alert("لم يتم تفعيل الدخول بحساب أبل بعد في إعدادات الخادم أو Xcode.");
     }
   };
 
