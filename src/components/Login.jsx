@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 // 🚀 تهيئة Capacitor لضمان الدخول داخل التطبيق (Native/In-App UX)
 import { Browser } from "@capacitor/browser";
 import { App } from "@capacitor/app";
+import { SignInWithApple } from "@capacitor-community/apple-sign-in"; // تم إضافة مكتبة الدخول الأصلي لأبل
 
 // نصوص الصفحات القانونية (تمت صياغتها بشكل احترافي)
 const legalDocs = {
@@ -86,19 +87,34 @@ const Login = () => {
     }
   };
 
-  // ✨ تعديل تسجيل دخول أبل ليعمل داخل التطبيق عبر Deep Link
+  // ✨ تعديل تسجيل دخول أبل ليعمل بشكل أصلي (Native) داخل التطبيق
   const handleAppleLogin = async () => {
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: "apple",
-        options: {
-          // 🚨 قم بتغيير com.bookonmap.app إلى الـ Bundle ID الحقيقي الخاص بك في Xcode
-          redirectTo: "com.bookonmap.app://auth-callback",
-        },
+      // 1. استدعاء نافذة أبل الأصلية (بصمة الوجه/الإصبع)
+      const { response } = await SignInWithApple.authorize({
+        clientId: "com.bookonmap.app",
+        scopes: "email name",
       });
+
+      // 2. استخراج رمز الأمان (Token) اللي عطتنا إياه أبل
+      const idToken = response.identityToken;
+
+      if (!idToken) {
+        throw new Error("لم يتم إرجاع رمز تحقق من أبل");
+      }
+
+      // 3. إرسال الرمز إلى Supabase لتسجيل الدخول بهدوء في الخلفية
+      const { data, error } = await supabase.auth.signInWithIdToken({
+        provider: "apple",
+        token: idToken,
+      });
+
       if (error) throw error;
+
+      console.log("تم تسجيل الدخول بنجاح!", data);
     } catch (error) {
-      alert("لم يتم تفعيل الدخول بحساب أبل بعد في إعدادات الخادم أو Xcode.");
+      console.error("حدث خطأ أثناء تسجيل الدخول بـ Apple:", error);
+      alert("حدث خطأ أثناء تسجيل الدخول بحساب أبل.");
     }
   };
 
