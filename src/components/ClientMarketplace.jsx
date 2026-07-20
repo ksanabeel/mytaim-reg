@@ -60,6 +60,9 @@ export default function ClientMarketplace({
   const observer = useRef();
   const ITEMS_PER_PAGE = 12;
 
+  // حالة التحكم في إرسال الطلب لمنع التكرار (Debounce / Loading)
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   // حالة الحجز تتضمن العدد اليدوي ورسالة العميل
   const [bookingData, setBookingData] = useState({
     startDate: "",
@@ -208,10 +211,8 @@ export default function ClientMarketplace({
     }
   };
 
-  // 🪄 دالة ذكية لتحويل أي رابط نصي إلى رابط قابل للضغط بنفس النص الذي أدخله الإدارة
   const renderTextWithLinks = (text) => {
     if (!text) return text;
-    // كود البحث عن الروابط
     const urlRegex = /(https?:\/\/[^\s]+)/g;
 
     return text.split(urlRegex).map((part, index) => {
@@ -223,7 +224,7 @@ export default function ClientMarketplace({
             target="_blank"
             rel="noopener noreferrer"
             style={{
-              color: "#fef08a", // لون أصفر فاتح يبرز على البنفسجي
+              color: "#fef08a",
               textDecoration: "underline",
               fontWeight: "bold",
               margin: "0 4px",
@@ -550,6 +551,9 @@ export default function ClientMarketplace({
   };
 
   const handleBook = async () => {
+    // منع الضغط المتكرر إذا كان الطلب قيد المعالجة بالفعل
+    if (isSubmitting) return;
+
     if (!session) {
       if (typeof onRequireLogin === "function") onRequireLogin();
       else
@@ -634,87 +638,100 @@ export default function ClientMarketplace({
         );
     }
 
-    // حماية الطاقة الاستيعابية
-    const { data: existing } = await supabase
-      .from("bookings")
-      .select("appointment_date, end_time, quantity")
-      .eq("offering_id", selected.id)
-      .neq("status", "cancelled");
-    let overlappingUsedCapacity = 0;
-    existing?.forEach((b) => {
-      const bStart = new Date(b.appointment_date);
-      const bEnd = new Date(b.end_time);
-      if (requestedStart < bEnd && requestedEnd > bStart)
-        overlappingUsedCapacity += b.quantity || 1;
-    });
+    // تفعيل قفل الزر لمنع الحجوزات المكررة
+    setIsSubmitting(true);
 
-    const maxCapacity = selected.max_capacity || 1;
-    if (overlappingUsedCapacity + bookingData.manualQuantity > maxCapacity) {
-      return alert(
-        `⚠️ نعتذر، السعة المتاحة في هذا الوقت هي ${Math.max(
-          0,
-          maxCapacity - overlappingUsedCapacity,
-        )} فقط من أصل ${maxCapacity}. الرجاء تقليل العدد المطلوب أو تغيير الوقت.`,
-      );
-    }
+    try {
+      // حماية الطاقة الاستيعابية
+      const { data: existing } = await supabase
+        .from("bookings")
+        .select("appointment_date, end_time, quantity")
+        .eq("offering_id", selected.id)
+        .neq("status", "cancelled");
+      let overlappingUsedCapacity = 0;
+      existing?.forEach((b) => {
+        const bStart = new Date(b.appointment_date);
+        const bEnd = new Date(b.end_time);
+        if (requestedStart < bEnd && requestedEnd > bStart)
+          overlappingUsedCapacity += b.quantity || 1;
+      });
 
-    // ✨ استخراج رقم الحجز (ID) مباشرة بعد الإنشاء
-    const { data: bookingResult, error } = await supabase
-      .from("bookings")
-      .insert([
-        {
-          offering_id: selected.id,
-          customer_id: session.user.id,
-          appointment_date: requestedStart.toISOString(),
-          end_time: requestedEnd.toISOString(),
-          location: finalLocation,
-          quantity: bookingData.manualQuantity,
-          status: selected.price_upon_agreement
-            ? "awaiting_pricing"
-            : "pending",
-          client_contact: bookingData.clientContact,
-          proposed_price: selected.price_upon_agreement
-            ? null
-            : calculatedData.price,
-        },
-      ])
-      .select();
-
-    if (!error && bookingResult) {
-      const providerId = selected.provider_id || selected.profiles?.id;
-      const newBookingId = bookingResult[0].id;
-
-      // إرسال الرسالة إلى جدول messages
-      if (bookingData.clientMessage.trim() && providerId) {
-        await supabase.from("messages").insert([
-          {
-            booking_id: newBookingId,
-            sender_id: session.user.id,
-            receiver_id: providerId,
-            text_content: bookingData.clientMessage.trim(),
-          },
-        ]);
+      const maxCapacity = selected.max_capacity || 1;
+      if (overlappingUsedCapacity + bookingData.manualQuantity > maxCapacity) {
+        setIsSubmitting(false);
+        return alert(
+          `⚠️ نعتذر، السعة المتاحة في هذا الوقت هي ${Math.max(
+            0,
+            maxCapacity - overlappingUsedCapacity,
+          )} فقط من أصل ${maxCapacity}. الرجاء تقليل العدد المطلوب أو تغيير الوقت.`,
+        );
       }
 
-      if (providerId)
-        await supabase.from("notifications").insert([
+      // ✨ استخراج رقم الحجز (ID) مباشرة بعد الإنشاء
+      const { data: bookingResult, error } = await supabase
+        .from("bookings")
+        .insert([
           {
-            user_id: providerId,
-            title: "طلب حجز جديد 🆕",
-            message: `لديك طلب حجز جديد لخدمة "${selected.title}". يرجى مراجعته في لوحة أعمالك.`,
-            is_read: false,
+            offering_id: selected.id,
+            customer_id: session.user.id,
+            appointment_date: requestedStart.toISOString(),
+            end_time: requestedEnd.toISOString(),
+            location: finalLocation,
+            quantity: bookingData.manualQuantity,
+            status: selected.price_upon_agreement
+              ? "awaiting_pricing"
+              : "pending",
+            client_contact: bookingData.clientContact,
+            proposed_price: selected.price_upon_agreement
+              ? null
+              : calculatedData.price,
           },
-        ]);
+        ])
+        .select();
 
-      alert(
-        isRTL
-          ? selected.price_upon_agreement
-            ? "تم إرسال طلب التسعير للمزود بنجاح 📨"
-            : "تم إرسال الطلب للمزود بنجاح ✅"
-          : "Request sent successfully ✅",
-      );
-      setSelected(null);
-    } else alert("Error: " + error.message);
+      if (!error && bookingResult) {
+        const providerId = selected.provider_id || selected.profiles?.id;
+        const newBookingId = bookingResult[0].id;
+
+        // إرسال الرسالة إلى جدول messages
+        if (bookingData.clientMessage.trim() && providerId) {
+          await supabase.from("messages").insert([
+            {
+              booking_id: newBookingId,
+              sender_id: session.user.id,
+              receiver_id: providerId,
+              text_content: bookingData.clientMessage.trim(),
+            },
+          ]);
+        }
+
+        if (providerId)
+          await supabase.from("notifications").insert([
+            {
+              user_id: providerId,
+              title: "طلب حجز جديد 🆕",
+              message: `لديك طلب حجز جديد لخدمة "${selected.title}". يرجى مراجعته في لوحة أعمالك.`,
+              is_read: false,
+            },
+          ]);
+
+        alert(
+          isRTL
+            ? selected.price_upon_agreement
+              ? "تم إرسال طلب التسعير للمزود بنجاح 📨"
+              : "تم إرسال الطلب للمزود بنجاح ✅"
+            : "Request sent successfully ✅",
+        );
+        setSelected(null);
+      } else {
+        alert("Error: " + error.message);
+      }
+    } catch (err) {
+      alert("حدث خطأ غير متوقع، يرجى المحاولة لاحقاً.");
+    } finally {
+      // إعادة تفعيل الزر بعد الانتهاء (سواء نجح أو فشل)
+      setIsSubmitting(false);
+    }
   };
 
   const modelLabels = {
@@ -2207,17 +2224,25 @@ export default function ClientMarketplace({
               )}
             </div>
 
+            {/* زر الحجز المحدث مع حالة التعطيل ومنع التكرار */}
             <button
               onClick={handleBook}
+              disabled={isSubmitting}
               style={{
                 ...confirmBtn,
-                backgroundColor: selected.profiles?.theme_color || "#7c3aed",
+                backgroundColor: isSubmitting
+                  ? "#94a3b8"
+                  : selected.profiles?.theme_color || "#7c3aed",
+                cursor: isSubmitting ? "not-allowed" : "pointer",
                 boxShadow: `0 4px 15px ${
                   selected.profiles?.theme_color || "#7c3aed"
                 }40`,
+                opacity: isSubmitting ? 0.8 : 1,
               }}
             >
-              {selected.price_upon_agreement
+              {isSubmitting
+                ? "⏳ جاري إرسال الطلب..."
+                : selected.price_upon_agreement
                 ? "إرسال طلب تسعير للمزود 📨"
                 : isRTL
                 ? "تأكيد وإرسال الطلب ✅"
