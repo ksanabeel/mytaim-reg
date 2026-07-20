@@ -436,26 +436,32 @@ export default function ClientMarketplace({
   }, [bookingData, selected, t]);
 
   const handleGetLocation = () => {
-    if (!navigator.geolocation)
+    if (!navigator.geolocation) {
       return alert(
         isRTL
           ? "جهازك لا يدعم تحديد الموقع."
           : "Your device doesn't support geolocation.",
       );
+    }
 
     navigator.geolocation.getCurrentPosition(
-      (pos) =>
+      (pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
         setBookingData({
           ...bookingData,
-          gpsLocation: `https://maps.google.com/?q=${pos.coords.latitude},${pos.coords.longitude}`,
+          gpsLocation: `https://maps.google.com/?q=${lat},${lng}`,
           manualLocation: "",
-        }),
-      () =>
+        });
+      },
+      (err) => {
         alert(
           isRTL
-            ? "يرجى السماح بالوصول للـ GPS 📍"
+            ? "يرجى السماح بالوصول للـ GPS من إعدادات الجهاز 📍"
             : "Please allow GPS access 📍",
-        ),
+        );
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 },
     );
   };
 
@@ -729,7 +735,6 @@ export default function ClientMarketplace({
     } catch (err) {
       alert("حدث خطأ غير متوقع، يرجى المحاولة لاحقاً.");
     } finally {
-      // إعادة تفعيل الزر بعد الانتهاء (سواء نجح أو فشل)
       setIsSubmitting(false);
     }
   };
