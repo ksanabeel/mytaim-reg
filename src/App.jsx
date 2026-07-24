@@ -3529,7 +3529,7 @@ function MainAppContent() {
                                   fontWeight: "900",
                                 }}
                               >
-                                لوحة تحكم طلبات خدماتي
+                                لوحة تحكم حجوزاتي كمزود خدمه
                               </h2>
                               <p
                                 style={{
@@ -3586,7 +3586,7 @@ function MainAppContent() {
                                   fontWeight: "900",
                                 }}
                               >
-                                مشترياتي وطلباتي كعميل
+                                حجوزاتي وطلباتي كعميل
                               </h2>
                               <p
                                 style={{
