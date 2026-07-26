@@ -731,7 +731,7 @@ export default function ProfileSettings({ session, onUpdate }) {
                 <option value="">اختر من القائمة...</option>
                 <option value="twitter">تويتر (X)</option>
                 <option value="snapchat">سناب شات</option>
-                <option value="friend">صديق / شخص مسوق</option>
+                <option value="friend">(المسوق)شريك Book On Map </option>
                 <option value="search">محرك بحث (جوجل)</option>
                 <option value="other">أخرى</option>
               </select>
