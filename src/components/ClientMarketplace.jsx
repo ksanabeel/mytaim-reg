@@ -2079,30 +2079,26 @@ export default function ClientMarketplace({
                   >
                     الوقت (البدء) {isTimeOptional && "(اختياري)"}:
                   </label>
-                  <SmartDatePicker
-                    disableDayPicker
-                    format="hh:mm A"
-                    plugins={[<SmartTimePicker hideSeconds />]}
-                    value={
-                      bookingData.startTime
-                        ? new Date(`2026-01-01T${bookingData.startTime}:00`)
-                        : null
+                  <input
+                    type="time"
+                    step="900"
+                    required={!isTimeOptional}
+                    value={bookingData.startTime || ""}
+                    onChange={(e) =>
+                      setBookingData({
+                        ...bookingData,
+                        startTime: e.target.value,
+                      })
                     }
-                    onChange={(date) => {
-                      if (!date) {
-                        setBookingData({ ...bookingData, startTime: "" });
-                        return;
-                      }
-                      const jsDate = date.toDate();
-                      const time = `${String(jsDate.getHours()).padStart(
-                        2,
-                        "0",
-                      )}:${String(jsDate.getMinutes()).padStart(2, "0")}`;
-                      setBookingData({ ...bookingData, startTime: time });
+                    style={{
+                      width: "100%",
+                      padding: "10px",
+                      border: "1px solid #d1d5db",
+                      borderRadius: "8px",
+                      textAlign: "center",
+                      direction: "ltr",
+                      outline: "none",
                     }}
-                    containerStyle={{ width: "100%" }}
-                    inputClass="rmdp-input"
-                    placeholder="اختر الوقت ⏰"
                   />
                 </div>
                 <div style={{ flex: 1 }}>
@@ -2111,30 +2107,26 @@ export default function ClientMarketplace({
                   >
                     الوقت (الانتهاء) {isTimeOptional && "(اختياري)"}:
                   </label>
-                  <SmartDatePicker
-                    disableDayPicker
-                    format="hh:mm A"
-                    plugins={[<SmartTimePicker hideSeconds />]}
-                    value={
-                      bookingData.endTime
-                        ? new Date(`2026-01-01T${bookingData.endTime}:00`)
-                        : null
+                  <input
+                    type="time"
+                    step="900"
+                    required={!isTimeOptional}
+                    value={bookingData.endTime || ""}
+                    onChange={(e) =>
+                      setBookingData({
+                        ...bookingData,
+                        endTime: e.target.value,
+                      })
                     }
-                    onChange={(date) => {
-                      if (!date) {
-                        setBookingData({ ...bookingData, endTime: "" });
-                        return;
-                      }
-                      const jsDate = date.toDate();
-                      const time = `${String(jsDate.getHours()).padStart(
-                        2,
-                        "0",
-                      )}:${String(jsDate.getMinutes()).padStart(2, "0")}`;
-                      setBookingData({ ...bookingData, endTime: time });
+                    style={{
+                      width: "100%",
+                      padding: "10px",
+                      border: "1px solid #d1d5db",
+                      borderRadius: "8px",
+                      textAlign: "center",
+                      direction: "ltr",
+                      outline: "none",
                     }}
-                    containerStyle={{ width: "100%" }}
-                    inputClass="rmdp-input"
-                    placeholder="اختر الوقت ⏰"
                   />
                 </div>
               </div>
