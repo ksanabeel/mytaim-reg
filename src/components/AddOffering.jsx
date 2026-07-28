@@ -236,6 +236,16 @@ export default function AddOffering({
     }
   };
 
+  // ✨ دالة توليد الأوقات في القائمة المنسدلة كل 15 دقيقة
+  const timeOptions = [];
+  for (let h = 0; h < 24; h++) {
+    for (let m = 0; m < 60; m += 15) {
+      const hour = String(h).padStart(2, "0");
+      const minute = String(m).padStart(2, "0");
+      timeOptions.push(`${hour}:${minute}`);
+    }
+  }
+
   return (
     <div
       style={{
@@ -813,25 +823,53 @@ export default function AddOffering({
                 >
                   <div style={{ flex: 1 }}>
                     <label style={labelS}>تبدأ من الساعة:</label>
-                    <input
-                      type="time"
+                    <select
                       className="smart-input"
-                      value={workStart}
+                      value={workStart || ""}
                       onChange={(e) => setWorkStart(e.target.value)}
-                      style={inputS}
+                      style={{
+                        ...inputS,
+                        textAlign: "center",
+                        direction: "ltr",
+                        backgroundColor: "#fff",
+                        cursor: "pointer",
+                      }}
                       required
-                    />
+                    >
+                      <option value="" disabled>
+                        اختر وقت البدء
+                      </option>
+                      {timeOptions.map((time) => (
+                        <option key={`start-${time}`} value={time}>
+                          {time}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                   <div style={{ flex: 1 }}>
                     <label style={labelS}>تنتهي الساعة:</label>
-                    <input
-                      type="time"
+                    <select
                       className="smart-input"
-                      value={workEnd}
+                      value={workEnd || ""}
                       onChange={(e) => setWorkEnd(e.target.value)}
-                      style={inputS}
+                      style={{
+                        ...inputS,
+                        textAlign: "center",
+                        direction: "ltr",
+                        backgroundColor: "#fff",
+                        cursor: "pointer",
+                      }}
                       required
-                    />
+                    >
+                      <option value="" disabled>
+                        اختر وقت الانتهاء
+                      </option>
+                      {timeOptions.map((time) => (
+                        <option key={`end-${time}`} value={time}>
+                          {time}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </div>
               )}

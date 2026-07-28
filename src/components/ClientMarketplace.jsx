@@ -73,7 +73,7 @@ export default function ClientMarketplace({
     gpsLocation: "",
     manualQuantity: 1,
     clientContact: "",
-    clientMessage: "", // ✨ الحقل الجديد لحفظ الرسالة
+    clientMessage: "",
   });
 
   const [calculatedData, setCalculatedData] = useState({
@@ -557,7 +557,6 @@ export default function ClientMarketplace({
   };
 
   const handleBook = async () => {
-    // منع الضغط المتكرر إذا كان الطلب قيد المعالجة بالفعل
     if (isSubmitting) return;
 
     if (!session) {
@@ -644,11 +643,9 @@ export default function ClientMarketplace({
         );
     }
 
-    // تفعيل قفل الزر لمنع الحجوزات المكررة
     setIsSubmitting(true);
 
     try {
-      // حماية الطاقة الاستيعابية
       const { data: existing } = await supabase
         .from("bookings")
         .select("appointment_date, end_time, quantity")
@@ -673,7 +670,6 @@ export default function ClientMarketplace({
         );
       }
 
-      // ✨ استخراج رقم الحجز (ID) مباشرة بعد الإنشاء
       const { data: bookingResult, error } = await supabase
         .from("bookings")
         .insert([
@@ -699,7 +695,6 @@ export default function ClientMarketplace({
         const providerId = selected.provider_id || selected.profiles?.id;
         const newBookingId = bookingResult[0].id;
 
-        // إرسال الرسالة إلى جدول messages
         if (bookingData.clientMessage.trim() && providerId) {
           await supabase.from("messages").insert([
             {
@@ -777,6 +772,75 @@ export default function ClientMarketplace({
       selected.price_upon_agreement);
   const isStoreMode = !!username;
   const storeTheme = storeProfile?.theme_color || "#7c3aed";
+
+  // ✨ دالة توليد الأوقات الذكية
+  const generateTimeOptions = () => {
+    const options = [];
+    const is24Hours = selected?.is_24_7;
+    const startTimeStr = selected?.work_start_time;
+    const endTimeStr = selected?.work_end_time;
+
+    const addSlots = (start, end) => {
+      for (let h = start; h < end; h++) {
+        for (let m = 0; m < 60; m += 15) {
+          options.push(
+            `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`,
+          );
+        }
+      }
+    };
+
+    if (is24Hours) {
+      addSlots(0, 24);
+    } else if (startTimeStr && endTimeStr) {
+      let startH = parseInt(startTimeStr.split(":")[0], 10);
+      let endH = parseInt(endTimeStr.split(":")[0], 10);
+
+      if (endH === 0) endH = 24;
+
+      if (startH < endH) {
+        addSlots(startH, endH);
+      } else {
+        addSlots(startH, 24);
+        addSlots(0, endH);
+      }
+    } else {
+      addSlots(0, 24);
+    }
+    return options;
+  };
+
+  const timeOptions = generateTimeOptions();
+
+  // ✨ دالة ذكية لتعطيل الأيام خارج دوام المزود في التقويم
+  const disableOffDays = ({ date }) => {
+    if (!selected) return;
+
+    // ربط أيام الأسبوع بالأرقام
+    const dayMap = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
+
+    // جلب أيام عمل المزود، أو اعتبار كل الأيام متاحة إذا لم يحدد
+    const activeDays =
+      Array.isArray(selected.available_days) &&
+      selected.available_days.length > 0
+        ? selected.available_days
+        : ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
+
+    // تحويل أسماء الأيام إلى أرقام لتطابق نظام التقويم
+    const activeIndexes = activeDays.map((d) => dayMap[d]);
+
+    // إذا كان اليوم في التقويم لا يطابق أيام عمل المزود، قم بتعطيله!
+    if (!activeIndexes.includes(date.weekDay.index)) {
+      return {
+        disabled: true,
+        style: {
+          color: "#cbd5e1",
+          textDecoration: "line-through",
+          cursor: "not-allowed",
+        },
+      };
+    }
+  };
 
   return (
     <div style={{ direction: isRTL ? "rtl" : "ltr" }}>
@@ -2031,6 +2095,7 @@ export default function ClientMarketplace({
                       setBookingData({ ...bookingData, startDate: start });
                     }}
                     minDate={new Date()}
+                    mapDays={disableOffDays}
                     placeholder="اختر تاريخ البدء 📅"
                     containerStyle={{ width: "100%" }}
                     inputClass="rmdp-input"
@@ -2065,6 +2130,7 @@ export default function ClientMarketplace({
                         ? new Date(bookingData.startDate)
                         : new Date()
                     }
+                    mapDays={disableOffDays}
                     placeholder="اختر تاريخ الانتهاء 📅"
                     containerStyle={{ width: "100%" }}
                     inputClass="rmdp-input"
@@ -2079,9 +2145,7 @@ export default function ClientMarketplace({
                   >
                     الوقت (البدء) {isTimeOptional && "(اختياري)"}:
                   </label>
-                  <input
-                    type="time"
-                    step="900"
+                  <select
                     required={!isTimeOptional}
                     value={bookingData.startTime || ""}
                     onChange={(e) =>
@@ -2098,8 +2162,25 @@ export default function ClientMarketplace({
                       textAlign: "center",
                       direction: "ltr",
                       outline: "none",
+                      backgroundColor: "white",
+                      cursor: "pointer",
                     }}
-                  />
+                  >
+                    <option value="" disabled={!isTimeOptional}>
+                      {isTimeOptional
+                        ? isRTL
+                          ? "-- وقت غير محدد --"
+                          : "-- No Specific Time --"
+                        : isRTL
+                        ? "اختر وقت البدء"
+                        : "Select Start Time"}
+                    </option>
+                    {timeOptions.map((time) => (
+                      <option key={`start-${time}`} value={time}>
+                        {time}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div style={{ flex: 1 }}>
                   <label
@@ -2107,9 +2188,7 @@ export default function ClientMarketplace({
                   >
                     الوقت (الانتهاء) {isTimeOptional && "(اختياري)"}:
                   </label>
-                  <input
-                    type="time"
-                    step="900"
+                  <select
                     required={!isTimeOptional}
                     value={bookingData.endTime || ""}
                     onChange={(e) =>
@@ -2126,8 +2205,25 @@ export default function ClientMarketplace({
                       textAlign: "center",
                       direction: "ltr",
                       outline: "none",
+                      backgroundColor: "white",
+                      cursor: "pointer",
                     }}
-                  />
+                  >
+                    <option value="" disabled={!isTimeOptional}>
+                      {isTimeOptional
+                        ? isRTL
+                          ? "-- وقت غير محدد --"
+                          : "-- No Specific Time --"
+                        : isRTL
+                        ? "اختر وقت الانتهاء"
+                        : "Select End Time"}
+                    </option>
+                    {timeOptions.map((time) => (
+                      <option key={`end-${time}`} value={time}>
+                        {time}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
             </div>
