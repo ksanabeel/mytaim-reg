@@ -797,7 +797,7 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
                 />
                 <input
                   type="text"
-                  placeholder="سبب التكلفة (مثال: رسوم سكن وتذاكر سفر)"
+                  placeholder="سبب التكلفة (مثال: تسعير جديد او رسوم سكن وتذاكر سفر)"
                   value={extraDetails}
                   onChange={(e) => setExtraDetails(e.target.value)}
                   style={inputS}
