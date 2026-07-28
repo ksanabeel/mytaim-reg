@@ -790,7 +790,7 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
 
                 <input
                   type="number"
-                  placeholder="مبلغ التكلفة الإضافية (ريال)"
+                  placeholder="مبلغ التسعير او  التكلفة الإضافية (ريال)"
                   value={extraCostAmount}
                   onChange={(e) => setExtraCostAmount(e.target.value)}
                   style={inputS}
