@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next"; // أضفنا مكتبة الترجمة للتواريخ
 
 export default function InvoicesView({
   bookings = [],
@@ -7,6 +8,8 @@ export default function InvoicesView({
   platName = "المنصة",
   platLogo = "📍",
 }) {
+  const { i18n } = useTranslation();
+
   // ✨ حالات الفلترة والبحث ✨
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
@@ -40,6 +43,7 @@ export default function InvoicesView({
       qty: b.quantity || 1,
     };
   };
+
   // تطبيق الفلاتر
   let processedBookings = bookings.filter((b) => b.status === "completed");
 
@@ -92,13 +96,60 @@ export default function InvoicesView({
     backgroundColor: "#fff",
   };
 
+  // ✨ دوال استخراج وتنسيق التواريخ والأوقات ✨
+  const isRTL = i18n?.language === "ar" || true; // افتراضي عربي
+  const dateLocale = isRTL ? "ar-SA" : "en-US";
+
+  const getFullFormattedDate = (dateObj) => {
+    if (!dateObj) return null;
+    try {
+      const dayName = new Intl.DateTimeFormat(dateLocale, {
+        weekday: "long",
+      }).format(dateObj);
+      const gregDate = new Intl.DateTimeFormat(dateLocale, {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      }).format(dateObj);
+      const hijriDate = new Intl.DateTimeFormat("ar-SA-u-ca-islamic-umalqura", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      }).format(dateObj);
+      return { dayName, gregDate, hijriDate };
+    } catch (e) {
+      return null;
+    }
+  };
+
   // دالة فتح نافذة الفاتورة وتمرير الحسابات معها
   const openInvoiceModal = (b) => {
+    // تجهيز التواريخ لحظة الفتح
+    const startObj = b.appointment_date ? new Date(b.appointment_date) : null;
+    const endObj = b.end_time ? new Date(b.end_time) : null;
+
+    const startTimeStr = startObj
+      ? startObj.toLocaleTimeString(dateLocale, {
+          hour: "2-digit",
+          minute: "2-digit",
+        })
+      : "";
+    const endTimeStr = endObj
+      ? endObj.toLocaleTimeString(dateLocale, {
+          hour: "2-digit",
+          minute: "2-digit",
+        })
+      : "";
+
     setSelectedInvoice({
       booking: b,
       fin: calculateFinancials(b),
       isProvider: b.offerings?.provider_id === userId,
       currency: b.offerings?.currency || "SAR",
+      startFormatted: getFullFormattedDate(startObj),
+      endFormatted: getFullFormattedDate(endObj),
+      startTimeStr,
+      endTimeStr,
     });
   };
 
@@ -623,16 +674,14 @@ export default function InvoicesView({
                     marginTop: "5px",
                   }}
                 >
-                  <strong>التاريخ:</strong>{" "}
-                  {new Date(
-                    selectedInvoice.booking.appointment_date,
-                  ).toLocaleDateString("ar-SA")}
+                  <strong>تاريخ الإصدار:</strong>{" "}
+                  {new Date().toLocaleDateString("ar-SA")}
                 </div>
               </div>
             </div>
 
             {/* --- بيانات الأطراف --- */}
-            <div style={{ display: "flex", gap: "30px", marginBottom: "40px" }}>
+            <div style={{ display: "flex", gap: "30px", marginBottom: "20px" }}>
               <div
                 style={{
                   flex: 1,
@@ -704,6 +753,136 @@ export default function InvoicesView({
               </div>
             </div>
 
+            {/* ✨ قسم تفاصيل الموعد والموقع (الجديد المضاف للفاتورة) ✨ */}
+            <div
+              style={{
+                backgroundColor: "#eff6ff",
+                border: "1px dashed #bfdbfe",
+                padding: "20px",
+                borderRadius: "16px",
+                marginBottom: "30px",
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: "20px",
+              }}
+            >
+              {/* تاريخ البدء */}
+              <div>
+                <h4
+                  style={{
+                    margin: "0 0 8px 0",
+                    color: "#64748b",
+                    fontSize: "0.85rem",
+                  }}
+                >
+                  تاريخ ووقت البدء:
+                </h4>
+                {selectedInvoice.startFormatted ? (
+                  <div
+                    style={{
+                      color: "#1e293b",
+                      fontWeight: "bold",
+                      fontSize: "0.95rem",
+                      lineHeight: "1.6",
+                    }}
+                  >
+                    📅 {selectedInvoice.startFormatted.dayName}،{" "}
+                    {selectedInvoice.startFormatted.gregDate}
+                    <div style={{ color: "#64748b", fontSize: "0.85rem" }}>
+                      🌙 {selectedInvoice.startFormatted.hijriDate}
+                    </div>
+                    <div style={{ marginTop: "4px" }}>
+                      ⏰ {selectedInvoice.startTimeStr}
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ color: "#64748b" }}>غير محدد</div>
+                )}
+              </div>
+
+              {/* تاريخ الانتهاء */}
+              <div>
+                <h4
+                  style={{
+                    margin: "0 0 8px 0",
+                    color: "#64748b",
+                    fontSize: "0.85rem",
+                  }}
+                >
+                  تاريخ ووقت الانتهاء:
+                </h4>
+                <div
+                  style={{
+                    color: "#1e293b",
+                    fontWeight: "bold",
+                    fontSize: "0.95rem",
+                    lineHeight: "1.6",
+                  }}
+                >
+                  {selectedInvoice.endFormatted ? (
+                    <>
+                      🏁 {selectedInvoice.endFormatted.dayName}،{" "}
+                      {selectedInvoice.endFormatted.gregDate}
+                      <div style={{ color: "#64748b", fontSize: "0.85rem" }}>
+                        🌙 {selectedInvoice.endFormatted.hijriDate}
+                      </div>
+                    </>
+                  ) : (
+                    <>🏁 نفس تاريخ البدء</>
+                  )}
+                  <div style={{ marginTop: "4px" }}>
+                    ⌛ {selectedInvoice.endTimeStr || "غير محدد"}
+                  </div>
+                </div>
+              </div>
+
+              {/* الموقع (إن وجد) يأخذ المساحة الكاملة بالأسفل */}
+              {selectedInvoice.booking.location && (
+                <div
+                  style={{
+                    gridColumn: "1 / -1",
+                    borderTop: "1px solid #bfdbfe",
+                    paddingTop: "15px",
+                    marginTop: "5px",
+                  }}
+                >
+                  <h4
+                    style={{
+                      margin: "0 0 8px 0",
+                      color: "#64748b",
+                      fontSize: "0.85rem",
+                    }}
+                  >
+                    📍 موقع تقديم الخدمة:
+                  </h4>
+                  <div
+                    style={{
+                      color: "#1e293b",
+                      fontWeight: "bold",
+                      fontSize: "0.95rem",
+                      wordBreak: "break-all",
+                    }}
+                  >
+                    {selectedInvoice.booking.location.startsWith("http") ? (
+                      <a
+                        href={selectedInvoice.booking.location}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{
+                          color: "#2563eb",
+                          textDecoration: "underline",
+                        }}
+                      >
+                        رابط الموقع على الخريطة (اضغط للفتح)
+                      </a>
+                    ) : (
+                      selectedInvoice.booking.location
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* --- تفاصيل الخدمة (الجدول) --- */}
             <h3
               style={{
@@ -712,7 +891,7 @@ export default function InvoicesView({
                 fontSize: "1.1rem",
               }}
             >
-              تفاصيل الخدمة المنفذة:
+              التفاصيل المالية للخدمة المنفذة:
             </h3>
             <table
               style={{

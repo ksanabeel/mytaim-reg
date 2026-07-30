@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
+import { useTranslation } from "react-i18next";
 
 // ✨ مكون بطاقة الحجز المطور والشامل ✨
 export default function BookingRow({ booking, onRefresh, isProviderView }) {
+  const { t, i18n } = useTranslation();
   const [loading, setLoading] = useState(false);
 
   // ✨ الإخفاء الفوري اللحظي من الشاشة عند الضغط على أرشفة ✨
@@ -154,10 +156,8 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
       "الرجاء كتابة سبب الإلغاء ليتم إشعار الطرف الآخر:",
     );
 
-    // إذا ضغط المستخدم على زر الإلغاء في النافذة
     if (reason === null) return;
 
-    // التأكد من عدم ترك السبب فارغاً
     if (reason.trim() === "") {
       return alert("لا يمكن إلغاء الحجز المؤكد بدون ذكر السبب!");
     }
@@ -169,14 +169,12 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
     const senderId = isProviderView ? providerId : customerId;
     const receiverId = isProviderView ? customerId : providerId;
 
-    // 1. تغيير الحالة إلى ملغي
     const { error } = await supabase
       .from("bookings")
       .update({ status: "cancelled" })
       .eq("id", booking.id);
 
     if (!error) {
-      // 2. إرسال رسالة آلية في شات الحجز لتوثيق السبب للطرفين
       await supabase.from("messages").insert([
         {
           booking_id: booking.id,
@@ -186,7 +184,6 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
         },
       ]);
 
-      // 3. إرسال إشعار للطرف الآخر
       await notifyUser(
         receiverId,
         "تم إلغاء الحجز المؤكد ❌",
@@ -196,7 +193,7 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
       );
 
       alert("تم إلغاء الحجز بنجاح وإرسال السبب للطرف الآخر.");
-      fetchMessages(); // تحديث المراسلات
+      fetchMessages();
       if (onRefresh) onRefresh();
     } else {
       alert("حدث خطأ أثناء الإلغاء: " + error.message);
@@ -436,6 +433,55 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
     fontFamily: "inherit",
   };
 
+  // ✨ استخراج أوقات البدء والانتهاء (بصيغة متقدمة: اليوم + الميلادي كامل + الهجري) ✨
+  const isRTL = i18n.language === "ar";
+  const dateLocale = isRTL ? "ar-SA" : "en-US";
+
+  // دوال مساعدة لتنسيق التاريخ
+  const getFullFormattedDate = (dateObj) => {
+    if (!dateObj) return "";
+
+    // 1. استخراج اسم اليوم
+    const dayName = new Intl.DateTimeFormat(dateLocale, {
+      weekday: "long",
+    }).format(dateObj);
+
+    // 2. استخراج التاريخ الميلادي كاملاً (اليوم، الشهر، السنة)
+    const gregDate = new Intl.DateTimeFormat(dateLocale, {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    }).format(dateObj);
+
+    // 3. استخراج التاريخ الهجري كاملاً
+    const hijriDate = new Intl.DateTimeFormat("ar-SA-u-ca-islamic-umalqura", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    }).format(dateObj);
+
+    return { dayName, gregDate, hijriDate };
+  };
+
+  const startDateTime = new Date(booking.appointment_date);
+  const endDateTime = booking.end_time ? new Date(booking.end_time) : null;
+
+  const startTimeStr = startDateTime.toLocaleTimeString(dateLocale, {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const endTimeStr = endDateTime
+    ? endDateTime.toLocaleTimeString(dateLocale, {
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : isRTL
+    ? "غير محدد"
+    : "N/A";
+
+  const startFormatted = getFullFormattedDate(startDateTime);
+  const endFormatted = endDateTime ? getFullFormattedDate(endDateTime) : null;
+
   if (hidden) return null;
   if (isProviderView && booking.is_archived_by_provider) return null;
   if (!isProviderView && booking.is_archived_by_client) return null;
@@ -521,24 +567,117 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
             ? booking.profiles?.full_name || "عميل غير محدد"
             : booking.offerings?.profiles?.full_name || "مزود غير محدد"}
         </span>
-        <span style={{ display: "flex", alignItems: "center", gap: "5px" }}>
-          📅{" "}
-          {booking.appointment_date
-            ? new Date(booking.appointment_date).toLocaleDateString("ar-SA")
-            : "غير محدد"}
-        </span>
-        <span style={{ display: "flex", alignItems: "center", gap: "5px" }}>
-          ⏰{" "}
-          {booking.appointment_date &&
-          booking.appointment_date.includes("T00:00")
-            ? "وقت مرن"
-            : booking.appointment_date
-            ? new Date(booking.appointment_date).toLocaleTimeString("ar-SA", {
-                hour: "2-digit",
-                minute: "2-digit",
-              })
-            : "غير محدد"}
-        </span>
+      </div>
+
+      {/* ✨ شبكة تفاصيل الموعد (البدء والانتهاء) محدثة بالتفاصيل الجديدة ✨ */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: "15px",
+          backgroundColor: "#f8fafc",
+          padding: "15px",
+          borderRadius: "12px",
+          border: "1px dashed #cbd5e1",
+          margin: "10px 0",
+          textAlign: isRTL ? "right" : "left",
+        }}
+      >
+        {/* قسم تاريخ ووقت البدء */}
+        <div>
+          <div
+            style={{
+              fontSize: "0.8rem",
+              color: "#64748b",
+              marginBottom: "8px",
+              fontWeight: "bold",
+            }}
+          >
+            تاريخ ووقت البدء
+          </div>
+          <div
+            style={{
+              fontSize: "0.95rem",
+              fontWeight: "bold",
+              color: "#0f172a",
+              lineHeight: "1.8",
+            }}
+          >
+            📅{" "}
+            <span style={{ color: "#7c3aed" }}>{startFormatted.dayName}</span>،{" "}
+            {startFormatted.gregDate}
+            <div
+              style={{
+                fontSize: "0.8rem",
+                color: "#64748b",
+                paddingRight: "25px",
+                marginTop: "-2px",
+              }}
+            >
+              🌙 {startFormatted.hijriDate}
+            </div>
+            <div style={{ marginTop: "4px" }}>⏰ {startTimeStr}</div>
+          </div>
+        </div>
+
+        {/* قسم تاريخ ووقت الانتهاء */}
+        <div>
+          <div
+            style={{
+              fontSize: "0.8rem",
+              color: "#64748b",
+              marginBottom: "8px",
+              fontWeight: "bold",
+            }}
+          >
+            تاريخ ووقت الانتهاء
+          </div>
+          <div
+            style={{
+              fontSize: "0.95rem",
+              fontWeight: "bold",
+              color: "#0f172a",
+              lineHeight: "1.8",
+            }}
+          >
+            {endFormatted ? (
+              <>
+                🏁{" "}
+                <span style={{ color: "#7c3aed" }}>{endFormatted.dayName}</span>
+                ، {endFormatted.gregDate}
+                <div
+                  style={{
+                    fontSize: "0.8rem",
+                    color: "#64748b",
+                    paddingRight: "25px",
+                    marginTop: "-2px",
+                  }}
+                >
+                  🌙 {endFormatted.hijriDate}
+                </div>
+              </>
+            ) : (
+              <>
+                🏁{" "}
+                <span style={{ color: "#7c3aed" }}>
+                  {startFormatted.dayName}
+                </span>
+                ، {startFormatted.gregDate}
+                <div
+                  style={{
+                    fontSize: "0.8rem",
+                    color: "#64748b",
+                    paddingRight: "25px",
+                    marginTop: "-2px",
+                  }}
+                >
+                  🌙 {startFormatted.hijriDate}
+                </div>
+              </>
+            )}
+            <div style={{ marginTop: "4px" }}>⌛ {endTimeStr}</div>
+          </div>
+        </div>
       </div>
 
       <div

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { supabase } from "../lib/supabase";
+import { useTranslation } from "react-i18next"; // مكتبة الترجمة لاستخراج لغة المستخدم
 
 // --- التنسيقات العامة والجمالية للملف ---
 const thS = {
@@ -109,12 +110,38 @@ const sumByCurrency = (
   return entries.map(([c, v]) => `${v.toFixed(2)} ${c}`).join(" | ");
 };
 
+// ✨ دوال التواريخ والأوقات ✨
+const getFullFormattedDate = (dateObj, locale) => {
+  if (!dateObj) return null;
+  try {
+    const dayName = new Intl.DateTimeFormat(locale, { weekday: "long" }).format(
+      dateObj,
+    );
+    const gregDate = new Intl.DateTimeFormat(locale, {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    }).format(dateObj);
+    const hijriDate = new Intl.DateTimeFormat("ar-SA-u-ca-islamic-umalqura", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    }).format(dateObj);
+    return { dayName, gregDate, hijriDate };
+  } catch (e) {
+    return null;
+  }
+};
+
 // ✨ المكون الرئيسي للوحة التقارير ✨
 export default function AdminReports({
   commissionRate,
   affiliateRate,
   platName,
 }) {
+  const { i18n } = useTranslation();
+  const dateLocale = i18n?.language === "en" ? "en-US" : "ar-SA";
+
   const [data, setData] = useState({ users: [], bookings: [], categories: [] });
   const [loading, setLoading] = useState(true);
 
@@ -341,7 +368,6 @@ export default function AdminReports({
       .sort((a, b) => b.unpaidEarnings - a.unpaidEarnings);
   };
 
-  // ✨ تم إضافة useMemo لزيادة سرعة الصفحة ومنع الحساب المتكرر ✨
   const affiliateStats = useMemo(
     () => getAffiliateStats(),
     [data.users, data.bookings, affiliateRate, commissionRate],
@@ -385,6 +411,7 @@ export default function AdminReports({
             table{width:100%; border-collapse:collapse; margin-top:20px; text-align:center;} 
             th{background:#f1f5f9; padding:12px; border:1px solid #cbd5e1; font-weight:bold;}
             td{padding:12px; border:1px solid #cbd5e1;}
+            .date-block { font-size: 0.85rem; line-height: 1.4; color: #475569; }
           </style>
         </head>
         <body>
@@ -397,6 +424,7 @@ export default function AdminReports({
               <tr>
                 <th>رقم الحجز</th>
                 <th>المزود والخدمة</th>
+                <th>التاريخ والوقت</th>
                 <th>بيانات العميل</th>
                 <th>الإجمالي</th>
                 <th>صافي المزود</th>
@@ -409,6 +437,43 @@ export default function AdminReports({
                 .map((b) => {
                   const curr = b.offerings?.currency || "SAR";
                   const fin = calculateFinancials(b, commissionRate);
+
+                  // تواريخ الفاتورة للطباعة
+                  const startObj = b.appointment_date
+                    ? new Date(b.appointment_date)
+                    : null;
+                  const endObj = b.end_time ? new Date(b.end_time) : null;
+                  const startF = getFullFormattedDate(startObj, dateLocale);
+                  const endF = endObj
+                    ? getFullFormattedDate(endObj, dateLocale)
+                    : null;
+
+                  const sTime = startObj
+                    ? startObj.toLocaleTimeString(dateLocale, {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })
+                    : "";
+                  const eTime = endObj
+                    ? endObj.toLocaleTimeString(dateLocale, {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })
+                    : "";
+
+                  let datePrintHtml = "غير محدد";
+                  if (startF) {
+                    datePrintHtml = `
+                      <div class="date-block" style="text-align: right;">
+                        <strong>من:</strong> ${startF.gregDate} (${sTime})<br/>
+                        <strong>إلى:</strong> ${
+                          endF
+                            ? `${endF.gregDate} (${eTime})`
+                            : `${startF.gregDate} (${eTime || "غير محدد"})`
+                        }
+                      </div>
+                    `;
+                  }
 
                   const locationData = b.location || "";
                   const isUrl = locationData.includes("http");
@@ -447,6 +512,7 @@ export default function AdminReports({
                       }</small>
                       <small style="background:#f8fafc; padding:3px; border-radius:4px; display:inline-block; margin-top:5px; font-weight:bold;">${locString}</small>
                     </td>
+                    <td>${datePrintHtml}</td>
                     <td style="text-align:right;">
                       <strong>${
                         b.profiles?.full_name || "غير محدد"
@@ -1393,7 +1459,8 @@ export default function AdminReports({
                     borderBottom: "2px solid #e2e8f0",
                   }}
                 >
-                  <th style={thS}>المزود / الخدمة / الموقع</th>
+                  <th style={thS}>المزود والخدمة</th>
+                  <th style={thS}>الموعد والموقع</th>
                   <th style={thS}>العميل والتواصل</th>
                   <th style={thS}>الإجمالي</th>
                   <th style={thS}>صافي المزود</th>
@@ -1409,6 +1476,30 @@ export default function AdminReports({
 
                   const locationData = b.location || "";
                   const isUrl = locationData.includes("http");
+
+                  // تجهيز التواريخ للعرض في الجدول
+                  const startObj = b.appointment_date
+                    ? new Date(b.appointment_date)
+                    : null;
+                  const endObj = b.end_time ? new Date(b.end_time) : null;
+
+                  const sTime = startObj
+                    ? startObj.toLocaleTimeString(dateLocale, {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })
+                    : "";
+                  const eTime = endObj
+                    ? endObj.toLocaleTimeString(dateLocale, {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })
+                    : "";
+
+                  const startF = getFullFormattedDate(startObj, dateLocale);
+                  const endF = endObj
+                    ? getFullFormattedDate(endObj, dateLocale)
+                    : null;
 
                   return (
                     <tr
@@ -1459,74 +1550,147 @@ export default function AdminReports({
                         >
                           📌 خدمة: {b.offerings?.title || "غير محددة"}
                         </div>
-
                         <div
                           style={{
-                            marginTop: "12px",
-                            backgroundColor: "#f1f5f9",
+                            marginTop: "8px",
+                            fontSize: "0.75rem",
+                            color: "#94a3b8",
+                            fontFamily: "monospace",
+                            borderTop: "1px solid #e2e8f0",
+                            paddingTop: "5px",
+                          }}
+                        >
+                          رقم الحجز: #{b.id.substring(0, 8).toUpperCase()}
+                        </div>
+                      </td>
+
+                      {/* ✨ خلية الموعد والموقع الجديدة ✨ */}
+                      <td
+                        style={{
+                          ...tdS,
+                          textAlign: "right",
+                          verticalAlign: "top",
+                        }}
+                      >
+                        <div
+                          style={{
+                            backgroundColor: "#f8fafc",
                             padding: "10px",
                             borderRadius: "10px",
                             border: "1px dashed #cbd5e1",
                           }}
                         >
-                          <div
-                            style={{
-                              fontSize: "0.8rem",
-                              fontWeight: "bold",
-                              color: "#475569",
-                              marginBottom: "6px",
-                            }}
-                          >
-                            📍 موقع التنفيذ:
-                          </div>
-                          {locationData ? (
-                            isUrl ? (
-                              <a
-                                href={locationData}
-                                target="_blank"
-                                rel="noreferrer"
-                                style={{
-                                  color: "#2563eb",
-                                  textDecoration: "none",
-                                  fontSize: "0.85rem",
-                                  fontWeight: "bold",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: "5px",
-                                }}
-                              >
-                                عرض الخريطة{" "}
-                                <span style={{ fontSize: "1rem" }}>🌍</span>
-                              </a>
-                            ) : (
+                          {startF ? (
+                            <div
+                              style={{
+                                fontSize: "0.85rem",
+                                color: "#1e293b",
+                                lineHeight: "1.6",
+                              }}
+                            >
+                              <strong style={{ color: "#64748b" }}>
+                                البدء:
+                              </strong>
+                              <br />
+                              📅 {startF.gregDate} ({sTime})<br />
                               <span
                                 style={{
-                                  color: "#475569",
-                                  fontSize: "0.85rem",
-                                  fontWeight: "bold",
+                                  color: "#64748b",
+                                  fontSize: "0.75rem",
                                 }}
                               >
-                                {locationData}
+                                🌙 {startF.hijriDate}
                               </span>
-                            )
+                            </div>
                           ) : (
-                            <span
-                              style={{ color: "#64748b", fontSize: "0.85rem" }}
+                            <div
+                              style={{ fontSize: "0.85rem", color: "#64748b" }}
                             >
-                              أونلاين / غير محدد
-                            </span>
+                              تاريخ البدء غير محدد
+                            </div>
                           )}
+
                           <div
                             style={{
-                              marginTop: "8px",
-                              fontSize: "0.75rem",
-                              color: "#94a3b8",
-                              fontFamily: "monospace",
                               borderTop: "1px solid #e2e8f0",
-                              paddingTop: "5px",
+                              margin: "8px 0",
                             }}
+                          ></div>
+
+                          {endF ? (
+                            <div
+                              style={{
+                                fontSize: "0.85rem",
+                                color: "#1e293b",
+                                lineHeight: "1.6",
+                              }}
+                            >
+                              <strong style={{ color: "#64748b" }}>
+                                الانتهاء:
+                              </strong>
+                              <br />
+                              🏁 {endF.gregDate} ({eTime})<br />
+                              <span
+                                style={{
+                                  color: "#64748b",
+                                  fontSize: "0.75rem",
+                                }}
+                              >
+                                🌙 {endF.hijriDate}
+                              </span>
+                            </div>
+                          ) : (
+                            <div
+                              style={{
+                                fontSize: "0.85rem",
+                                color: "#64748b",
+                                lineHeight: "1.6",
+                              }}
+                            >
+                              <strong style={{ color: "#64748b" }}>
+                                الانتهاء:
+                              </strong>
+                              <br />
+                              🏁 نفس يوم البدء ({eTime || "غير محدد"})
+                            </div>
+                          )}
+
+                          <div
+                            style={{
+                              borderTop: "1px solid #e2e8f0",
+                              margin: "8px 0",
+                            }}
+                          ></div>
+
+                          <div
+                            style={{ fontSize: "0.85rem", fontWeight: "bold" }}
                           >
-                            رقم الحجز: #{b.id.substring(0, 8).toUpperCase()}
+                            {locationData ? (
+                              isUrl ? (
+                                <a
+                                  href={locationData}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  style={{
+                                    color: "#2563eb",
+                                    textDecoration: "none",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "5px",
+                                  }}
+                                >
+                                  عرض الخريطة 🌍
+                                </a>
+                              ) : (
+                                <span style={{ color: "#475569" }}>
+                                  📍 {locationData}
+                                </span>
+                              )
+                            ) : (
+                              <span style={{ color: "#94a3b8" }}>
+                                🌐 أونلاين / غير محدد
+                              </span>
+                            )}
                           </div>
                         </div>
                       </td>
@@ -1563,7 +1727,7 @@ export default function AdminReports({
                         )}
                         <div
                           style={{
-                            color: "#64748b",
+                            color: "#475569",
                             fontSize: "0.85rem",
                             marginTop: "10px",
                             direction: "ltr",
@@ -1840,7 +2004,7 @@ export default function AdminReports({
                 {filteredBookings.length === 0 && (
                   <tr>
                     <td
-                      colSpan="7"
+                      colSpan="8"
                       style={{
                         padding: "40px",
                         color: "#94a3b8",

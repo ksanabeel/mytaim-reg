@@ -29,11 +29,9 @@ export default function CalendarView({
 
   // ✨ ميزة تبديل التقويم (هجري / ميلادي) ✨
   const [calendarType, setCalendarType] = useState(() => {
-    // حاول قراءة الاختيار السابق للمستخدم، وإذا ما فيه خله الافتراضي ميلادي
     return localStorage.getItem("preferredCalendar") || "gregory";
   });
 
-  // حفظ اختيار المستخدم إذا تغير
   useEffect(() => {
     localStorage.setItem("preferredCalendar", calendarType);
   }, [calendarType]);
@@ -44,7 +42,6 @@ export default function CalendarView({
     );
   };
 
-  // دالة مخصصة لطباعة التواريخ بالتنسيق المختار
   const formatDate = (dateObj, options) => {
     if (!dateObj) return "";
     return dateObj.toLocaleDateString(
@@ -59,7 +56,6 @@ export default function CalendarView({
   const daysInMonth = (y, m) => new Date(y, m + 1, 0).getDate();
   const firstDay = new Date(curr.getFullYear(), curr.getMonth(), 1).getDay();
 
-  // ✨ متغير لمعرفة تاريخ اليوم الحالي لتمييزه في التقويم ✨
   const today = new Date();
   const isCurrentMonth =
     today.getMonth() === curr.getMonth() &&
@@ -170,7 +166,6 @@ export default function CalendarView({
     const addCosts = Number(b.additional_costs) || 0;
     const total = price * qty + addCosts;
 
-    // تنسيق التاريخ للطباعة
     const printDate = new Date(b.appointment_date);
     const dateStr = formatDate(printDate);
     const timeStr = printDate.toLocaleTimeString(isRTL ? "ar-SA" : "en-US", {
@@ -283,7 +278,7 @@ export default function CalendarView({
         .toggle-switch:not(.hijri) .toggle-circle { transform: translateX(0); }
       `}</style>
 
-      {/* ✨ محول التقويم (هجري / ميلادي) ✨ */}
+      {/* محول التقويم */}
       <div
         style={{
           display: "flex",
@@ -324,7 +319,7 @@ export default function CalendarView({
         </span>
       </div>
 
-      {/* ✨ رأس التقويم (الشهر والأسهم) بتصميم فخم ✨ */}
+      {/* رأس التقويم */}
       <div
         style={{
           display: "flex",
@@ -361,7 +356,7 @@ export default function CalendarView({
         </button>
       </div>
 
-      {/* ✨ فلاتر عرض التقويم بنظام (Pill Toggle) ✨ */}
+      {/* فلاتر العرض */}
       <div
         className="filter-group"
         style={{
@@ -408,7 +403,6 @@ export default function CalendarView({
           gap: "10px",
         }}
       >
-        {/* أيام الأسبوع */}
         {weekDays.map((d, index) => (
           <div
             key={index}
@@ -425,15 +419,27 @@ export default function CalendarView({
           </div>
         ))}
 
-        {/* خلايا الأيام */}
         {days.map((d, i) => {
           const s = getStatus(d);
           const hasBookings = s !== "free";
           const roles = getDayRoles(d);
           const isThisDay = isCurrentMonth && d === todayDate;
 
-          // تحويل رقم اليوم ليتوافق مع التقويم المختار إذا أردنا ذلك (للتوضيح: سيبقى رقمياً لسهولة القراءة ولكن عرض الشهر في الأعلى يعكس التقويم المختار)
-          const displayDay = d;
+          // ✨ حساب التاريخ المزدوج للخلية ✨
+          let cellDate = null;
+          let gregNum = "";
+          let hijriNum = "";
+
+          if (d) {
+            cellDate = new Date(curr.getFullYear(), curr.getMonth(), d);
+            gregNum = d;
+            hijriNum = new Intl.DateTimeFormat("ar-SA-u-ca-islamic-umalqura", {
+              day: "numeric",
+            }).format(cellDate);
+          }
+
+          const primaryDay = calendarType === "gregory" ? gregNum : hijriNum;
+          const secondaryDay = calendarType === "gregory" ? hijriNum : gregNum;
 
           return (
             <div
@@ -447,8 +453,6 @@ export default function CalendarView({
                 justifyContent: "center",
                 minHeight: "75px",
                 borderRadius: "16px",
-                fontSize: "1.1rem",
-                fontWeight: "bold",
                 cursor: hasBookings ? "pointer" : "default",
 
                 background:
@@ -474,11 +478,36 @@ export default function CalendarView({
 
                 opacity: d ? 1 : 0,
                 position: "relative",
+                padding: "5px",
               }}
               title={hasBookings ? "اضغط لعرض وإدارة الحجوزات" : ""}
             >
-              <span style={{ position: "relative", zIndex: 2 }}>
-                {displayDay}
+              {/* الرقم الفرعي (صغير في الأعلى) */}
+              {d && (
+                <span
+                  style={{
+                    fontSize: "0.65rem",
+                    opacity: hasBookings ? 0.8 : 0.5,
+                    alignSelf: "flex-end",
+                    marginRight: "5px",
+                    fontWeight: "normal",
+                  }}
+                >
+                  {secondaryDay}
+                </span>
+              )}
+
+              {/* الرقم الأساسي (كبير في المنتصف) */}
+              <span
+                style={{
+                  position: "relative",
+                  zIndex: 2,
+                  fontSize: "1.2rem",
+                  fontWeight: "bold",
+                  marginTop: "-5px",
+                }}
+              >
+                {primaryDay}
               </span>
 
               {isThisDay && hasBookings && (
@@ -501,7 +530,7 @@ export default function CalendarView({
                   style={{
                     display: "flex",
                     gap: "5px",
-                    marginTop: "6px",
+                    marginTop: "4px",
                     fontSize: "0.8rem",
                     background: "rgba(255,255,255,0.2)",
                     padding: "2px 8px",
@@ -521,28 +550,72 @@ export default function CalendarView({
       {selectedDate && (
         <div style={modalOverlay}>
           <div style={modalContent}>
+            {/* ✨ ترويسة النافذة المنبثقة غنية بالتفاصيل ✨ */}
             <div
               style={{
                 display: "flex",
                 justifyContent: "space-between",
-                alignItems: "center",
+                alignItems: "flex-start",
                 borderBottom: "1px solid #f1f5f9",
                 paddingBottom: "15px",
                 marginBottom: "15px",
               }}
             >
-              <h3
-                style={{
-                  margin: 0,
-                  color: "#7c3aed",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "10px",
-                }}
-              >
-                <span style={{ fontSize: "1.5rem" }}>📅</span> حجوزات يوم:{" "}
-                <span dir="ltr">{formatDate(new Date(selectedDate))}</span>
-              </h3>
+              <div>
+                <h3
+                  style={{
+                    margin: "0 0 10px 0",
+                    color: "#7c3aed",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "10px",
+                  }}
+                >
+                  <span style={{ fontSize: "1.5rem" }}>📅</span>
+                  يوم{" "}
+                  {new Intl.DateTimeFormat("ar-SA", { weekday: "long" }).format(
+                    new Date(selectedDate),
+                  )}
+                </h3>
+
+                <div
+                  style={{
+                    display: "flex",
+                    gap: "15px",
+                    fontSize: "0.9rem",
+                    color: "#475569",
+                    fontWeight: "bold",
+                  }}
+                >
+                  <span
+                    style={{
+                      backgroundColor: "#f1f5f9",
+                      padding: "4px 10px",
+                      borderRadius: "8px",
+                    }}
+                  >
+                    🌍{" "}
+                    {new Intl.DateTimeFormat("ar-SA", {
+                      dateStyle: "long",
+                      calendar: "gregory",
+                    }).format(new Date(selectedDate))}
+                  </span>
+                  <span
+                    style={{
+                      backgroundColor: "#f3e8ff",
+                      color: "#7c3aed",
+                      padding: "4px 10px",
+                      borderRadius: "8px",
+                    }}
+                  >
+                    🌙{" "}
+                    {new Intl.DateTimeFormat("ar-SA-u-ca-islamic-umalqura", {
+                      dateStyle: "long",
+                    }).format(new Date(selectedDate))}
+                  </span>
+                </div>
+              </div>
+
               <button
                 onClick={() => setSelectedDate(null)}
                 style={{
@@ -571,13 +644,29 @@ export default function CalendarView({
               {dayBookings.map((b) => {
                 const badge = getStatusBadge(b.status);
                 const isProvider = localUserId === b.offerings?.provider_id;
-                // استخدام دالة التنسيق المخصصة هنا أيضاً
-                const bookingTime = new Date(
-                  b.appointment_date,
-                ).toLocaleTimeString(dateLocale, {
-                  hour: "2-digit",
-                  minute: "2-digit",
+
+                // ✨ استخراج تفاصيل الوقت والتاريخ بدقة ✨
+                const startDateTime = new Date(b.appointment_date); // أو b.start_date إذا توفر
+                const endDateTime = b.end_time ? new Date(b.end_time) : null; // بافتراض وجود هذا الحقل في المستقبل
+
+                const startTimeStr = startDateTime.toLocaleTimeString(
+                  dateLocale,
+                  { hour: "2-digit", minute: "2-digit" },
+                );
+                const startDateStr = formatDate(startDateTime, {
+                  month: "short",
+                  day: "numeric",
                 });
+
+                const endTimeStr = endDateTime
+                  ? endDateTime.toLocaleTimeString(dateLocale, {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })
+                  : "غير محدد";
+                const endDateStr = endDateTime
+                  ? formatDate(endDateTime, { month: "short", day: "numeric" })
+                  : "";
 
                 return (
                   <div
@@ -599,14 +688,13 @@ export default function CalendarView({
                         gap: "15px",
                       }}
                     >
-                      <div>
-                        {/* توضيح نوع الحجز للمستخدم */}
+                      <div style={{ flex: 1, minWidth: "250px" }}>
                         <div
                           style={{
                             display: "flex",
                             alignItems: "center",
                             gap: "8px",
-                            marginBottom: "8px",
+                            marginBottom: "12px",
                           }}
                         >
                           <h4
@@ -635,6 +723,62 @@ export default function CalendarView({
                           </span>
                         </div>
 
+                        {/* ✨ شبكة تفاصيل الموعد ✨ */}
+                        <div
+                          style={{
+                            display: "grid",
+                            gridTemplateColumns: "1fr 1fr",
+                            gap: "10px",
+                            backgroundColor: "#f8fafc",
+                            padding: "12px",
+                            borderRadius: "12px",
+                            border: "1px dashed #cbd5e1",
+                            marginBottom: "10px",
+                          }}
+                        >
+                          <div>
+                            <div
+                              style={{
+                                fontSize: "0.7rem",
+                                color: "#64748b",
+                                marginBottom: "4px",
+                              }}
+                            >
+                              تاريخ ووقت البدء
+                            </div>
+                            <div
+                              style={{
+                                fontSize: "0.85rem",
+                                fontWeight: "bold",
+                                color: "#0f172a",
+                              }}
+                            >
+                              📅 {startDateStr} <br /> ⏰ {startTimeStr}
+                            </div>
+                          </div>
+                          <div>
+                            <div
+                              style={{
+                                fontSize: "0.7rem",
+                                color: "#64748b",
+                                marginBottom: "4px",
+                              }}
+                            >
+                              تاريخ ووقت الانتهاء
+                            </div>
+                            <div
+                              style={{
+                                fontSize: "0.85rem",
+                                fontWeight: "bold",
+                                color: "#0f172a",
+                              }}
+                            >
+                              🏁 {endDateStr || startDateStr} <br /> ⌛{" "}
+                              {endTimeStr}
+                            </div>
+                          </div>
+                        </div>
+
                         <div
                           style={{
                             fontSize: "0.8rem",
@@ -651,19 +795,6 @@ export default function CalendarView({
                           >
                             #{b.id.substring(0, 6)}
                           </span>
-                        </div>
-                        <div
-                          style={{
-                            fontSize: "0.8rem",
-                            color: "#64748b",
-                            marginTop: "4px",
-                            backgroundColor: "#f8fafc",
-                            display: "inline-block",
-                            padding: "4px 8px",
-                            borderRadius: "6px",
-                          }}
-                        >
-                          🕒 {bookingTime}
                         </div>
                       </div>
 
@@ -776,7 +907,7 @@ export default function CalendarView({
   );
 }
 
-// التنسيقات
+// التنسيقات الثابتة
 const navB = {
   border: "1px solid #e2e8f0",
   background: "#ffffff",
