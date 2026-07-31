@@ -642,83 +642,110 @@ export default function ClientMarketplace({
       return;
     }
 
-    const isTimeOptional =
-      ["fixed", "daily"].includes(selected?.pricing_model) ||
-      selected?.price_upon_agreement;
-    const finalLocation = bookingData.manualLocation || bookingData.gpsLocation;
-
-    if (
-      !bookingData.startDate ||
-      !bookingData.endDate ||
-      (!isTimeOptional && (!bookingData.startTime || !bookingData.endTime)) ||
-      !finalLocation ||
-      !bookingData.clientContact
-    ) {
-      return alert(
-        isRTL
-          ? "يرجى إكمال جميع التفاصيل المطلوبة (الموقع، التواريخ، ورقم التواصل) 📍📞"
-          : "Please complete all details.",
-      );
-    }
-
-    if (bookingData.manualQuantity < 1)
-      return alert("الرجاء تحديد عدد صحيح للخدمة.");
-
-    const requestedStart = new Date(
-      `${bookingData.startDate}T${bookingData.startTime || "00:00"}:00`,
-    );
-    let requestedEnd = new Date(
-      `${bookingData.endDate}T${bookingData.endTime || "23:59"}:00`,
-    );
-    const now = new Date();
-
-    if (requestedStart < now && bookingData.startTime)
-      return alert(
-        isRTL ? "⛔ لا يمكن الحجز في الماضي." : "⛔ Cannot book in the past.",
-      );
-    if (requestedEnd <= requestedStart)
-      return alert(
-        isRTL
-          ? "⛔ وقت الانتهاء يجب أن يكون بعد وقت البدء."
-          : "⛔ End time must be after start time.",
-      );
-
-    if (
-      selected.is_24_7 === false &&
-      selected.work_start_time &&
-      selected.work_end_time &&
-      bookingData.startTime &&
-      bookingData.endTime
-    ) {
-      const getMins = (dateObj) =>
-        dateObj.getHours() * 60 + dateObj.getMinutes();
-      const rStartMins = getMins(requestedStart);
-      const pStartMins =
-        parseInt(selected.work_start_time.split(":")[0]) * 60 +
-        parseInt(selected.work_start_time.split(":")[1]);
-      let pEndMins =
-        parseInt(selected.work_end_time.split(":")[0]) * 60 +
-        parseInt(selected.work_end_time.split(":")[1]);
-      if (pEndMins <= pStartMins) pEndMins += 24 * 60;
-      const normRStart =
-        rStartMins < pStartMins && pEndMins > 24 * 60
-          ? rStartMins + 24 * 60
-          : rStartMins;
-      if (normRStart < pStartMins || normRStart > pEndMins)
-        return alert(
-          isRTL
-            ? `⛔ الوقت المحدد خارج أوقات الدوام! ساعات العمل من ${selected.work_start_time.substring(
-                0,
-                5,
-              )} إلى ${selected.work_end_time.substring(0, 5)}.`
-            : "⛔ Outside working hours.",
-        );
-    }
-
     setIsSubmitting(true);
 
     try {
-      // 🚀 تدقيق أمني نهائي للسعة المتاحة (بناءً على الحجوزات المؤكدة والمكتملة فقط) 🚀
+      // 🚀 1. التحقق من اكتمال بيانات الحساب للإدارة (Progressive Profiling) 🚀
+      const { data: userProfile } = await supabase
+        .from("profiles")
+        .select("full_name, phone")
+        .eq("id", session.user.id)
+        .single();
+
+      if (!userProfile?.full_name?.trim() || !userProfile?.phone?.trim()) {
+        setIsSubmitting(false);
+        return alert(
+          isRTL
+            ? "عذراً، يجب إكمال بياناتك الشخصية (الاسم ورقم الجوال) في قسم (حسابي) لتتمكن من إتمام الحجز ⚠️"
+            : "Please complete your profile (Name and Phone) in 'My Account' to proceed with booking ⚠️",
+        );
+      }
+
+      // 🚀 2. تدقيق البيانات الأساسية المطلوبة للطلب 🚀
+      const isTimeOptional =
+        ["fixed", "daily"].includes(selected?.pricing_model) ||
+        selected?.price_upon_agreement;
+      const finalLocation =
+        bookingData.manualLocation || bookingData.gpsLocation;
+
+      if (
+        !bookingData.startDate ||
+        !bookingData.endDate ||
+        (!isTimeOptional && (!bookingData.startTime || !bookingData.endTime)) ||
+        !finalLocation ||
+        !bookingData.clientContact
+      ) {
+        setIsSubmitting(false);
+        return alert(
+          isRTL
+            ? "يرجى إكمال جميع التفاصيل المطلوبة (الموقع، التواريخ، ورقم التواصل) 📍📞"
+            : "Please complete all details.",
+        );
+      }
+
+      if (bookingData.manualQuantity < 1) {
+        setIsSubmitting(false);
+        return alert("الرجاء تحديد عدد صحيح للخدمة.");
+      }
+
+      const requestedStart = new Date(
+        `${bookingData.startDate}T${bookingData.startTime || "00:00"}:00`,
+      );
+      let requestedEnd = new Date(
+        `${bookingData.endDate}T${bookingData.endTime || "23:59"}:00`,
+      );
+      const now = new Date();
+
+      if (requestedStart < now && bookingData.startTime) {
+        setIsSubmitting(false);
+        return alert(
+          isRTL ? "⛔ لا يمكن الحجز في الماضي." : "⛔ Cannot book in the past.",
+        );
+      }
+      if (requestedEnd <= requestedStart) {
+        setIsSubmitting(false);
+        return alert(
+          isRTL
+            ? "⛔ وقت الانتهاء يجب أن يكون بعد وقت البدء."
+            : "⛔ End time must be after start time.",
+        );
+      }
+
+      if (
+        selected.is_24_7 === false &&
+        selected.work_start_time &&
+        selected.work_end_time &&
+        bookingData.startTime &&
+        bookingData.endTime
+      ) {
+        const getMins = (dateObj) =>
+          dateObj.getHours() * 60 + dateObj.getMinutes();
+        const rStartMins = getMins(requestedStart);
+        const pStartMins =
+          parseInt(selected.work_start_time.split(":")[0]) * 60 +
+          parseInt(selected.work_start_time.split(":")[1]);
+        let pEndMins =
+          parseInt(selected.work_end_time.split(":")[0]) * 60 +
+          parseInt(selected.work_end_time.split(":")[1]);
+        if (pEndMins <= pStartMins) pEndMins += 24 * 60;
+        const normRStart =
+          rStartMins < pStartMins && pEndMins > 24 * 60
+            ? rStartMins + 24 * 60
+            : rStartMins;
+        if (normRStart < pStartMins || normRStart > pEndMins) {
+          setIsSubmitting(false);
+          return alert(
+            isRTL
+              ? `⛔ الوقت المحدد خارج أوقات الدوام! ساعات العمل من ${selected.work_start_time.substring(
+                  0,
+                  5,
+                )} إلى ${selected.work_end_time.substring(0, 5)}.`
+              : "⛔ Outside working hours.",
+          );
+        }
+      }
+
+      // 🚀 3. تدقيق أمني نهائي للسعة المتاحة (بناءً على الحجوزات المؤكدة والمكتملة فقط) 🚀
       const { data: existing } = await supabase
         .from("bookings")
         .select("appointment_date, end_time, quantity, status")
@@ -746,6 +773,7 @@ export default function ClientMarketplace({
         );
       }
 
+      // 🚀 4. إرسال الطلب لقاعدة البيانات 🚀
       const bookingStatus = selected.price_upon_agreement
         ? "awaiting_pricing"
         : "pending";

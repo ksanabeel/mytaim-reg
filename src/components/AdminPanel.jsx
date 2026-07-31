@@ -53,21 +53,16 @@ export default function AdminPanel({ session }) {
     if (usersData) setUsers(usersData);
     if (config) setCommission(config.value);
     setLoading(false);
-  };
+  }; // ✨ الدالة المحاسبية المطورة للحساب الحي ✨
 
-  // ✨ الدالة المحاسبية المطورة للحساب الحي ✨
   const calculateFinancials = (user) => {
     // جلب نسبة العمولة من الإعدادات أو افتراض 10%
-    const rate = parseFloat(commission) || 0.1;
+    const rate = parseFloat(commission) || 0.1; // إجمالي المبالغ التي دخلت النظام لهذا المستخدم
 
-    // إجمالي المبالغ التي دخلت النظام لهذا المستخدم
-    const rawEarnings = user.total_earnings || 0;
+    const rawEarnings = user.total_earnings || 0; // الحسبة الحية: // العمولة = الإجمالي × النسبة
 
-    // الحسبة الحية:
-    // العمولة = الإجمالي × النسبة
-    const liveCommission = rawEarnings * rate;
+    const liveCommission = rawEarnings * rate; // الصافي للمزود = الإجمالي - العمولة
 
-    // الصافي للمزود = الإجمالي - العمولة
     const netEarnings = rawEarnings - liveCommission;
 
     return {
@@ -139,7 +134,7 @@ export default function AdminPanel({ session }) {
   if (loading)
     return (
       <div style={{ textAlign: "center", padding: "50px" }}>
-        ⏳ جاري فحص الصلاحيات...
+                ⏳ جاري فحص الصلاحيات...      {" "}
       </div>
     );
   if (!isAdmin)
@@ -153,7 +148,7 @@ export default function AdminPanel({ session }) {
           border: "1px solid #ef4444",
         }}
       >
-        <h2 style={{ color: "#dc2626" }}>🚫 وصول غير مصرح به</h2>
+                <h2 style={{ color: "#dc2626" }}>🚫 وصول غير مصرح به</h2>     {" "}
       </div>
     );
 
@@ -167,6 +162,7 @@ export default function AdminPanel({ session }) {
         direction: "rtl",
       }}
     >
+           {" "}
       <h2
         style={{
           color: "#1e293b",
@@ -175,9 +171,9 @@ export default function AdminPanel({ session }) {
           textAlign: "center",
         }}
       >
-        👑 لوحة تحكم الإدارة العليا
+                👑 لوحة تحكم الإدارة العليا      {" "}
       </h2>
-
+           {" "}
       <div
         style={{
           display: "flex",
@@ -191,46 +187,54 @@ export default function AdminPanel({ session }) {
           marginBottom: "30px",
         }}
       >
+               {" "}
         <TabButton
           icon="📩"
           label="رسائل الزوار"
           isActive={activeTab === "messages"}
           onClick={() => setActiveTab("messages")}
         />
+               {" "}
         <TabButton
           icon="⭐"
           label="التقييمات"
           isActive={activeTab === "reviews"}
           onClick={() => setActiveTab("reviews")}
         />
+               {" "}
         <TabButton
           icon="👥"
           label="المستخدمين"
           isActive={activeTab === "users"}
           onClick={() => setActiveTab("users")}
         />
+               {" "}
         <TabButton
           icon="📁"
           label="الأقسام"
           isActive={activeTab === "categories"}
           onClick={() => setActiveTab("categories")}
         />
+               {" "}
         <TabButton
           icon="📜"
           label="سياسات المنصة"
           isActive={activeTab === "policies"}
           onClick={() => setActiveTab("policies")}
         />
+               {" "}
         <TabButton
           icon="⚙️"
           label="إعدادات المنصة"
           isActive={activeTab === "settings"}
           onClick={() => setActiveTab("settings")}
         />
+             {" "}
       </div>
-
+           {" "}
       {activeTab === "users" && (
         <div className="animate-fade-in">
+                   {" "}
           <div
             style={{
               display: "flex",
@@ -239,14 +243,17 @@ export default function AdminPanel({ session }) {
               marginBottom: "15px",
             }}
           >
+                       {" "}
             <h3 style={{ color: "#1e293b", margin: 0 }}>
-              👥 إدارة المستخدمين ({users.length})
+                            👥 إدارة المستخدمين ({users.length})            {" "}
             </h3>
+                       {" "}
             <button onClick={() => window.print()} style={btnStyle("#475569")}>
-              🖨️ طباعة التقرير
+                            🖨️ طباعة التقرير            {" "}
             </button>
+                     {" "}
           </div>
-
+                   {" "}
           <div
             style={{
               overflowX: "auto",
@@ -254,6 +261,7 @@ export default function AdminPanel({ session }) {
               border: "1px solid #e2e8f0",
             }}
           >
+                       {" "}
             <table
               style={{
                 width: "100%",
@@ -262,18 +270,23 @@ export default function AdminPanel({ session }) {
                 textAlign: "right",
               }}
             >
+                           {" "}
               <thead>
+                               {" "}
                 <tr style={{ backgroundColor: "#f1f5f9", color: "#475569" }}>
-                  <th style={thStyle}>الاسم</th>
-                  <th style={thStyle}>اليوزر / النوع</th>
-                  <th style={thStyle}>الصلاحية</th>
-                  <th style={thStyle}>المستحق للمنصة 💰</th>
-                  <th style={thStyle}>صافي الأرباح 📈</th>
-                  <th style={thStyle}>الحالة</th>
-                  <th style={thStyle}>الإجراءات</th>
+                                    <th style={thStyle}>الاسم</th>             
+                      <th style={thStyle}>اليوزر / النوع</th>                 {" "}
+                  <th style={thStyle}>الصلاحية</th>                 {" "}
+                  <th style={thStyle}>المستحق للمنصة 💰</th>                 {" "}
+                  <th style={thStyle}>صافي الأرباح 📈</th>                 {" "}
+                  <th style={thStyle}>الحالة</th>                 {" "}
+                  <th style={thStyle}>الإجراءات</th>               {" "}
                 </tr>
+                             {" "}
               </thead>
+                           {" "}
               <tbody>
+                               {" "}
                 {users.map((u) => {
                   const financials = calculateFinancials(u);
                   return (
@@ -281,28 +294,40 @@ export default function AdminPanel({ session }) {
                       key={u.id}
                       style={{ borderBottom: "1px solid #f1f5f9" }}
                     >
+                                           {" "}
                       <td style={tdStyle}>
+                                               {" "}
                         <strong>{u.full_name || "بدون اسم"}</strong>
-                        <br />
+                                                <br />                       {" "}
                         <small dir="ltr" style={{ color: "#64748b" }}>
-                          {u.phone || "---"}
+                                                    {u.phone || "---"}         
+                                       {" "}
                         </small>
+                                             {" "}
                       </td>
+                                           {" "}
                       <td style={tdStyle}>
+                                               {" "}
                         <span
                           dir="ltr"
                           style={{ color: "#7c3aed", fontWeight: "bold" }}
                         >
-                          @{u.username || "---"}
+                                                    @{u.username || "---"}     
+                                           {" "}
                         </span>
-                        <br />
+                                                <br />                       {" "}
                         <small style={{ color: "#64748b" }}>
+                                                   {" "}
                           {u.provider_type === "institution"
                             ? "🏢 مؤسسة"
                             : "👤 فرد"}
+                                                 {" "}
                         </small>
+                                             {" "}
                       </td>
+                                           {" "}
                       <td style={tdStyle}>
+                                               {" "}
                         <select
                           value={u.role || "عادي"}
                           onChange={(e) => changeUserRole(u.id, e.target.value)}
@@ -313,10 +338,14 @@ export default function AdminPanel({ session }) {
                             fontWeight: "bold",
                           }}
                         >
-                          <option value="عادي">👤 عادي</option>
-                          <option value="مدير">👑 مدير</option>
+                                                   {" "}
+                          <option value="عادي">👤 عادي</option>                 
+                                  <option value="مدير">👑 مدير</option>         
+                                       {" "}
                         </select>
+                                             {" "}
                       </td>
+                                           {" "}
                       <td
                         style={{
                           ...tdStyle,
@@ -324,8 +353,10 @@ export default function AdminPanel({ session }) {
                           fontWeight: "bold",
                         }}
                       >
-                        {financials.commissionDisplay} ر.س
+                                                {financials.commissionDisplay}{" "}
+                        ر.س                      {" "}
                       </td>
+                                           {" "}
                       <td
                         style={{
                           ...tdStyle,
@@ -333,25 +364,34 @@ export default function AdminPanel({ session }) {
                           fontWeight: "bold",
                         }}
                       >
-                        {financials.earningsDisplay} ر.س
+                                                {financials.earningsDisplay} ر.س
+                                             {" "}
                       </td>
+                                           {" "}
                       <td style={tdStyle}>
+                                               {" "}
                         <span
                           style={badgeStyle(
                             u.is_active !== false ? "#10b981" : "#ef4444",
                           )}
                         >
-                          {u.is_active !== false ? "نشط" : "موقوف"}
+                                                   {" "}
+                          {u.is_active !== false ? "نشط" : "موقوف"}             
+                                   {" "}
                         </span>
+                                             {" "}
                       </td>
+                                           {" "}
                       <td style={{ ...tdStyle, display: "flex", gap: "5px" }}>
+                                               {" "}
                         <button
                           onClick={() => openForceEdit(u)}
                           style={actionBtn("#3b82f6")}
                           title="تعديل"
                         >
-                          ✏️
+                                                    ✏️                        {" "}
                         </button>
+                                               {" "}
                         <button
                           onClick={() =>
                             toggleUserStatus(u.id, u.is_active !== false)
@@ -360,24 +400,33 @@ export default function AdminPanel({ session }) {
                             u.is_active !== false ? "#f59e0b" : "#10b981",
                           )}
                         >
-                          {u.is_active !== false ? "⏸️" : "▶️"}
+                                                   {" "}
+                          {u.is_active !== false ? "⏸️" : "▶️"}                 
+                               {" "}
                         </button>
+                                               {" "}
                         <button
                           onClick={() => deleteUser(u.id)}
                           style={actionBtn("#ef4444")}
                         >
-                          🗑️
+                                                    🗑️                        {" "}
                         </button>
+                                             {" "}
                       </td>
+                                         {" "}
                     </tr>
                   );
                 })}
+                             {" "}
               </tbody>
+                         {" "}
             </table>
+                     {" "}
           </div>
+                 {" "}
         </div>
       )}
-
+           {" "}
       {activeTab === "settings" && (
         <div
           style={{
@@ -387,14 +436,19 @@ export default function AdminPanel({ session }) {
             border: "1px solid #e2e8f0",
           }}
         >
+                   {" "}
           <h4 style={{ margin: "0 0 15px 0", color: "#334155" }}>
-            💰 إعدادات العمولة العامة
+                        💰 إعدادات العمولة العامة          {" "}
           </h4>
+                   {" "}
           <div style={{ display: "flex", gap: "10px", maxWidth: "450px" }}>
+                       {" "}
             <div style={{ flex: 1 }}>
+                           {" "}
               <label style={{ fontSize: "0.8rem", color: "#64748b" }}>
-                نسبة العمولة (0.10 تعني 10%)
+                                نسبة العمولة (0.10 تعني 10%)              {" "}
               </label>
+                           {" "}
               <input
                 type="number"
                 step="0.01"
@@ -407,18 +461,21 @@ export default function AdminPanel({ session }) {
                   border: "1px solid #cbd5e1",
                 }}
               />
+                         {" "}
             </div>
+                       {" "}
             <button
               onClick={updateCommission}
               style={{ ...btnStyle("#7c3aed"), marginTop: "22px" }}
             >
-              تحديث ⚙️
+                            تحديث ⚙️            {" "}
             </button>
+                     {" "}
           </div>
+                 {" "}
         </div>
       )}
-
-      {/* النافذة المنبثقة للتعديل الإجباري */}
+            {/* النافذة المنبثقة للتعديل الإجباري */}     {" "}
       {isModalOpen && (
         <div
           style={{
@@ -435,6 +492,7 @@ export default function AdminPanel({ session }) {
             zIndex: 9999,
           }}
         >
+                   {" "}
           <div
             style={{
               backgroundColor: "#fff",
@@ -444,7 +502,9 @@ export default function AdminPanel({ session }) {
               maxWidth: "450px",
             }}
           >
-            <h3 style={{ margin: "0 0 20px 0" }}>🛠️ التعديل الإجباري</h3>
+                       {" "}
+            <h3 style={{ margin: "0 0 20px 0" }}>🛠️ التعديل الإجباري</h3>       
+               {" "}
             <label
               style={{
                 display: "block",
@@ -452,8 +512,9 @@ export default function AdminPanel({ session }) {
                 fontWeight: "bold",
               }}
             >
-              الاسم الكامل:
+                            الاسم الكامل:            {" "}
             </label>
+                       {" "}
             <input
               type="text"
               value={newFullName}
@@ -466,6 +527,7 @@ export default function AdminPanel({ session }) {
                 marginBottom: "15px",
               }}
             />
+                       {" "}
             <label
               style={{
                 display: "block",
@@ -474,8 +536,9 @@ export default function AdminPanel({ session }) {
                 color: "#ef4444",
               }}
             >
-              اليوزر نيم بالقوة:
+                            اليوزر نيم بالقوة:            {" "}
             </label>
+                       {" "}
             <input
               type="text"
               dir="ltr"
@@ -488,23 +551,30 @@ export default function AdminPanel({ session }) {
                 border: "2px solid #fca5a5",
               }}
             />
+                       {" "}
             <div style={{ display: "flex", gap: "15px", marginTop: "25px" }}>
+                           {" "}
               <button
                 onClick={saveForceEdit}
                 style={{ flex: 1, ...btnStyle("#7c3aed") }}
               >
-                حفظ
+                                حفظ              {" "}
               </button>
+                           {" "}
               <button
                 onClick={() => setIsModalOpen(false)}
                 style={{ flex: 1, ...btnStyle("#94a3b8") }}
               >
-                إلغاء
+                                إلغاء              {" "}
               </button>
+                         {" "}
             </div>
+                     {" "}
           </div>
+                 {" "}
         </div>
       )}
+         {" "}
     </div>
   );
 }
@@ -527,7 +597,7 @@ function TabButton({ icon, label, isActive, onClick }) {
         transition: "0.2s",
       }}
     >
-      <span>{icon}</span> <span>{label}</span>
+            <span>{icon}</span> <span>{label}</span>   {" "}
     </button>
   );
 }

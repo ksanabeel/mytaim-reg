@@ -1914,7 +1914,7 @@ function MainAppContent() {
                           (e.currentTarget.style.background = "#e0e7ff")
                         }
                       >
-                        ↩️ رد على الإدارة
+                        ↩️ للتواصل مع الإدارة
                       </button>
                     </div>
                   </div>

@@ -9,6 +9,7 @@ const thS = {
   borderBottom: "2px solid #e2e8f0",
   fontWeight: "900",
   fontSize: "0.85rem",
+  whiteSpace: "nowrap",
 };
 const tdS = {
   padding: "15px",
@@ -27,6 +28,7 @@ const admBtn = (bg) => ({
   fontSize: "0.85rem",
   transition: "all 0.2s ease",
   boxShadow: `0 4px 10px ${bg}40`,
+  whiteSpace: "nowrap",
 });
 const cardS = {
   backgroundColor: "#fff",
@@ -68,6 +70,22 @@ const smInput = {
   transition: "border-color 0.2s",
 };
 
+// تنسيقات التمرير الأفقي لحل مشكلة الجوال
+const tableWrapperS = {
+  width: "100%",
+  overflowX: "auto",
+  WebkitOverflowScrolling: "touch",
+  borderRadius: "16px",
+  border: "1px solid #e2e8f0",
+  backgroundColor: "#fff",
+};
+const responsiveTableS = {
+  width: "100%",
+  minWidth: "850px", // إجبار الجدول على التمرير في الشاشات الصغيرة
+  borderCollapse: "collapse",
+  textAlign: "right",
+};
+
 const fetchSafe = async (tableName) => {
   try {
     const { data, error } = await supabase.from(tableName).select("*");
@@ -90,9 +108,8 @@ const fetchSettingsSafe = async () => {
   }
 };
 
-// ✨ المكون الرئيسي المطور للوحة الإدارة والتحكم المالي ✨
 export default function PlatformManagement({
-  userRole, // جلب رتبة المستخدم الحالي لتطبيق القيود المالية الذكية
+  userRole,
   onRefresh,
   commissionRate,
   setCommissionRate,
@@ -173,6 +190,9 @@ export default function PlatformManagement({
   const [newCatAr, setNewCatAr] = useState("");
   const [newCatEn, setNewCatEn] = useState("");
   const [newCatIcon, setNewCatIcon] = useState("");
+
+  // حالات تعديل الأقسام
+  const [isEditCatModalOpen, setIsEditCatModalOpen] = useState(false);
   const [editingCatId, setEditingCatId] = useState(null);
   const [editCatForm, setEditCatForm] = useState({
     label_ar: "",
@@ -195,7 +215,6 @@ export default function PlatformManagement({
 
   const isFin = userRole === "financial_manager";
 
-  // تحويل التبويب آلياً لرسائل الوارد إذا كان المسجل مدير مالي لعدم إظهار صفحة بيضاء
   useEffect(() => {
     if (isFin) {
       setActiveAdminTab("messages");
@@ -320,13 +339,9 @@ export default function PlatformManagement({
     fetchAdminData();
   }, []);
 
-  // ✨ دالة زر "اعتماد السداد المالي الذكي" (النسخة المضادة للأخطاء) ✨
   const handleApproveCommission = async (messageOrId) => {
-    // جلب الـ ID سواء تم تمريره كرقم أو ككائن رسالة
     const msgId =
       typeof messageOrId === "object" ? messageOrId.id : messageOrId;
-
-    // جلب بيانات الرسالة للتأكد 100% من هوية المزود
     const { data: msgData } = await supabase
       .from("contact_messages")
       .select("user_id")
@@ -347,7 +362,6 @@ export default function PlatformManagement({
 
     try {
       if (choice === "1") {
-        // الخيار الأول: تصفية كافة الحجوزات المعلقة لهذا المزود
         const { data: offeringsData } = await supabase
           .from("offerings")
           .select("id")
@@ -373,7 +387,6 @@ export default function PlatformManagement({
           },
         ]);
       } else if (choice === "2") {
-        // الخيار الثاني: تصفية حجز واحد محدد
         const bookingIdInput = window.prompt(
           "الرجاء إدخال (رقم الحجز) المراد تصفية عمولته:",
         );
@@ -396,7 +409,6 @@ export default function PlatformManagement({
         return alert("خيار غير صحيح، الرجاء إدخال رقم 1 أو 2.");
       }
 
-      // أرشفة رسالة الإيصال لأنها تمت معالجتها بالكامل
       await supabase
         .from("contact_messages")
         .update({ is_read: true })
@@ -409,6 +421,7 @@ export default function PlatformManagement({
       alert("حدث خطأ مالي أثناء محاولة الاعتماد: " + err.message);
     }
   };
+
   const handleUpdateSettings = async () => {
     const newRateDec = inputRate / 100;
     const newAffiliateRateDec = inputAffiliateRate / 100;
@@ -530,10 +543,43 @@ export default function PlatformManagement({
     }
   };
 
-  const handleSaveEditCategory = async (id) => {
-    await supabase.from("categories").update(editCatForm).eq("id", id);
-    setEditingCatId(null);
-    fetchAdminData();
+  // ✨ دالة فتح نافذة تعديل القسم ✨
+  const openEditCategory = (cat) => {
+    setEditingCatId(cat.id);
+    setEditCatForm({
+      label_ar: cat.label_ar || "",
+      label_en: cat.label_en || "",
+      icon: cat.icon || "",
+    });
+    setIsEditCatModalOpen(true);
+  };
+
+  // ✨ دالة حفظ تعديل القسم ✨
+  const handleSaveEditCategory = async () => {
+    if (!editCatForm.label_ar.trim())
+      return alert("الرجاء إدخال الاسم بالعربي");
+
+    try {
+      const { error } = await supabase
+        .from("categories")
+        .update({
+          label_ar: editCatForm.label_ar,
+          label_en: editCatForm.label_en || editCatForm.label_ar,
+          icon: editCatForm.icon || "📌",
+        })
+        .eq("id", editingCatId);
+
+      if (!error) {
+        alert("تم تعديل القسم بنجاح ✅");
+        setIsEditCatModalOpen(false);
+        setEditingCatId(null);
+        fetchAdminData();
+      } else {
+        alert("حدث خطأ أثناء التعديل: " + error.message);
+      }
+    } catch (err) {
+      alert("حدث خطأ.");
+    }
   };
 
   const toggleUserActive = async (id, status) => {
@@ -609,28 +655,6 @@ export default function PlatformManagement({
       }
     } catch (err) {
       alert("خطأ أثناء التعديل");
-    }
-  };
-
-  const sendAdminMessage = async (userId) => {
-    try {
-      await supabase
-        .from("profiles")
-        .update({ admin_note: adminMessageText })
-        .eq("id", userId);
-      await supabase.from("notifications").insert([
-        {
-          user_id: userId,
-          title: "رسالة إدارية جديدة 📩",
-          message: adminMessageText,
-        },
-      ]);
-      alert("تم الإرسال بنجاح ✅");
-      setMessagingUserId(null);
-      setAdminMessageText("");
-      fetchAdminData();
-    } catch (err) {
-      alert("حدث خطأ.");
     }
   };
 
@@ -733,7 +757,6 @@ export default function PlatformManagement({
     } catch (err) {}
   };
 
-  // ✨ دالة ذكية ومطورة لعرض روابط المرفقات المادية كصور حية داخل الجدول للإدارة والمالية ✨
   const renderMessageWithLinks = (text) => {
     if (!text) return "";
     const urlRegex = /(https?:\/\/[^\s]+)/g;
@@ -835,7 +858,7 @@ export default function PlatformManagement({
         <span>👑</span> لوحة تحكم الإدارة {isFin && "والمالية العليا"}
       </h2>
 
-      {/* شريط تبويبات الإدارة الذكي (يخفي الإعدادات والسياسات عن المدير المالي تلقائياً ويترك له مهامه فقط) */}
+      {/* شريط تبويبات الإدارة الذكي */}
       <div
         style={{
           display: "flex",
@@ -907,6 +930,7 @@ export default function PlatformManagement({
         </button>
       </div>
 
+      {/* ================= تبويب إعدادات المنصة ================= */}
       {activeAdminTab === "settings" && !isFin && (
         <div
           style={{
@@ -1131,7 +1155,9 @@ export default function PlatformManagement({
                 <input
                   type="checkbox"
                   checked={inputIsAnnouncementActive}
-                  onChange={(e) => inputIsAnnouncementActive(e.target.checked)}
+                  onChange={(e) =>
+                    setInputIsAnnouncementActive(e.target.checked)
+                  }
                   style={{ transform: "scale(1.2)" }}
                 />
                 {inputIsAnnouncementActive
@@ -1402,6 +1428,7 @@ export default function PlatformManagement({
         </div>
       )}
 
+      {/* ================= تبويب السياسات ================= */}
       {activeAdminTab === "policies" && !isFin && (
         <div
           style={{
@@ -1465,6 +1492,7 @@ export default function PlatformManagement({
         </div>
       )}
 
+      {/* ================= تبويب الأقسام (مع زر التعديل) ================= */}
       {activeAdminTab === "categories" && !isFin && (
         <div
           style={{
@@ -1474,6 +1502,7 @@ export default function PlatformManagement({
             border: "1px solid #e2e8f0",
           }}
         >
+          {/* نموذج الإضافة */}
           <div
             style={{
               backgroundColor: "#fff",
@@ -1504,6 +1533,51 @@ export default function PlatformManagement({
                 style={{ ...smInput, width: "100%", boxSizing: "border-box" }}
               />
             </div>
+            <div style={{ flex: 1, minWidth: "200px" }}>
+              <strong
+                style={{
+                  color: "#475569",
+                  fontSize: "0.85rem",
+                  display: "block",
+                  marginBottom: "5px",
+                }}
+              >
+                الاسم بالإنجليزي:
+              </strong>
+              <input
+                value={newCatEn}
+                onChange={(e) => setNewCatEn(e.target.value)}
+                style={{
+                  ...smInput,
+                  width: "100%",
+                  boxSizing: "border-box",
+                  direction: "ltr",
+                }}
+              />
+            </div>
+            <div style={{ width: "100px" }}>
+              <strong
+                style={{
+                  color: "#475569",
+                  fontSize: "0.85rem",
+                  display: "block",
+                  marginBottom: "5px",
+                }}
+              >
+                الأيقونة 🌟:
+              </strong>
+              <input
+                value={newCatIcon}
+                onChange={(e) => setNewCatIcon(e.target.value)}
+                style={{
+                  ...smInput,
+                  width: "100%",
+                  boxSizing: "border-box",
+                  textAlign: "center",
+                }}
+                placeholder="📌"
+              />
+            </div>
             <button
               onClick={handleAddCategory}
               style={{
@@ -1521,9 +1595,90 @@ export default function PlatformManagement({
               ➕ إضافة قسم
             </button>
           </div>
+
+          {/* جدول الأقسام بالتمرير الأفقي */}
+          <h3 style={{ color: "#1e293b", margin: "20px 0 15px 0" }}>
+            📁 الأقسام الحالية
+          </h3>
+          <div style={tableWrapperS}>
+            <table style={responsiveTableS}>
+              <thead>
+                <tr style={{ backgroundColor: "#f1f5f9" }}>
+                  <th style={thS}>الأيقونة</th>
+                  <th style={thS}>الاسم بالعربي</th>
+                  <th style={thS}>الاسم بالإنجليزي</th>
+                  <th style={{ ...thS, textAlign: "center" }}>إجراءات القسم</th>
+                </tr>
+              </thead>
+              <tbody>
+                {categories.map((c) => (
+                  <tr key={c.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                    <td
+                      style={{
+                        ...tdS,
+                        textAlign: "center",
+                        fontSize: "1.5rem",
+                      }}
+                    >
+                      {c.icon}
+                    </td>
+                    <td style={{ ...tdS, fontWeight: "bold" }}>{c.label_ar}</td>
+                    <td style={tdS}>{c.label_en}</td>
+                    <td
+                      style={{
+                        ...tdS,
+                        display: "flex",
+                        gap: "8px",
+                        justifyContent: "center",
+                      }}
+                    >
+                      {/* ✨ زر التعديل الجديد ✨ */}
+                      <button
+                        onClick={() => openEditCategory(c)}
+                        style={{
+                          ...admBtn("transparent"),
+                          color: "#3b82f6",
+                          border: "1px solid #bfdbfe",
+                        }}
+                        title="تعديل اسم أو أيقونة القسم"
+                      >
+                        ✏️ تعديل
+                      </button>
+                      <button
+                        onClick={() => handleDeleteCategory(c.id)}
+                        style={{
+                          ...admBtn("transparent"),
+                          color: "#ef4444",
+                          border: "1px solid #fca5a5",
+                        }}
+                        title="حذف القسم نهائياً"
+                      >
+                        🗑️ حذف
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {categories.length === 0 && (
+                  <tr>
+                    <td
+                      colSpan="4"
+                      style={{
+                        padding: "30px",
+                        textAlign: "center",
+                        color: "#94a3b8",
+                      }}
+                    >
+                      لا توجد أقسام مسجلة.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
+      {/* ================= تبويب المستخدمين ================= */}
       {activeAdminTab === "users" && !isFin && (
         <div
           style={{
@@ -1531,16 +1686,21 @@ export default function PlatformManagement({
             padding: "20px",
             borderRadius: "15px",
             border: "1px solid #e2e8f0",
-            overflowX: "auto",
           }}
         >
           <div
             style={{
               marginBottom: "20px",
               display: "flex",
-              justifyContent: "flex-end",
+              justifyContent: "space-between",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: "10px",
             }}
           >
+            <h3 style={{ margin: 0, color: "#1e293b" }}>
+              👥 إدارة المستخدمين ({users.length})
+            </h3>
             <button
               onClick={() => setIsBroadcastModalOpen(true)}
               style={{
@@ -1552,25 +1712,14 @@ export default function PlatformManagement({
               📢 إرسال إعلان جماعي
             </button>
           </div>
-          <div
-            style={{
-              backgroundColor: "#fff",
-              borderRadius: "16px",
-              border: "1px solid #cbd5e1",
-              overflow: "hidden",
-            }}
-          >
-            <table
-              style={{
-                width: "100%",
-                borderCollapse: "collapse",
-                fontSize: "0.95rem",
-              }}
-            >
+
+          <div style={tableWrapperS}>
+            <table style={responsiveTableS}>
               <thead>
                 <tr style={{ backgroundColor: "#f1f5f9", textAlign: "center" }}>
                   <th style={thS}>المستخدم</th>
                   <th style={thS}>الصلاحية</th>
+                  <th style={thS}>الحالة</th>
                   <th style={thS}>إجراءات الإدارة</th>
                 </tr>
               </thead>
@@ -1594,7 +1743,12 @@ export default function PlatformManagement({
                       <select
                         value={u.role || "user"}
                         onChange={(e) => changeUserRole(u.id, e.target.value)}
-                        style={{ padding: "6px", borderRadius: "8px" }}
+                        style={{
+                          padding: "6px",
+                          borderRadius: "8px",
+                          border: "1px solid #cbd5e1",
+                          outline: "none",
+                        }}
                       >
                         <option value="user">👤 عادي</option>
                         <option value="supervisor">🛡️ مشرف</option>
@@ -1603,11 +1757,64 @@ export default function PlatformManagement({
                       </select>
                     </td>
                     <td style={tdS}>
+                      <span
+                        style={{
+                          backgroundColor:
+                            u.is_active !== false ? "#d1fae5" : "#fee2e2",
+                          color: u.is_active !== false ? "#059669" : "#dc2626",
+                          padding: "5px 12px",
+                          borderRadius: "20px",
+                          fontWeight: "bold",
+                          fontSize: "0.85rem",
+                        }}
+                      >
+                        {u.is_active !== false ? "نشط ✅" : "موقوف 🚫"}
+                      </span>
+                    </td>
+                    <td
+                      style={{
+                        ...tdS,
+                        display: "flex",
+                        gap: "8px",
+                        justifyContent: "center",
+                      }}
+                    >
                       <button
                         onClick={() => openForceEdit(u)}
-                        style={admBtn("#3b82f6")}
+                        style={{
+                          ...admBtn("transparent"),
+                          color: "#3b82f6",
+                          border: "1px solid #bfdbfe",
+                        }}
+                        title="تعديل"
                       >
                         ✏️ تعديل
+                      </button>
+                      <button
+                        onClick={() =>
+                          toggleUserActive(u.id, u.is_active !== false)
+                        }
+                        style={{
+                          ...admBtn("transparent"),
+                          color: u.is_active !== false ? "#f59e0b" : "#10b981",
+                          border: `1px solid ${
+                            u.is_active !== false ? "#fcd34d" : "#6ee7b7"
+                          }`,
+                        }}
+                        title={u.is_active !== false ? "إيقاف" : "تفعيل"}
+                      >
+                        {u.is_active !== false ? "⏸️ إيقاف" : "▶️ تفعيل"}
+                      </button>
+                      <button
+                        onClick={() => handleAdminDeleteUser(u.id)}
+                        style={{
+                          ...admBtn("transparent"),
+                          color: "#ef4444",
+                          border: "1px solid #fca5a5",
+                        }}
+                        title="حذف نهائي"
+                      >
+                        🗑️ حذف
                       </button>
                     </td>
                   </tr>
@@ -1618,6 +1825,7 @@ export default function PlatformManagement({
         </div>
       )}
 
+      {/* ================= تبويب التقييمات ================= */}
       {activeAdminTab === "reviews" && (
         <div
           style={{
@@ -1625,35 +1833,84 @@ export default function PlatformManagement({
             padding: "25px",
             borderRadius: "20px",
             border: "1px solid #e2e8f0",
-            overflowX: "auto",
           }}
         >
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr style={{ backgroundColor: "#f1f5f9" }}>
-                <th style={thS}>العميل</th>
-                <th style={thS}>التقييم</th>
-                <th style={thS}>التعليق</th>
-              </tr>
-            </thead>
-            <tbody>
-              {reviews.map((r, idx) => (
-                <tr
-                  key={r.id || idx}
-                  style={{ borderBottom: "1px solid #f1f5f9" }}
-                >
-                  <td style={tdS}>{r.profiles?.full_name}</td>
-                  <td style={{ ...tdS, color: "#f59e0b" }}>
-                    {"⭐".repeat(r.rating || 5)}
-                  </td>
-                  <td style={tdS}>{r.comment}</td>
+          <h3 style={{ color: "#1e293b", marginBottom: "15px" }}>
+            ⭐ إدارة التقييمات
+          </h3>
+          <div style={tableWrapperS}>
+            <table style={responsiveTableS}>
+              <thead>
+                <tr style={{ backgroundColor: "#f1f5f9" }}>
+                  <th style={thS}>صاحب التقييم</th>
+                  <th style={thS}>الخدمة المُقيمة</th>
+                  <th style={thS}>التقييم</th>
+                  <th style={thS}>التعليق</th>
+                  <th style={thS}>إجراء</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {reviews.map((r, idx) => (
+                  <tr
+                    key={r.id || idx}
+                    style={{ borderBottom: "1px solid #f1f5f9" }}
+                  >
+                    <td style={{ ...tdS, fontWeight: "bold" }}>
+                      {r.profiles?.full_name || "عميل"}
+                    </td>
+                    <td style={tdS}>{r.offerings?.title || "خدمة محذوفة"}</td>
+                    <td
+                      style={{ ...tdS, color: "#f59e0b", fontSize: "1.1rem" }}
+                    >
+                      {"⭐".repeat(r.rating || 5)}
+                    </td>
+                    <td
+                      style={{
+                        ...tdS,
+                        color: r.is_comment_hidden ? "#ef4444" : "#475569",
+                      }}
+                    >
+                      {r.comment}
+                    </td>
+                    <td style={tdS}>
+                      {!r.is_comment_hidden && (
+                        <button
+                          onClick={() =>
+                            handleHideComment(r.id, r.source_table)
+                          }
+                          style={{
+                            ...admBtn("transparent"),
+                            color: "#ef4444",
+                            border: "1px solid #fca5a5",
+                          }}
+                        >
+                          🚫 إخفاء مسيء
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+                {reviews.length === 0 && (
+                  <tr>
+                    <td
+                      colSpan="5"
+                      style={{
+                        padding: "30px",
+                        textAlign: "center",
+                        color: "#94a3b8",
+                      }}
+                    >
+                      لا توجد تقييمات حالياً.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
+      {/* ================= تبويب الرسائل والإيصالات ================= */}
       {activeAdminTab === "messages" && (
         <div
           style={{
@@ -1663,21 +1920,8 @@ export default function PlatformManagement({
             border: "1px solid #e2e8f0",
           }}
         >
-          <div
-            style={{
-              backgroundColor: "#fff",
-              borderRadius: "16px",
-              border: "1px solid #cbd5e1",
-              overflow: "hidden",
-            }}
-          >
-            <table
-              style={{
-                width: "100%",
-                borderCollapse: "collapse",
-                textAlign: "right",
-              }}
-            >
+          <div style={tableWrapperS}>
+            <table style={responsiveTableS}>
               <thead>
                 <tr style={{ backgroundColor: "#f1f5f9" }}>
                   <th style={{ ...thS, width: "110px", textAlign: "center" }}>
@@ -1742,7 +1986,7 @@ export default function PlatformManagement({
                           whiteSpace: "pre-wrap",
                         }}
                       >
-                        {renderMessageWithLinks(m.message)}
+                        {renderMessageWithLinks(m.message || m.text_content)}
                       </div>
                     </td>
                     <td style={{ ...tdS, textAlign: "center" }}>
@@ -1753,7 +1997,6 @@ export default function PlatformManagement({
                           gap: "5px",
                         }}
                       >
-                        {/* زر السحر والاعتماد الآلي للمدير المالي أو المدير العام */}
                         {m.type === "receipt" && !m.is_read && (
                           <button
                             onClick={() => handleApproveCommission(m.id)}
@@ -1792,8 +2035,275 @@ export default function PlatformManagement({
                     </td>
                   </tr>
                 ))}
+                {messages.length === 0 && (
+                  <tr>
+                    <td
+                      colSpan="5"
+                      style={{
+                        padding: "30px",
+                        textAlign: "center",
+                        color: "#94a3b8",
+                      }}
+                    >
+                      صندوق الوارد فارغ.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* ================= النوافذ المنبثقة (Modals) ================= */}
+
+      {/* 1. النافذة المنبثقة للتعديل الإجباري للمستخدم */}
+      {isForceEditModalOpen && (
+        <div style={modalOverlay}>
+          <div style={{ ...modalContent, maxWidth: "450px" }}>
+            <h3 style={{ margin: "0 0 20px 0", color: "#1e293b" }}>
+              🛠️ التعديل الإجباري لليوزر
+            </h3>
+            <label
+              style={{
+                display: "block",
+                marginBottom: "8px",
+                fontWeight: "bold",
+                color: "#475569",
+              }}
+            >
+              الاسم الكامل:
+            </label>
+            <input
+              type="text"
+              value={newFullName}
+              onChange={(e) => setNewFullName(e.target.value)}
+              style={{ ...smInput, marginBottom: "15px" }}
+            />
+            <label
+              style={{
+                display: "block",
+                marginBottom: "8px",
+                fontWeight: "bold",
+                color: "#ef4444",
+              }}
+            >
+              اليوزر نيم بالقوة:
+            </label>
+            <input
+              type="text"
+              dir="ltr"
+              value={newUsername}
+              onChange={(e) => setNewUsername(e.target.value)}
+              style={{
+                ...smInput,
+                border: "2px solid #fca5a5",
+                backgroundColor: "#fef2f2",
+              }}
+            />
+            <div style={{ display: "flex", gap: "15px", marginTop: "25px" }}>
+              <button
+                onClick={saveForceEdit}
+                style={{ flex: 1, ...admBtn("#7c3aed") }}
+              >
+                حفظ التعديل
+              </button>
+              <button
+                onClick={() => setIsForceEditModalOpen(false)}
+                style={{ flex: 1, ...admBtn("#94a3b8") }}
+              >
+                إلغاء
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ✨ 2. النافذة المنبثقة الجديدة لتعديل الأقسام ✨ */}
+      {isEditCatModalOpen && (
+        <div style={modalOverlay}>
+          <div style={{ ...modalContent, maxWidth: "450px" }}>
+            <h3 style={{ margin: "0 0 20px 0", color: "#3b82f6" }}>
+              ✏️ تعديل القسم
+            </h3>
+
+            <label
+              style={{
+                display: "block",
+                marginBottom: "8px",
+                fontWeight: "bold",
+                color: "#475569",
+              }}
+            >
+              الاسم بالعربي:
+            </label>
+            <input
+              type="text"
+              value={editCatForm.label_ar}
+              onChange={(e) =>
+                setEditCatForm({ ...editCatForm, label_ar: e.target.value })
+              }
+              style={{
+                ...smInput,
+                marginBottom: "15px",
+                width: "100%",
+                boxSizing: "border-box",
+              }}
+            />
+
+            <label
+              style={{
+                display: "block",
+                marginBottom: "8px",
+                fontWeight: "bold",
+                color: "#475569",
+              }}
+            >
+              الاسم بالإنجليزي:
+            </label>
+            <input
+              type="text"
+              dir="ltr"
+              value={editCatForm.label_en}
+              onChange={(e) =>
+                setEditCatForm({ ...editCatForm, label_en: e.target.value })
+              }
+              style={{
+                ...smInput,
+                marginBottom: "15px",
+                width: "100%",
+                boxSizing: "border-box",
+              }}
+            />
+
+            <label
+              style={{
+                display: "block",
+                marginBottom: "8px",
+                fontWeight: "bold",
+                color: "#475569",
+              }}
+            >
+              الأيقونة 🌟:
+            </label>
+            <input
+              type="text"
+              value={editCatForm.icon}
+              onChange={(e) =>
+                setEditCatForm({ ...editCatForm, icon: e.target.value })
+              }
+              style={{ ...smInput, width: "100px", textAlign: "center" }}
+            />
+
+            <div style={{ display: "flex", gap: "15px", marginTop: "25px" }}>
+              <button
+                onClick={handleSaveEditCategory}
+                style={{ flex: 1, ...admBtn("#3b82f6") }}
+              >
+                💾 حفظ التعديلات
+              </button>
+              <button
+                onClick={() => {
+                  setIsEditCatModalOpen(false);
+                  setEditingCatId(null);
+                }}
+                style={{ flex: 1, ...admBtn("#94a3b8") }}
+              >
+                إلغاء
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 3. النافذة المنبثقة لإرسال إعلان جماعي */}
+      {isBroadcastModalOpen && (
+        <div style={modalOverlay}>
+          <div style={{ ...modalContent, maxWidth: "500px" }}>
+            <h3
+              style={{
+                margin: "0 0 20px 0",
+                color: "#10b981",
+                display: "flex",
+                alignItems: "center",
+                gap: "10px",
+              }}
+            >
+              <span>📢</span> إرسال إعلان / تنبيه جماعي
+            </h3>
+
+            <label
+              style={{
+                display: "block",
+                marginBottom: "8px",
+                fontWeight: "bold",
+                color: "#475569",
+              }}
+            >
+              اختر الشريحة المستهدفة:
+            </label>
+            <select
+              value={broadcastTarget}
+              onChange={(e) => setBroadcastTarget(e.target.value)}
+              style={{
+                ...smInput,
+                marginBottom: "15px",
+                backgroundColor: "#f8fafc",
+                cursor: "pointer",
+                width: "100%",
+              }}
+            >
+              <option value="all">🌐 إرسال للجميع (كل المسجلين)</option>
+              <option value="users_only">👤 المستخدمين العاديين فقط</option>
+              <option value="admins">🛡️ المدراء والمشرفين فقط</option>
+              <option value="inactive">
+                🚫 المستخدمين الموقوفين أو غير النشطين
+              </option>
+            </select>
+
+            <label
+              style={{
+                display: "block",
+                marginBottom: "8px",
+                fontWeight: "bold",
+                color: "#475569",
+              }}
+            >
+              نص الرسالة (سيصل كإشعار منبثق):
+            </label>
+            <textarea
+              value={broadcastMessageText}
+              onChange={(e) => setBroadcastMessageText(e.target.value)}
+              placeholder="اكتب التنبيه أو التحديث هنا..."
+              style={{
+                ...smInput,
+                height: "120px",
+                resize: "vertical",
+                width: "100%",
+                boxSizing: "border-box",
+              }}
+            />
+
+            <div style={{ display: "flex", gap: "15px", marginTop: "25px" }}>
+              <button
+                onClick={handleSendBroadcast}
+                disabled={isBroadcasting}
+                style={{
+                  flex: 2,
+                  ...admBtn(isBroadcasting ? "#94a3b8" : "#10b981"),
+                }}
+              >
+                {isBroadcasting
+                  ? "⏳ جاري الإرسال..."
+                  : "🚀 إرسال الإعلان الآن"}
+              </button>
+              <button
+                onClick={() => setIsBroadcastModalOpen(false)}
+                style={{ flex: 1, ...admBtn("#ef4444") }}
+              >
+                إلغاء
+              </button>
+            </div>
           </div>
         </div>
       )}
