@@ -343,22 +343,73 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
     }
   };
 
+  // 🚀 ✨ دالة التقييم الذكية (تحسب المتوسط الحسابي للمزود وتحدث ملفه الشخصي) ✨ 🚀
   const submitReview = async () => {
     setIsSubmittingReview(true);
-    const { error } = await supabase
-      .from("bookings")
-      .update({ rating: parseInt(rating), review: reviewText })
-      .eq("id", booking.id);
-    setIsSubmittingReview(false);
-    if (!error) {
+
+    try {
+      // 1. حفظ التقييم في جدول الحجوزات نفسه (ليظهر في لوحة الإدارة وللعميل)
+      const { error } = await supabase
+        .from("bookings")
+        .update({ rating: parseInt(rating), review: reviewText })
+        .eq("id", booking.id);
+
+      if (error) throw error;
+
+      // 2. تحديث التقييم العام (المتوسط الحسابي) للمزود في جدول profiles لكي يظهر للجميع في المنصة
       const providerId = booking.offerings?.provider_id || booking.provider_id;
+
+      // جلب جميع خدمات هذا المزود
+      const { data: myOfferings } = await supabase
+        .from("offerings")
+        .select("id")
+        .eq("provider_id", providerId);
+
+      if (myOfferings && myOfferings.length > 0) {
+        const offeringIds = myOfferings.map((o) => o.id);
+
+        // جلب جميع التقييمات السابقة لخدمات هذا المزود
+        const { data: ratedBookings } = await supabase
+          .from("bookings")
+          .select("rating")
+          .in("offering_id", offeringIds)
+          .not("rating", "is", null);
+
+        if (ratedBookings && ratedBookings.length > 0) {
+          // حساب المتوسط الحسابي
+          const totalStars = ratedBookings.reduce(
+            (sum, b) => sum + b.rating,
+            0,
+          );
+          const avgRating = totalStars / ratedBookings.length;
+
+          // تحديث ملف المزود بالمتوسط الجديد
+          await supabase
+            .from("profiles")
+            .update({ rating: avgRating })
+            .eq("id", providerId);
+        } else {
+          // إذا كان هذا هو التقييم الوحيد في حسابه
+          await supabase
+            .from("profiles")
+            .update({ rating: parseInt(rating) })
+            .eq("id", providerId);
+        }
+      }
+
+      // 3. إشعار المزود بالتقييم
       await notifyUser(
         providerId,
         "تقييم جديد لخدمتك ⭐️",
         `قام العميل بتقييم خدمتك بـ ${rating} نجوم.`,
       );
-      alert("تم إرسال التقييم بنجاح! شكراً لك. ✅");
+
+      alert("تم إرسال التقييم وتحديث ترتيب المزود بنجاح! شكراً لك. ✅");
       if (onRefresh) onRefresh();
+    } catch (err) {
+      alert("حدث خطأ أثناء إرسال التقييم: " + err.message);
+    } finally {
+      setIsSubmittingReview(false);
     }
   };
 

@@ -37,12 +37,8 @@ export default function ClientMarketplace({
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
 
-  // حالة تحدد ما إذا كان الحجز عبارة عن "حجز خاص / خارجي" للمزود نفسه
   const [isSpecialManualBooking, setIsSpecialManualBooking] = useState(false);
-
-  // حالة لتتبع "السعة المتبقية اللحظية" بناءً على التقاطعات الزمنية
   const [availableCapacity, setAvailableCapacity] = useState(null);
-
   const [storeProfile, setStoreProfile] = useState(null);
 
   const [localSearch, setLocalSearch] = useState("");
@@ -54,21 +50,15 @@ export default function ClientMarketplace({
   const [filterEndTime, setFilterEndTime] = useState("");
 
   const [reviews, setReviews] = useState([]);
-
-  // حالات المفضلة
   const [favorites, setFavorites] = useState([]);
 
-  // حالات التحميل اللانهائي
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
   const observer = useRef();
   const ITEMS_PER_PAGE = 12;
 
-  // حالة التحكم في إرسال الطلب لمنع التكرار (Debounce / Loading)
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // حالة الحجز
   const [bookingData, setBookingData] = useState({
     startDate: "",
     startTime: "",
@@ -104,6 +94,42 @@ export default function ClientMarketplace({
     return () => clearInterval(timer);
   }, []);
 
+  // 🚀 ✨ دالة ذكية لحساب التقييمات اللحظية من قاعدة البيانات مباشرة ✨ 🚀
+  const enrichWithRatings = async (offeringsList) => {
+    if (!offeringsList || offeringsList.length === 0) return [];
+    const offeringIds = offeringsList.map((o) => o.id);
+
+    try {
+      // جلب جميع التقييمات لهذه الخدمات
+      const { data: ratingsData } = await supabase
+        .from("bookings")
+        .select("offering_id, rating")
+        .in("offering_id", offeringIds)
+        .not("rating", "is", null);
+
+      const ratingMap = {};
+      if (ratingsData) {
+        ratingsData.forEach((r) => {
+          if (!ratingMap[r.offering_id])
+            ratingMap[r.offering_id] = { sum: 0, count: 0 };
+          ratingMap[r.offering_id].sum += r.rating;
+          ratingMap[r.offering_id].count += 1;
+        });
+      }
+
+      return offeringsList.map((o) => {
+        let avg = null;
+        if (ratingMap[o.id] && ratingMap[o.id].count > 0) {
+          avg = ratingMap[o.id].sum / ratingMap[o.id].count;
+        }
+        return { ...o, dynamic_rating: avg };
+      });
+    } catch (err) {
+      console.error("Error fetching dynamic ratings:", err);
+      return offeringsList;
+    }
+  };
+
   const fetchInitialData = async () => {
     setLoading(true);
 
@@ -136,12 +162,26 @@ export default function ClientMarketplace({
       .eq("profiles.is_active", true);
     if (username) query = query.eq("profiles.username", username);
 
-    const { data: offs } = await query
-      .order("rating", { foreignTable: "profiles", ascending: false })
-      .range(0, ITEMS_PER_PAGE - 1);
+    const { data: offs } = await query.range(0, ITEMS_PER_PAGE - 1);
 
-    if (offs) {
-      setOfferings(offs);
+    if (offs && offs.length > 0) {
+      // حقن التقييمات اللحظية
+      let enrichedOffs = await enrichWithRatings(offs);
+
+      // الترتيب الذكي: الأعلى تقييماً أولاً (يعتمد على التقييم اللحظي، وإذا لم يوجد يعتمد على الافتراضي)
+      enrichedOffs.sort((a, b) => {
+        const ratingA =
+          a.dynamic_rating !== null
+            ? a.dynamic_rating
+            : a.profiles?.rating || 0;
+        const ratingB =
+          b.dynamic_rating !== null
+            ? b.dynamic_rating
+            : b.profiles?.rating || 0;
+        return ratingB - ratingA;
+      });
+
+      setOfferings(enrichedOffs);
       if (offs.length < ITEMS_PER_PAGE) setHasMore(false);
     }
     setLoading(false);
@@ -164,12 +204,27 @@ export default function ClientMarketplace({
       .eq("profiles.is_active", true);
     if (username) query = query.eq("profiles.username", username);
 
-    const { data: newOffs } = await query
-      .order("rating", { foreignTable: "profiles", ascending: false })
-      .range(nextPage * ITEMS_PER_PAGE, (nextPage + 1) * ITEMS_PER_PAGE - 1);
+    const { data: newOffs } = await query.range(
+      nextPage * ITEMS_PER_PAGE,
+      (nextPage + 1) * ITEMS_PER_PAGE - 1,
+    );
 
     if (newOffs && newOffs.length > 0) {
-      setOfferings((prev) => [...prev, ...newOffs]);
+      let enrichedNewOffs = await enrichWithRatings(newOffs);
+
+      enrichedNewOffs.sort((a, b) => {
+        const ratingA =
+          a.dynamic_rating !== null
+            ? a.dynamic_rating
+            : a.profiles?.rating || 0;
+        const ratingB =
+          b.dynamic_rating !== null
+            ? b.dynamic_rating
+            : b.profiles?.rating || 0;
+        return ratingB - ratingA;
+      });
+
+      setOfferings((prev) => [...prev, ...enrichedNewOffs]);
       setPage(nextPage);
       if (newOffs.length < ITEMS_PER_PAGE) setHasMore(false);
     } else {
@@ -363,7 +418,6 @@ export default function ClientMarketplace({
     setAvailableCapacity(selected.max_capacity || 1);
   }, [selected]);
 
-  // 🚀 ✨ التعديل الجوهري: حساب السعة اللحظية استناداً إلى الحجوزات المؤكدة والمكتملة فقط ✨ 🚀
   useEffect(() => {
     const fetchRealTimeCapacity = async () => {
       if (!selected) return;
@@ -384,7 +438,6 @@ export default function ClientMarketplace({
       );
 
       try {
-        // ✨ جلب الحجوزات المؤكدة أو المكتملة فقط (لتجاهل الطلبات المعلقة أو الملغاة) ✨
         const { data: existing } = await supabase
           .from("bookings")
           .select("appointment_date, end_time, quantity, status")
@@ -399,7 +452,6 @@ export default function ClientMarketplace({
             ? new Date(b.end_time)
             : new Date(bStart.getTime() + 60 * 60 * 1000);
 
-          // فحص التقاطع الزمني
           if (requestedStart < bEnd && requestedEnd > bStart) {
             usedCapacity += b.quantity || 1;
           }
@@ -642,110 +694,97 @@ export default function ClientMarketplace({
       return;
     }
 
+    const { data: userProfile } = await supabase
+      .from("profiles")
+      .select("full_name, phone")
+      .eq("id", session.user.id)
+      .single();
+
+    if (!userProfile?.full_name?.trim() || !userProfile?.phone?.trim()) {
+      setIsSubmitting(false);
+      return alert(
+        isRTL
+          ? "عذراً، يجب إكمال بياناتك الشخصية (الاسم ورقم الجوال) في قسم (حسابي) لتتمكن من إتمام الحجز ⚠️"
+          : "Please complete your profile (Name and Phone) in 'My Account' to proceed with booking ⚠️",
+      );
+    }
+
+    const isTimeOptional =
+      ["fixed", "daily"].includes(selected?.pricing_model) ||
+      selected?.price_upon_agreement;
+    const finalLocation = bookingData.manualLocation || bookingData.gpsLocation;
+
+    if (
+      !bookingData.startDate ||
+      !bookingData.endDate ||
+      (!isTimeOptional && (!bookingData.startTime || !bookingData.endTime)) ||
+      !finalLocation ||
+      !bookingData.clientContact
+    ) {
+      return alert(
+        isRTL
+          ? "يرجى إكمال جميع التفاصيل المطلوبة (الموقع، التواريخ، ورقم التواصل) 📍📞"
+          : "Please complete all details.",
+      );
+    }
+
+    if (bookingData.manualQuantity < 1)
+      return alert("الرجاء تحديد عدد صحيح للخدمة.");
+
+    const requestedStart = new Date(
+      `${bookingData.startDate}T${bookingData.startTime || "00:00"}:00`,
+    );
+    let requestedEnd = new Date(
+      `${bookingData.endDate}T${bookingData.endTime || "23:59"}:00`,
+    );
+    const now = new Date();
+
+    if (requestedStart < now && bookingData.startTime)
+      return alert(
+        isRTL ? "⛔ لا يمكن الحجز في الماضي." : "⛔ Cannot book in the past.",
+      );
+    if (requestedEnd <= requestedStart)
+      return alert(
+        isRTL
+          ? "⛔ وقت الانتهاء يجب أن يكون بعد وقت البدء."
+          : "⛔ End time must be after start time.",
+      );
+
+    if (
+      selected.is_24_7 === false &&
+      selected.work_start_time &&
+      selected.work_end_time &&
+      bookingData.startTime &&
+      bookingData.endTime
+    ) {
+      const getMins = (dateObj) =>
+        dateObj.getHours() * 60 + dateObj.getMinutes();
+      const rStartMins = getMins(requestedStart);
+      const pStartMins =
+        parseInt(selected.work_start_time.split(":")[0]) * 60 +
+        parseInt(selected.work_start_time.split(":")[1]);
+      let pEndMins =
+        parseInt(selected.work_end_time.split(":")[0]) * 60 +
+        parseInt(selected.work_end_time.split(":")[1]);
+      if (pEndMins <= pStartMins) pEndMins += 24 * 60;
+      const normRStart =
+        rStartMins < pStartMins && pEndMins > 24 * 60
+          ? rStartMins + 24 * 60
+          : rStartMins;
+      if (normRStart < pStartMins || normRStart > pEndMins)
+        return alert(
+          isRTL
+            ? `⛔ الوقت المحدد خارج أوقات الدوام! ساعات العمل من ${selected.work_start_time.substring(
+                0,
+                5,
+              )} إلى ${selected.work_end_time.substring(0, 5)}.`
+            : "⛔ Outside working hours.",
+        );
+    }
+
     setIsSubmitting(true);
 
     try {
-      // 🚀 1. التحقق من اكتمال بيانات الحساب للإدارة (Progressive Profiling) 🚀
-      const { data: userProfile } = await supabase
-        .from("profiles")
-        .select("full_name, phone")
-        .eq("id", session.user.id)
-        .single();
-
-      if (!userProfile?.full_name?.trim() || !userProfile?.phone?.trim()) {
-        setIsSubmitting(false);
-        return alert(
-          isRTL
-            ? "عذراً، يجب إكمال بياناتك الشخصية (الاسم ورقم الجوال) في قسم (حسابي) لتتمكن من إتمام الحجز ⚠️"
-            : "Please complete your profile (Name and Phone) in 'My Account' to proceed with booking ⚠️",
-        );
-      }
-
-      // 🚀 2. تدقيق البيانات الأساسية المطلوبة للطلب 🚀
-      const isTimeOptional =
-        ["fixed", "daily"].includes(selected?.pricing_model) ||
-        selected?.price_upon_agreement;
-      const finalLocation =
-        bookingData.manualLocation || bookingData.gpsLocation;
-
-      if (
-        !bookingData.startDate ||
-        !bookingData.endDate ||
-        (!isTimeOptional && (!bookingData.startTime || !bookingData.endTime)) ||
-        !finalLocation ||
-        !bookingData.clientContact
-      ) {
-        setIsSubmitting(false);
-        return alert(
-          isRTL
-            ? "يرجى إكمال جميع التفاصيل المطلوبة (الموقع، التواريخ، ورقم التواصل) 📍📞"
-            : "Please complete all details.",
-        );
-      }
-
-      if (bookingData.manualQuantity < 1) {
-        setIsSubmitting(false);
-        return alert("الرجاء تحديد عدد صحيح للخدمة.");
-      }
-
-      const requestedStart = new Date(
-        `${bookingData.startDate}T${bookingData.startTime || "00:00"}:00`,
-      );
-      let requestedEnd = new Date(
-        `${bookingData.endDate}T${bookingData.endTime || "23:59"}:00`,
-      );
-      const now = new Date();
-
-      if (requestedStart < now && bookingData.startTime) {
-        setIsSubmitting(false);
-        return alert(
-          isRTL ? "⛔ لا يمكن الحجز في الماضي." : "⛔ Cannot book in the past.",
-        );
-      }
-      if (requestedEnd <= requestedStart) {
-        setIsSubmitting(false);
-        return alert(
-          isRTL
-            ? "⛔ وقت الانتهاء يجب أن يكون بعد وقت البدء."
-            : "⛔ End time must be after start time.",
-        );
-      }
-
-      if (
-        selected.is_24_7 === false &&
-        selected.work_start_time &&
-        selected.work_end_time &&
-        bookingData.startTime &&
-        bookingData.endTime
-      ) {
-        const getMins = (dateObj) =>
-          dateObj.getHours() * 60 + dateObj.getMinutes();
-        const rStartMins = getMins(requestedStart);
-        const pStartMins =
-          parseInt(selected.work_start_time.split(":")[0]) * 60 +
-          parseInt(selected.work_start_time.split(":")[1]);
-        let pEndMins =
-          parseInt(selected.work_end_time.split(":")[0]) * 60 +
-          parseInt(selected.work_end_time.split(":")[1]);
-        if (pEndMins <= pStartMins) pEndMins += 24 * 60;
-        const normRStart =
-          rStartMins < pStartMins && pEndMins > 24 * 60
-            ? rStartMins + 24 * 60
-            : rStartMins;
-        if (normRStart < pStartMins || normRStart > pEndMins) {
-          setIsSubmitting(false);
-          return alert(
-            isRTL
-              ? `⛔ الوقت المحدد خارج أوقات الدوام! ساعات العمل من ${selected.work_start_time.substring(
-                  0,
-                  5,
-                )} إلى ${selected.work_end_time.substring(0, 5)}.`
-              : "⛔ Outside working hours.",
-          );
-        }
-      }
-
-      // 🚀 3. تدقيق أمني نهائي للسعة المتاحة (بناءً على الحجوزات المؤكدة والمكتملة فقط) 🚀
       const { data: existing } = await supabase
         .from("bookings")
         .select("appointment_date, end_time, quantity, status")
@@ -773,7 +812,6 @@ export default function ClientMarketplace({
         );
       }
 
-      // 🚀 4. إرسال الطلب لقاعدة البيانات 🚀
       const bookingStatus = selected.price_upon_agreement
         ? "awaiting_pricing"
         : "pending";
@@ -864,7 +902,13 @@ export default function ClientMarketplace({
     yearly: t("year"),
     free: t("volunteer"),
   };
-  const renderStars = (rating) => "⭐ " + (rating ? rating.toFixed(1) : "5.0");
+
+  // 🚀 دالة عرض النجوم المعدلة لاختيار التقييم الحقيقي 🚀
+  const renderStars = (dynamicRating, profileRating) => {
+    const finalRating = dynamicRating !== null ? dynamicRating : profileRating;
+    return "⭐ " + (finalRating ? finalRating.toFixed(1) : "5.0");
+  };
+
   const defaultAvatar = (name, hexColor = "#7c3aed") =>
     `https://ui-avatars.com/api/?name=${
       name || "User"
@@ -1510,7 +1554,8 @@ export default function ClientMarketplace({
                         borderRadius: "10px",
                       }}
                     >
-                      {renderStars(item.profiles?.rating)}
+                      {/* ✨ التقييم اللحظي المعالج ✨ */}
+                      {renderStars(item.dynamic_rating, item.profiles?.rating)}
                     </div>
                   </div>
 
@@ -1819,7 +1864,11 @@ export default function ClientMarketplace({
                     fontWeight: "bold",
                   }}
                 >
-                  {renderStars(selected.profiles?.rating)}
+                  {/* ✨ التقييم اللحظي للخدمة المختارة ✨ */}
+                  {renderStars(
+                    selected.dynamic_rating,
+                    selected.profiles?.rating,
+                  )}
                 </div>
               </div>
             </div>
@@ -2098,7 +2147,6 @@ export default function ClientMarketplace({
                 </button>
               </div>
 
-              {/* تحديد العدد مع مراقبة السعة المؤكدة فقط */}
               <div
                 style={{
                   marginBottom: "15px",
@@ -2771,12 +2819,7 @@ const locOk = {
   fontWeight: "bold",
   fontSize: "0.9rem",
 };
-const socialBtn = (bg) => ({
-  backgroundColor: bg,
-  color: "#fff",
-  padding: "6px 12px",
-  borderRadius: "8px",
-  textDecoration: "none",
-  fontSize: "0.75rem",
-  fontWeight: "bold",
-});
+const renderStars = (dynamicRating, profileRating) => {
+  const finalRating = dynamicRating !== null ? dynamicRating : profileRating;
+  return "⭐ " + (finalRating ? finalRating.toFixed(1) : "5.0");
+};
