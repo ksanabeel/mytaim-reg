@@ -75,13 +75,17 @@ const fetchSafe = async (tableName) => {
   }
 };
 
+// 💰✨ دالة حساب العمولات محدثة لدعم الحجوزات الخاصة (يدوية) ✨💰
 const calculateFinancials = (b, commissionRate) => {
   const finalTotal =
     b.proposed_price && Number(b.proposed_price) > 0
       ? Number(b.proposed_price)
       : (Number(b.offerings?.price) || 0) * (b.quantity || 1);
 
-  const platformCommission = finalTotal * commissionRate;
+  // إذا كان الحجز يدوياً (خاصاً) تكون عمولة المنصة صفر
+  const isManual = b.is_manual_booking === true;
+  const platformCommission = isManual ? 0 : finalTotal * commissionRate;
+
   const providerNet = finalTotal - platformCommission;
 
   return {
@@ -91,6 +95,7 @@ const calculateFinancials = (b, commissionRate) => {
     totalClientPrice: finalTotal,
     platformCommission,
     providerNet,
+    isManual,
   };
 };
 
@@ -310,6 +315,8 @@ export default function AdminReports({
   const completedBookings = data.bookings.filter(
     (b) => b.status === "completed",
   );
+
+  // الحسابات هنا ستتجاهل العمولات للحجوزات الخاصة لأن الدالة ترجع 0.00
   const totalProfitText = sumByCurrency(completedBookings, commissionRate);
   const collectedProfitText = sumByCurrency(
     completedBookings.filter((b) => b.is_commission_paid),
@@ -490,10 +497,15 @@ export default function AdminReports({
                     ? `<br><small style="color:#059669;" dir="ltr">@${b.profiles.username}</small>`
                     : "";
 
-                  const commissionColor = b.is_commission_paid
+                  const commissionColor = b.is_manual_booking
+                    ? "#166534"
+                    : b.is_commission_paid
                     ? "#10b981"
                     : "#ef4444";
-                  const commissionBadge = b.is_commission_paid
+
+                  const commissionBadge = b.is_manual_booking
+                    ? `<span style="background:#f0fdf4; color:#166534; border:1px solid #bbf7d0; padding:3px 8px; border-radius:6px; font-size:0.75rem; margin-top:5px; display:inline-block;">معفى (حجز خاص) 📞</span>`
+                    : b.is_commission_paid
                     ? `<span style="background:#d1fae5; color:#047857; padding:3px 8px; border-radius:6px; font-size:0.75rem; margin-top:5px; display:inline-block;">مسددة ✅</span>`
                     : `<span style="background:#fef2f2; color:#b91c1c; padding:3px 8px; border-radius:6px; font-size:0.75rem; margin-top:5px; display:inline-block;">غير مسددة ❌</span>`;
 
@@ -1755,11 +1767,15 @@ export default function AdminReports({
                         {fin.providerNet.toFixed(2)} {currency}
                       </td>
 
-                      {/* ✨ عمود عمولة المنصة (المراسلة الداخلية + الواتساب) ✨ */}
+                      {/* ✨ عمود عمولة المنصة - معدل لدعم الحجز الخاص ✨ */}
                       <td style={{ ...tdS, verticalAlign: "middle" }}>
                         <div
                           style={{
-                            color: b.is_commission_paid ? "#10b981" : "#ef4444",
+                            color: b.is_manual_booking
+                              ? "#10b981"
+                              : b.is_commission_paid
+                              ? "#10b981"
+                              : "#ef4444",
                             fontWeight: "900",
                             direction: "ltr",
                             fontSize: "1.1rem",
@@ -1768,7 +1784,23 @@ export default function AdminReports({
                           {fin.platformCommission.toFixed(2)} {currency}
                         </div>
 
-                        {b.is_commission_paid ? (
+                        {b.is_manual_booking ? (
+                          <div
+                            style={{
+                              marginTop: "8px",
+                              fontSize: "0.8rem",
+                              color: "#166534",
+                              fontWeight: "bold",
+                              backgroundColor: "#f0fdf4",
+                              padding: "4px 8px",
+                              borderRadius: "8px",
+                              display: "inline-block",
+                              border: "1px solid #bbf7d0",
+                            }}
+                          >
+                            📞 حجز خاص (معفى)
+                          </div>
+                        ) : b.is_commission_paid ? (
                           <div
                             style={{
                               marginTop: "8px",

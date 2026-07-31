@@ -19,7 +19,6 @@ export default function ClientMarketplace({
   allowTextReviews = true,
   welcomeMsg = "",
   heroSubtitle = "",
-  // ✨ المتغيرات الجديدة الخاصة بالشريط والتطبيقات ✨
   announcementText,
   announcementLink,
   isAnnouncementActive,
@@ -37,6 +36,12 @@ export default function ClientMarketplace({
   const [dbCategories, setDbCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
+
+  // حالة تحدد ما إذا كان الحجز عبارة عن "حجز خاص / خارجي" للمزود نفسه
+  const [isSpecialManualBooking, setIsSpecialManualBooking] = useState(false);
+
+  // حالة لتتبع "السعة المتبقية اللحظية" بناءً على التقاطعات الزمنية
+  const [availableCapacity, setAvailableCapacity] = useState(null);
 
   const [storeProfile, setStoreProfile] = useState(null);
 
@@ -63,7 +68,7 @@ export default function ClientMarketplace({
   // حالة التحكم في إرسال الطلب لمنع التكرار (Debounce / Loading)
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // حالة الحجز تتضمن العدد اليدوي ورسالة العميل
+  // حالة الحجز
   const [bookingData, setBookingData] = useState({
     startDate: "",
     startTime: "",
@@ -338,6 +343,7 @@ export default function ClientMarketplace({
         manualQuantity: 1,
         clientMessage: "",
       }));
+      setAvailableCapacity(null);
       return;
     }
     const fetchReviews = async () => {
@@ -354,7 +360,73 @@ export default function ClientMarketplace({
       setReviews(data || []);
     };
     fetchReviews();
+    setAvailableCapacity(selected.max_capacity || 1);
   }, [selected]);
+
+  // 🚀 ✨ التعديل الجوهري: حساب السعة اللحظية استناداً إلى الحجوزات المؤكدة والمكتملة فقط ✨ 🚀
+  useEffect(() => {
+    const fetchRealTimeCapacity = async () => {
+      if (!selected) return;
+      const maxCap = selected.max_capacity || 1;
+
+      if (!bookingData.startDate) {
+        setAvailableCapacity(maxCap);
+        return;
+      }
+
+      const requestedStart = new Date(
+        `${bookingData.startDate}T${bookingData.startTime || "00:00"}:00`,
+      );
+      const requestedEnd = new Date(
+        `${bookingData.endDate || bookingData.startDate}T${
+          bookingData.endTime || "23:59"
+        }:00`,
+      );
+
+      try {
+        // ✨ جلب الحجوزات المؤكدة أو المكتملة فقط (لتجاهل الطلبات المعلقة أو الملغاة) ✨
+        const { data: existing } = await supabase
+          .from("bookings")
+          .select("appointment_date, end_time, quantity, status")
+          .eq("offering_id", selected.id)
+          .in("status", ["confirmed", "completed"]);
+
+        let usedCapacity = 0;
+
+        existing?.forEach((b) => {
+          const bStart = new Date(b.appointment_date);
+          const bEnd = b.end_time
+            ? new Date(b.end_time)
+            : new Date(bStart.getTime() + 60 * 60 * 1000);
+
+          // فحص التقاطع الزمني
+          if (requestedStart < bEnd && requestedEnd > bStart) {
+            usedCapacity += b.quantity || 1;
+          }
+        });
+
+        const available = Math.max(0, maxCap - usedCapacity);
+        setAvailableCapacity(available);
+
+        if (bookingData.manualQuantity > available) {
+          setBookingData((prev) => ({
+            ...prev,
+            manualQuantity: available > 0 ? available : 1,
+          }));
+        }
+      } catch (err) {
+        console.error("Error fetching dynamic capacity:", err);
+      }
+    };
+
+    fetchRealTimeCapacity();
+  }, [
+    selected,
+    bookingData.startDate,
+    bookingData.startTime,
+    bookingData.endDate,
+    bookingData.endTime,
+  ]);
 
   useEffect(() => {
     if (!selected) return;
@@ -646,29 +718,37 @@ export default function ClientMarketplace({
     setIsSubmitting(true);
 
     try {
+      // 🚀 تدقيق أمني نهائي للسعة المتاحة (بناءً على الحجوزات المؤكدة والمكتملة فقط) 🚀
       const { data: existing } = await supabase
         .from("bookings")
-        .select("appointment_date, end_time, quantity")
+        .select("appointment_date, end_time, quantity, status")
         .eq("offering_id", selected.id)
-        .neq("status", "cancelled");
+        .in("status", ["confirmed", "completed"]);
+
       let overlappingUsedCapacity = 0;
       existing?.forEach((b) => {
         const bStart = new Date(b.appointment_date);
-        const bEnd = new Date(b.end_time);
+        const bEnd = b.end_time
+          ? new Date(b.end_time)
+          : new Date(bStart.getTime() + 60 * 60 * 1000);
         if (requestedStart < bEnd && requestedEnd > bStart)
           overlappingUsedCapacity += b.quantity || 1;
       });
 
       const maxCapacity = selected.max_capacity || 1;
-      if (overlappingUsedCapacity + bookingData.manualQuantity > maxCapacity) {
+      const finalAvailable = Math.max(0, maxCapacity - overlappingUsedCapacity);
+
+      if (bookingData.manualQuantity > finalAvailable) {
         setIsSubmitting(false);
+        setAvailableCapacity(finalAvailable);
         return alert(
-          `⚠️ نعتذر، السعة المتاحة في هذا الوقت هي ${Math.max(
-            0,
-            maxCapacity - overlappingUsedCapacity,
-          )} فقط من أصل ${maxCapacity}. الرجاء تقليل العدد المطلوب أو تغيير الوقت.`,
+          `⚠️ نعتذر، السعة المؤكدة المتاحة في هذا الوقت هي (${finalAvailable}) فقط من أصل (${maxCapacity}).\nالرجاء تقليل العدد المطلوب أو تغيير الوقت.`,
         );
       }
+
+      const bookingStatus = selected.price_upon_agreement
+        ? "awaiting_pricing"
+        : "pending";
 
       const { data: bookingResult, error } = await supabase
         .from("bookings")
@@ -680,13 +760,13 @@ export default function ClientMarketplace({
             end_time: requestedEnd.toISOString(),
             location: finalLocation,
             quantity: bookingData.manualQuantity,
-            status: selected.price_upon_agreement
-              ? "awaiting_pricing"
-              : "pending",
+            status: bookingStatus,
             client_contact: bookingData.clientContact,
             proposed_price: selected.price_upon_agreement
               ? null
               : calculatedData.price,
+            is_commission_paid: isSpecialManualBooking ? true : false,
+            is_manual_booking: isSpecialManualBooking ? true : false,
           },
         ])
         .select();
@@ -695,18 +775,27 @@ export default function ClientMarketplace({
         const providerId = selected.provider_id || selected.profiles?.id;
         const newBookingId = bookingResult[0].id;
 
-        if (bookingData.clientMessage.trim() && providerId) {
-          await supabase.from("messages").insert([
-            {
-              booking_id: newBookingId,
-              sender_id: session.user.id,
-              receiver_id: providerId,
-              text_content: bookingData.clientMessage.trim(),
-            },
-          ]);
+        if (providerId) {
+          const msgText = isSpecialManualBooking
+            ? `📞 [حجز خاص / خارجي]\n${
+                bookingData.clientMessage.trim() ||
+                "تم تسجيل الحجز يدوياً من قبل المزود."
+              }`
+            : bookingData.clientMessage.trim();
+
+          if (msgText) {
+            await supabase.from("messages").insert([
+              {
+                booking_id: newBookingId,
+                sender_id: session.user.id,
+                receiver_id: providerId,
+                text_content: msgText,
+              },
+            ]);
+          }
         }
 
-        if (providerId)
+        if (providerId && !isSpecialManualBooking) {
           await supabase.from("notifications").insert([
             {
               user_id: providerId,
@@ -715,15 +804,19 @@ export default function ClientMarketplace({
               is_read: false,
             },
           ]);
+        }
 
         alert(
           isRTL
-            ? selected.price_upon_agreement
+            ? isSpecialManualBooking
+              ? "تم إرسال الحجز الخاص بنجاح وسيظهر في 'أعمالي' بانتظار التأكيد ✅"
+              : selected.price_upon_agreement
               ? "تم إرسال طلب التسعير للمزود بنجاح 📨"
               : "تم إرسال الطلب للمزود بنجاح ✅"
             : "Request sent successfully ✅",
         );
         setSelected(null);
+        setIsSpecialManualBooking(false);
       } else {
         alert("Error: " + error.message);
       }
@@ -773,7 +866,6 @@ export default function ClientMarketplace({
   const isStoreMode = !!username;
   const storeTheme = storeProfile?.theme_color || "#7c3aed";
 
-  // ✨ دالة توليد الأوقات الذكية
   const generateTimeOptions = () => {
     const options = [];
     const is24Hours = selected?.is_24_7;
@@ -812,24 +904,16 @@ export default function ClientMarketplace({
 
   const timeOptions = generateTimeOptions();
 
-  // ✨ دالة ذكية لتعطيل الأيام خارج دوام المزود في التقويم
   const disableOffDays = ({ date }) => {
     if (!selected) return;
-
-    // ربط أيام الأسبوع بالأرقام
     const dayMap = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
-
-    // جلب أيام عمل المزود، أو اعتبار كل الأيام متاحة إذا لم يحدد
     const activeDays =
       Array.isArray(selected.available_days) &&
       selected.available_days.length > 0
         ? selected.available_days
         : ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
-
-    // تحويل أسماء الأيام إلى أرقام لتطابق نظام التقويم
     const activeIndexes = activeDays.map((d) => dayMap[d]);
 
-    // إذا كان اليوم في التقويم لا يطابق أيام عمل المزود، قم بتعطيله!
     if (!activeIndexes.includes(date.weekDay.index)) {
       return {
         disabled: true,
@@ -858,7 +942,6 @@ export default function ClientMarketplace({
         .rmdp-input::placeholder { color: #94a3b8; font-weight: normal; }
       `}</style>
 
-      {/* ✨ الشريط الإعلاني الذكي ✨ */}
       {isAnnouncementActive && announcementText && (
         <div
           style={{
@@ -989,7 +1072,6 @@ export default function ClientMarketplace({
             <h1 style={heroTitleS}>{welcomeMsg}</h1>
             <p style={heroSubTitleS}>{renderTextWithLinks(heroSubtitle)}</p>
 
-            {/* 📱 أزرار تحميل التطبيقات */}
             {(appleStoreLink || playStoreLink) && (
               <div
                 style={{
@@ -1518,15 +1600,50 @@ export default function ClientMarketplace({
                         </span>
                       )}
                     </div>
-                    <button
-                      onClick={() => setSelected(item)}
+
+                    <div
                       style={{
-                        ...smartBookBtnS,
-                        backgroundColor: itemThemeColor,
+                        display: "flex",
+                        gap: "8px",
+                        alignItems: "center",
                       }}
                     >
-                      {t("view_book", "احجز الآن")}
-                    </button>
+                      {session && session.user.id === item.provider_id && (
+                        <button
+                          onClick={() => {
+                            setIsSpecialManualBooking(true);
+                            setSelected(item);
+                          }}
+                          style={{
+                            border: "1px solid #a7f3d0",
+                            background: "#f0fdf4",
+                            color: "#059669",
+                            padding: "8px 12px",
+                            borderRadius: "12px",
+                            cursor: "pointer",
+                            fontWeight: "bold",
+                            fontSize: "0.8rem",
+                            transition: "0.2s",
+                          }}
+                          title="تسجيل حجز هاتفي أو خارجي بدون عمولة"
+                        >
+                          📞 حجز خاص
+                        </button>
+                      )}
+
+                      <button
+                        onClick={() => {
+                          setIsSpecialManualBooking(false);
+                          setSelected(item);
+                        }}
+                        style={{
+                          ...smartBookBtnS,
+                          backgroundColor: itemThemeColor,
+                        }}
+                      >
+                        {t("view_book", "احجز الآن")}
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1567,12 +1684,32 @@ export default function ClientMarketplace({
             <div
               style={{
                 display: "flex",
-                justifyContent: "flex-end",
-                marginBottom: "-10px",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "10px",
+                borderBottom: "1px solid #f1f5f9",
+                paddingBottom: "10px",
               }}
             >
+              {isSpecialManualBooking && (
+                <span
+                  style={{
+                    backgroundColor: "#ecfdf5",
+                    color: "#059669",
+                    padding: "4px 10px",
+                    borderRadius: "8px",
+                    fontSize: "0.8rem",
+                    fontWeight: "bold",
+                  }}
+                >
+                  📞 وضع الحجز الخاص (خارجي / هاتفي - بدون عمولة)
+                </span>
+              )}
               <button
-                onClick={() => setSelected(null)}
+                onClick={() => {
+                  setSelected(null);
+                  setIsSpecialManualBooking(false);
+                }}
                 style={{
                   background: "none",
                   border: "none",
@@ -1655,85 +1792,6 @@ export default function ClientMarketplace({
                   }}
                 >
                   {renderStars(selected.profiles?.rating)}
-                </div>
-                <div
-                  style={{
-                    display: "flex",
-                    gap: "6px",
-                    marginTop: "10px",
-                    flexWrap: "wrap",
-                  }}
-                >
-                  {(selected.whatsapp_number || selected.profiles?.phone) && (
-                    <a
-                      href={`https://wa.me/${(
-                        selected.whatsapp_number || selected.profiles?.phone
-                      ).replace(/\D/g, "")}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      style={socialBtn("#25d366")}
-                    >
-                      واتساب
-                    </a>
-                  )}
-                  {selected.profiles?.phone && (
-                    <a
-                      href={`tel:${selected.profiles.phone}`}
-                      style={socialBtn("#10b981")}
-                    >
-                      {t("call")}
-                    </a>
-                  )}
-                  {selected.youtube_url && (
-                    <a
-                      href={selected.youtube_url}
-                      target="_blank"
-                      rel="noreferrer"
-                      style={socialBtn("#ef4444")}
-                    >
-                      يوتيوب 📺
-                    </a>
-                  )}
-                  {selected.instagram_url && (
-                    <a
-                      href={selected.instagram_url}
-                      target="_blank"
-                      rel="noreferrer"
-                      style={socialBtn("#e1306c")}
-                    >
-                      إنستقرام
-                    </a>
-                  )}
-                  {selected.tiktok_url && (
-                    <a
-                      href={selected.tiktok_url}
-                      target="_blank"
-                      rel="noreferrer"
-                      style={socialBtn("#000000")}
-                    >
-                      تيك توك
-                    </a>
-                  )}
-                  {selected.twitter_url && (
-                    <a
-                      href={selected.twitter_url}
-                      target="_blank"
-                      rel="noreferrer"
-                      style={socialBtn("#0f1419")}
-                    >
-                      𝕏 (تويتر)
-                    </a>
-                  )}
-                  {selected.snapchat_url && (
-                    <a
-                      href={selected.snapchat_url}
-                      target="_blank"
-                      rel="noreferrer"
-                      style={socialBtn("#d97706")}
-                    >
-                      سناب شات
-                    </a>
-                  )}
                 </div>
               </div>
             </div>
@@ -1937,7 +1995,6 @@ export default function ClientMarketplace({
                 )}
               </div>
 
-              {/* ✨ مربع الرسائل الجديد للعميل ✨ */}
               <div style={{ textAlign: isRTL ? "right" : "left" }}>
                 <label style={labelS}>
                   {isRTL
@@ -2013,6 +2070,7 @@ export default function ClientMarketplace({
                 </button>
               </div>
 
+              {/* تحديد العدد مع مراقبة السعة المؤكدة فقط */}
               <div
                 style={{
                   marginBottom: "15px",
@@ -2039,18 +2097,29 @@ export default function ClientMarketplace({
                   <input
                     type="number"
                     min="1"
-                    max={selected.max_capacity || 1}
+                    max={
+                      availableCapacity !== null
+                        ? availableCapacity
+                        : selected.max_capacity || 1
+                    }
+                    disabled={availableCapacity === 0}
                     value={bookingData.manualQuantity}
                     onChange={(e) => {
                       let val = parseInt(e.target.value) || 1;
-                      if (val > (selected.max_capacity || 1))
-                        val = selected.max_capacity || 1;
+                      const currentMax =
+                        availableCapacity !== null
+                          ? availableCapacity
+                          : selected.max_capacity || 1;
+                      if (val > currentMax) val = currentMax;
                       setBookingData({ ...bookingData, manualQuantity: val });
                     }}
                     style={{
                       ...inputS,
                       flex: 1,
-                      borderColor: "#bfdbfe",
+                      borderColor:
+                        availableCapacity === 0 ? "#fca5a5" : "#bfdbfe",
+                      backgroundColor:
+                        availableCapacity === 0 ? "#fef2f2" : "#fff",
                       fontWeight: "bold",
                       fontSize: "1.1rem",
                     }}
@@ -2058,13 +2127,30 @@ export default function ClientMarketplace({
                   <span
                     style={{
                       fontSize: "0.85rem",
-                      color: "#ef4444",
+                      color: availableCapacity === 0 ? "#ef4444" : "#059669",
                       fontWeight: "bold",
                     }}
                   >
-                    (أقصى عدد متاح: {selected.max_capacity || 1})
+                    (المتاح مؤكداً:{" "}
+                    {availableCapacity !== null
+                      ? availableCapacity
+                      : selected.max_capacity || 1}
+                    )
                   </span>
                 </div>
+                {availableCapacity === 0 && (
+                  <div
+                    style={{
+                      color: "#ef4444",
+                      fontSize: "0.8rem",
+                      marginTop: "8px",
+                      fontWeight: "bold",
+                    }}
+                  >
+                    ⚠️ نعتذر، السعة محجوزة بالكامل ومؤكدة في هذا الوقت. يرجى
+                    اختيار تاريخ أو وقت آخر.
+                  </div>
+                )}
               </div>
 
               <div
@@ -2317,24 +2403,31 @@ export default function ClientMarketplace({
               )}
             </div>
 
-            {/* زر الحجز المحدث مع حالة التعطيل ومنع التكرار */}
             <button
               onClick={handleBook}
-              disabled={isSubmitting}
+              disabled={isSubmitting || availableCapacity === 0}
               style={{
                 ...confirmBtn,
-                backgroundColor: isSubmitting
-                  ? "#94a3b8"
-                  : selected.profiles?.theme_color || "#7c3aed",
-                cursor: isSubmitting ? "not-allowed" : "pointer",
+                backgroundColor:
+                  isSubmitting || availableCapacity === 0
+                    ? "#94a3b8"
+                    : selected.profiles?.theme_color || "#7c3aed",
+                cursor:
+                  isSubmitting || availableCapacity === 0
+                    ? "not-allowed"
+                    : "pointer",
                 boxShadow: `0 4px 15px ${
                   selected.profiles?.theme_color || "#7c3aed"
                 }40`,
-                opacity: isSubmitting ? 0.8 : 1,
+                opacity: isSubmitting || availableCapacity === 0 ? 0.8 : 1,
               }}
             >
               {isSubmitting
                 ? "⏳ جاري إرسال الطلب..."
+                : availableCapacity === 0
+                ? "عذراً، محجوز بالكامل في هذا الوقت ⛔"
+                : isSpecialManualBooking
+                ? "تأكيد وإضافة الحجز الخاص فوراً ✅"
                 : selected.price_upon_agreement
                 ? "إرسال طلب تسعير للمزود 📨"
                 : isRTL
@@ -2626,7 +2719,6 @@ const confirmBtn = {
   padding: "16px",
   borderRadius: "16px",
   fontWeight: "900",
-  cursor: "pointer",
   fontSize: "1.1rem",
   transition: "0.3s",
 };

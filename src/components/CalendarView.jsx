@@ -254,6 +254,7 @@ export default function CalendarView({
 
   return (
     <div
+      className="calendar-container"
       style={{
         backgroundColor: "#fff",
         padding: "30px",
@@ -265,6 +266,13 @@ export default function CalendarView({
       }}
     >
       <style>{`
+        /* ✨ حل مشكلة التمدد وإجبار الـ Grid على احتواء الخلايا ✨ */
+        .calendar-grid {
+          display: grid;
+          /* التعديل السحري هنا: minmax(0, 1fr) يمنع الـ Grid من تجاوز حدود الشاشة */
+          grid-template-columns: repeat(7, minmax(0, 1fr));
+          gap: 10px;
+        }
         .calendar-day-card { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
         .calendar-day-card:hover { transform: translateY(-3px) scale(1.03); box-shadow: 0 8px 20px rgba(0,0,0,0.08); z-index: 10; }
         .filter-group button { transition: all 0.2s; }
@@ -276,6 +284,19 @@ export default function CalendarView({
           isRTL ? "-24px" : "24px"
         }); }
         .toggle-switch:not(.hijri) .toggle-circle { transform: translateX(0); }
+
+        /* ✨ التجاوب مع شاشات الجوال (Mobile Responsiveness) ✨ */
+        @media (max-width: 600px) {
+          .calendar-container { padding: 15px !important; border-radius: 16px !important; }
+          .calendar-grid { gap: 4px !important; }
+          .calendar-day-cell { min-height: 65px !important; padding: 4px !important; border-radius: 12px !important; }
+          .day-header { font-size: 0.75rem !important; }
+          .primary-day-txt { font-size: 1rem !important; margin-top: -2px !important; }
+          .secondary-day-txt { font-size: 0.6rem !important; margin-right: 2px !important; }
+          .booking-badges { padding: 2px 4px !important; flex-wrap: wrap !important; gap: 2px !important; }
+          .booking-badges span { font-size: 0.7rem !important; }
+          .calendar-title { font-size: 1.1rem !important; }
+        }
       `}</style>
 
       {/* محول التقويم */}
@@ -338,11 +359,13 @@ export default function CalendarView({
         </button>
 
         <h3
+          className="calendar-title"
           style={{
             fontSize: "1.4rem",
             margin: 0,
             color: "#1e293b",
             fontWeight: "900",
+            textAlign: "center",
           }}
         >
           {formatDate(curr, { month: "long", year: "numeric" })}
@@ -372,6 +395,8 @@ export default function CalendarView({
             padding: "5px",
             borderRadius: "15px",
             gap: "5px",
+            flexWrap: "wrap",
+            justifyContent: "center",
           }}
         >
           <button
@@ -396,16 +421,11 @@ export default function CalendarView({
       </div>
 
       {/* شبكة التقويم */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(7, 1fr)",
-          gap: "10px",
-        }}
-      >
+      <div className="calendar-grid">
         {weekDays.map((d, index) => (
           <div
             key={index}
+            className="day-header"
             style={{
               fontSize: "0.85rem",
               color: "#94a3b8",
@@ -445,7 +465,9 @@ export default function CalendarView({
             <div
               key={i}
               onClick={() => handleDayClick(d)}
-              className={hasBookings ? "calendar-day-card" : ""}
+              className={`calendar-day-cell ${
+                hasBookings ? "calendar-day-card" : ""
+              }`}
               style={{
                 display: "flex",
                 flexDirection: "column",
@@ -485,6 +507,7 @@ export default function CalendarView({
               {/* الرقم الفرعي (صغير في الأعلى) */}
               {d && (
                 <span
+                  className="secondary-day-txt"
                   style={{
                     fontSize: "0.65rem",
                     opacity: hasBookings ? 0.8 : 0.5,
@@ -499,6 +522,7 @@ export default function CalendarView({
 
               {/* الرقم الأساسي (كبير في المنتصف) */}
               <span
+                className="primary-day-txt"
                 style={{
                   position: "relative",
                   zIndex: 2,
@@ -527,6 +551,7 @@ export default function CalendarView({
 
               {d && hasBookings && (
                 <div
+                  className="booking-badges"
                   style={{
                     display: "flex",
                     gap: "5px",
@@ -535,6 +560,7 @@ export default function CalendarView({
                     background: "rgba(255,255,255,0.2)",
                     padding: "2px 8px",
                     borderRadius: "10px",
+                    justifyContent: "center",
                   }}
                 >
                   {roles.isProv && <span title="حجز لتقديم خدمة">💼</span>}
@@ -585,6 +611,7 @@ export default function CalendarView({
                     fontSize: "0.9rem",
                     color: "#475569",
                     fontWeight: "bold",
+                    flexWrap: "wrap",
                   }}
                 >
                   <span
@@ -695,6 +722,7 @@ export default function CalendarView({
                             alignItems: "center",
                             gap: "8px",
                             marginBottom: "12px",
+                            flexWrap: "wrap",
                           }}
                         >
                           <h4

@@ -237,7 +237,9 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
         .single();
       const rate = settings?.commission_rate || 0.1;
 
-      const commissionAmount = currentTotal * rate;
+      // ✨ التعديل: إذا كان החجز يدوياً (خاصاً) تكون عمولة المنصة صفر
+      const isManual = booking.is_manual_booking === true;
+      const commissionAmount = isManual ? 0 : currentTotal * rate;
       const netProfit = currentTotal - commissionAmount;
 
       const providerId = booking.offerings?.provider_id || booking.provider_id;
@@ -517,7 +519,8 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
             }}
           >
             💰 {priceDisplay}
-            {booking.quantity > 1 && (
+            {/* ✨ إعادة إضافة العدد بجوار السعر هنا ✨ */}
+            {booking.quantity >= 1 && (
               <span
                 style={{
                   fontSize: "0.8rem",
@@ -569,7 +572,7 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
         </span>
       </div>
 
-      {/* ✨ شبكة تفاصيل الموعد (البدء والانتهاء) محدثة بالتفاصيل الجديدة ✨ */}
+      {/* ✨ شبكة تفاصيل الموعد (البدء والانتهاء) ✨ */}
       <div
         style={{
           display: "grid",
@@ -1198,92 +1201,6 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
                     إلغاء الحجز ❌
                   </button>
                 </div>
-              </div>
-            )}
-
-            {status === "completed" && !isProviderView && (
-              <div
-                style={{
-                  width: "100%",
-                  marginTop: "10px",
-                  padding: "15px",
-                  backgroundColor: "#ffffffaa",
-                  borderRadius: "12px",
-                  border: "1px solid #cbd5e1",
-                }}
-              >
-                {booking.rating || booking.review ? (
-                  <div>
-                    <strong style={{ color: "#1e293b", fontSize: "0.95rem" }}>
-                      تقييمك:{" "}
-                    </strong>
-                    {"⭐".repeat(booking.rating || 5)}
-                    {(booking.review ||
-                      booking.review_text ||
-                      booking.client_review) && (
-                      <p
-                        style={{
-                          margin: "8px 0 0",
-                          color: "#64748b",
-                          fontSize: "0.9rem",
-                          fontStyle: "italic",
-                        }}
-                      >
-                        💬{" "}
-                        {booking.review ||
-                          booking.review_text ||
-                          booking.client_review}
-                      </p>
-                    )}
-                  </div>
-                ) : (
-                  <div
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: "10px",
-                    }}
-                  >
-                    <strong style={{ color: "#1e293b", fontSize: "0.95rem" }}>
-                      ⭐ شاركنا تقييمك للخدمة والمزود:
-                    </strong>
-                    <select
-                      value={rating}
-                      onChange={(e) => setRating(e.target.value)}
-                      style={{
-                        ...inputS,
-                        cursor: "pointer",
-                        backgroundColor: "#fff",
-                      }}
-                    >
-                      <option value="5">⭐⭐⭐⭐⭐ ممتاز</option>
-                      <option value="4">⭐⭐⭐⭐ جيد جداً</option>
-                      <option value="3">⭐⭐⭐ جيد</option>
-                      <option value="2">⭐⭐ مقبول</option>
-                      <option value="1">⭐ سيء</option>
-                    </select>
-                    <textarea
-                      placeholder="اكتب تجربتك مع المزود هنا (اختياري)..."
-                      value={reviewText}
-                      onChange={(e) => setReviewText(e.target.value)}
-                      style={{
-                        ...inputS,
-                        height: "70px",
-                        resize: "none",
-                        backgroundColor: "#fff",
-                      }}
-                    />
-                    <button
-                      onClick={submitReview}
-                      disabled={isSubmittingReview}
-                      style={{ ...btnGreen, width: "100%", padding: "12px" }}
-                    >
-                      {isSubmittingReview
-                        ? "جاري الإرسال..."
-                        : "إرسال التقييم 🚀"}
-                    </button>
-                  </div>
-                )}
               </div>
             )}
           </div>

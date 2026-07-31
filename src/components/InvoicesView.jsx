@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useTranslation } from "react-i18next"; // أضفنا مكتبة الترجمة للتواريخ
+import { useTranslation } from "react-i18next";
 
 export default function InvoicesView({
   bookings = [],
@@ -18,33 +18,30 @@ export default function InvoicesView({
   // ✨ حالة النافذة المنبثقة للفاتورة (Modal) ✨
   const [selectedInvoice, setSelectedInvoice] = useState(null);
 
-  // 💰 دالة حساب المبالغ المالية للفاتورة المحدثة
+  // 💰 دالة حساب المبالغ المالية للفاتورة المحدثة لدعم الحجوزات الخاصة
   const calculateFinancials = (b) => {
-    // 1. تحديد السعر النهائي الإجمالي:
-    // إذا كان هناك سعر تفاوض (proposed_price)، فهو يمثل الإجمالي النهائي
-    // وإذا لم يوجد، نضرب سعر الخدمة الأساسي في العدد
     const finalTotal =
       b.proposed_price && Number(b.proposed_price) > 0
         ? Number(b.proposed_price)
         : (Number(b.offerings?.price) || 0) * (b.quantity || 1);
 
-    // 2. حساب عمولة المنصة من الإجمالي
-    const platformCommission = finalTotal * commissionRate;
+    // ✨ التحديث: إذا كان حجزاً يدوياً/خاصاً، فإن العمولة تساوي صفر
+    const isManual = b.is_manual_booking === true;
+    const platformCommission = isManual ? 0 : finalTotal * commissionRate;
 
-    // 3. صافي ربح المزود
     const providerNet = finalTotal - platformCommission;
 
     return {
-      baseTotal: finalTotal, // نعرضه كإجمالي
-      additional: 0, // أصبحت مدمجة مسبقاً إذا كان هناك تفاوض
+      baseTotal: finalTotal,
+      additional: 0,
       totalClientPrice: finalTotal,
       platformCommission,
       providerNet,
       qty: b.quantity || 1,
+      isManual,
     };
   };
 
-  // تطبيق الفلاتر
   let processedBookings = bookings.filter((b) => b.status === "completed");
 
   if (roleFilter === "provider") {
@@ -96,8 +93,7 @@ export default function InvoicesView({
     backgroundColor: "#fff",
   };
 
-  // ✨ دوال استخراج وتنسيق التواريخ والأوقات ✨
-  const isRTL = i18n?.language === "ar" || true; // افتراضي عربي
+  const isRTL = i18n?.language === "ar" || true;
   const dateLocale = isRTL ? "ar-SA" : "en-US";
 
   const getFullFormattedDate = (dateObj) => {
@@ -122,9 +118,7 @@ export default function InvoicesView({
     }
   };
 
-  // دالة فتح نافذة الفاتورة وتمرير الحسابات معها
   const openInvoiceModal = (b) => {
-    // تجهيز التواريخ لحظة الفتح
     const startObj = b.appointment_date ? new Date(b.appointment_date) : null;
     const endObj = b.end_time ? new Date(b.end_time) : null;
 
@@ -155,10 +149,8 @@ export default function InvoicesView({
 
   return (
     <>
-      {/* 🚀 السحر هنا: كود الطباعة المتقدم الذي يعزل الفاتورة ويمنع التكرار 🚀 */}
       <style>{`
         @media print {
-          /* 1. إجبار المتصفح على طباعة صفحة واحدة فقط ومنع الصفحات الفارغة */
           html, body {
             height: 100vh !important;
             overflow: hidden !important;
@@ -166,13 +158,9 @@ export default function InvoicesView({
             margin: 0 !important;
             padding: 0 !important;
           }
-
-          /* 2. إخفاء الواجهة الرئيسية لشبكة الفواتير كلياً */
           .hide-on-print {
             display: none !important;
           }
-
-          /* 3. تمديد خلفية الفاتورة لتغطي أي شيء آخر (مثل شريط التنقل العلوي) */
           .invoice-modal-overlay {
             position: fixed !important;
             top: 0 !important;
@@ -184,8 +172,6 @@ export default function InvoicesView({
             padding: 20px !important;
             display: block !important;
           }
-
-          /* 4. تنظيف إطار الفاتورة لتبدو كورقة رسمية */
           #printable-invoice {
             width: 100% !important;
             max-width: 100% !important;
@@ -194,13 +180,9 @@ export default function InvoicesView({
             box-shadow: none !important;
             border: none !important;
           }
-
-          /* 5. إخفاء أزرار الطباعة والإغلاق أثناء الطباعة */
           .no-print {
             display: none !important;
           }
-
-          /* 6. إجبار المتصفح على طباعة الألوان بدقة */
           * {
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
@@ -416,18 +398,34 @@ export default function InvoicesView({
                     >
                       ملخص فاتورة #{shortId}
                     </span>
-                    <span
-                      style={{
-                        backgroundColor: isProvider ? "#ecfdf5" : "#eff6ff",
-                        color: isProvider ? "#059669" : "#2563eb",
-                        padding: "4px 10px",
-                        borderRadius: "8px",
-                        fontSize: "0.75rem",
-                        fontWeight: "bold",
-                      }}
-                    >
-                      {isProvider ? "إيراد 💼" : "مشتريات 🛍️"}
-                    </span>
+                    {/* ✨ تمييز كرت الحجز الخاص ✨ */}
+                    {b.is_manual_booking ? (
+                      <span
+                        style={{
+                          backgroundColor: "#f0fdf4",
+                          color: "#166534",
+                          padding: "4px 10px",
+                          borderRadius: "8px",
+                          fontSize: "0.75rem",
+                          fontWeight: "bold",
+                        }}
+                      >
+                        📞 حجز خاص
+                      </span>
+                    ) : (
+                      <span
+                        style={{
+                          backgroundColor: isProvider ? "#ecfdf5" : "#eff6ff",
+                          color: isProvider ? "#059669" : "#2563eb",
+                          padding: "4px 10px",
+                          borderRadius: "8px",
+                          fontSize: "0.75rem",
+                          fontWeight: "bold",
+                        }}
+                      >
+                        {isProvider ? "إيراد 💼" : "مشتريات 🛍️"}
+                      </span>
+                    )}
                   </div>
                   <div
                     style={{
@@ -444,9 +442,15 @@ export default function InvoicesView({
                         fontSize: "1.1rem",
                         color: "#1e293b",
                         fontWeight: "900",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
                       }}
                     >
-                      {b.offerings?.title}
+                      <span>{b.offerings?.title}</span>
+                      <span style={{ fontSize: "0.85rem", color: "#64748b" }}>
+                        (العدد: {b.quantity || 1})
+                      </span>
                     </h3>
                     <div style={{ fontSize: "0.85rem", color: "#475569" }}>
                       <strong>{isProvider ? "العميل:" : "المزود:"}</strong>{" "}
@@ -490,7 +494,6 @@ export default function InvoicesView({
                         {currency}
                       </strong>
                     </div>
-                    {/* ✨ الزر الذي يفتح الفاتورة المستقلة ✨ */}
                     <button
                       onClick={() => openInvoiceModal(b)}
                       style={{
@@ -655,7 +658,8 @@ export default function InvoicesView({
                     fontWeight: "900",
                   }}
                 >
-                  فاتورة خدمة
+                  فاتورة خدمة{" "}
+                  {selectedInvoice.booking.is_manual_booking ? "(خاصة)" : ""}
                 </h2>
                 <div
                   style={{
@@ -679,6 +683,24 @@ export default function InvoicesView({
                 </div>
               </div>
             </div>
+
+            {/* ✨ بانر توضيحي للحجوزات الخاصة ✨ */}
+            {selectedInvoice.booking.is_manual_booking && (
+              <div
+                style={{
+                  backgroundColor: "#f0fdf4",
+                  border: "1px dashed #bbf7d0",
+                  padding: "15px",
+                  borderRadius: "12px",
+                  marginBottom: "20px",
+                  textAlign: "center",
+                  color: "#166534",
+                  fontWeight: "bold",
+                }}
+              >
+                📞 هذا الحجز تم إدخاله يدوياً كحجز خارجي (معفى من عمولة المنصة)
+              </div>
+            )}
 
             {/* --- بيانات الأطراف --- */}
             <div style={{ display: "flex", gap: "30px", marginBottom: "20px" }}>
@@ -753,7 +775,7 @@ export default function InvoicesView({
               </div>
             </div>
 
-            {/* ✨ قسم تفاصيل الموعد والموقع (الجديد المضاف للفاتورة) ✨ */}
+            {/* ✨ قسم تفاصيل الموعد والموقع ✨ */}
             <div
               style={{
                 backgroundColor: "#eff6ff",
@@ -1010,25 +1032,47 @@ export default function InvoicesView({
                   </div>
                 )}
 
-                {selectedInvoice.isProvider && (
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      marginBottom: "15px",
-                      color: "#ef4444",
-                      fontSize: "0.95rem",
-                      paddingBottom: "15px",
-                      borderBottom: "1px dashed #cbd5e1",
-                    }}
-                  >
-                    <span>رسوم المنصة ({commissionRate * 100}%):</span>
-                    <span style={{ direction: "ltr", fontWeight: "bold" }}>
-                      - {selectedInvoice.fin.platformCommission.toFixed(2)}{" "}
-                      {selectedInvoice.currency}
-                    </span>
-                  </div>
-                )}
+                {/* ✨ عرض العمولة بشكل ذكي بناءً على نوع الحجز ✨ */}
+                {selectedInvoice.isProvider &&
+                  !selectedInvoice.booking.is_manual_booking && (
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        marginBottom: "15px",
+                        color: "#ef4444",
+                        fontSize: "0.95rem",
+                        paddingBottom: "15px",
+                        borderBottom: "1px dashed #cbd5e1",
+                      }}
+                    >
+                      <span>رسوم المنصة ({commissionRate * 100}%):</span>
+                      <span style={{ direction: "ltr", fontWeight: "bold" }}>
+                        - {selectedInvoice.fin.platformCommission.toFixed(2)}{" "}
+                        {selectedInvoice.currency}
+                      </span>
+                    </div>
+                  )}
+
+                {selectedInvoice.isProvider &&
+                  selectedInvoice.booking.is_manual_booking && (
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        marginBottom: "15px",
+                        color: "#10b981",
+                        fontSize: "0.95rem",
+                        paddingBottom: "15px",
+                        borderBottom: "1px dashed #cbd5e1",
+                      }}
+                    >
+                      <span>رسوم المنصة (معفى):</span>
+                      <span style={{ direction: "ltr", fontWeight: "bold" }}>
+                        0.00 {selectedInvoice.currency}
+                      </span>
+                    </div>
+                  )}
 
                 <div
                   style={{

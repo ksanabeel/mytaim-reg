@@ -116,7 +116,7 @@ const smInput = {
   transition: "border-color 0.2s",
 };
 
-// ✨ دوال الجلب والحساب ✨
+// ✨ دوال الجلب والحساب المحدثة ✨
 const fetchSafe = async (tableName) => {
   try {
     const { data, error } = await supabase.from(tableName).select("*");
@@ -162,7 +162,9 @@ const calculateFinancials = (b, commissionRate) => {
       ? Number(b.proposed_price)
       : (Number(b.offerings?.price) || 0) * (b.quantity || 1);
 
-  const platformCommission = finalTotal * commissionRate;
+  // ✨ التحديث الجذري: إذا كان الحجز يدوياً (خاص)، عمولة المنصة صفر.
+  const isManual = b.is_manual_booking === true;
+  const platformCommission = isManual ? 0 : finalTotal * commissionRate;
   const providerNet = finalTotal - platformCommission;
 
   return {
@@ -262,7 +264,6 @@ function MainAppContent() {
     message: "",
   });
 
-  // ✨ المتغيرات الجديدة المضافة لرفع الفاتورة والإيصال المالي ✨
   const [bookingRef, setBookingRef] = useState("");
   const [receiptFile, setReceiptFile] = useState(null);
 
@@ -604,7 +605,6 @@ function MainAppContent() {
     setIsAccepting(false);
   };
 
-  // ✨ دالة إرسال رسائل التواصل المحدثة لتدعم نظام رفع الإيصالات للمدير المالي آلياً ✨
   const handleSubmitContact = async () => {
     if (!contactForm.subject || !contactForm.message)
       return alert("الرجاء تعبئة العنوان والرسالة.");
@@ -936,20 +936,29 @@ function MainAppContent() {
                   </div>
                 )}
 
+                {/* ✨ تعديل شكل الملاحظة المالية ليظهر إذا كان الحجز خاصاً (بدون عمولة) ✨ */}
                 {isProvider && b.status === "completed" && (
                   <div
                     style={{
-                      backgroundColor: b.is_commission_paid
+                      backgroundColor: b.is_manual_booking
+                        ? "#f0fdf4"
+                        : b.is_commission_paid
                         ? "#ecfdf5"
                         : "#fef2f2",
-                      border: b.is_commission_paid
+                      border: b.is_manual_booking
+                        ? "1px solid #bbf7d0"
+                        : b.is_commission_paid
                         ? "1px solid #a7f3d0"
                         : "1px solid #fca5a5",
                       borderTop: "none",
                       padding: "12px 20px",
                       borderBottomRightRadius: "16px",
                       borderBottomLeftRadius: "16px",
-                      color: b.is_commission_paid ? "#047857" : "#b91c1c",
+                      color: b.is_manual_booking
+                        ? "#166534"
+                        : b.is_commission_paid
+                        ? "#047857"
+                        : "#b91c1c",
                       fontWeight: "bold",
                       fontSize: "0.85rem",
                       marginTop: hasComment || isHidden ? "0px" : "-15px",
@@ -958,34 +967,45 @@ function MainAppContent() {
                       display: "flex",
                       flexWrap: "wrap",
                       alignItems: "center",
-                      justifyContent: "space-between",
+                      justifyContent: b.is_manual_booking
+                        ? "center"
+                        : "space-between",
                     }}
                   >
-                    <span>
-                      💰 عمولة المنصة لهذا الحجز:{" "}
-                      <strong
-                        style={{
-                          direction: "ltr",
-                          display: "inline-block",
-                          fontSize: "1rem",
-                        }}
-                      >
-                        {platformCommission.toFixed(2)} {currency}
-                      </strong>
-                    </span>
-                    <span
-                      style={{
-                        backgroundColor: "#fff",
-                        padding: "4px 10px",
-                        borderRadius: "8px",
-                        fontSize: "0.75rem",
-                        boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
-                      }}
-                    >
-                      {b.is_commission_paid
-                        ? "✅ مسددة للمنصة"
-                        : "❌ مستحقة ولم تسدد بعد"}
-                    </span>
+                    {b.is_manual_booking ? (
+                      <span>
+                        📞 حجز خاص (خارجي) - الإيرادات لك بالكامل ولا توجد عمولة
+                        للمنصة
+                      </span>
+                    ) : (
+                      <>
+                        <span>
+                          💰 عمولة المنصة لهذا الحجز:{" "}
+                          <strong
+                            style={{
+                              direction: "ltr",
+                              display: "inline-block",
+                              fontSize: "1rem",
+                            }}
+                          >
+                            {platformCommission.toFixed(2)} {currency}
+                          </strong>
+                        </span>
+                        <span
+                          style={{
+                            backgroundColor: "#fff",
+                            padding: "4px 10px",
+                            borderRadius: "8px",
+                            fontSize: "0.75rem",
+                            boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
+                          }}
+                        >
+                          {b.is_commission_paid
+                            ? "✅ مسددة للمنصة"
+                            : "❌ مستحقة ولم تسدد بعد"}
+                        </span>
+                      </>
+                    )}
                   </div>
                 )}
               </div>
@@ -996,7 +1016,6 @@ function MainAppContent() {
     );
   };
 
-  // ✨ الترقية الذكية لنظام الصلاحيات والأمان ليدعم دور "المدير المالي" المخصص ✨
   const isSuperAdmin = userProfile?.role === "admin";
   const isSupervisor = userProfile?.role === "supervisor";
   const isFinancialManager = userProfile?.role === "financial_manager";
@@ -1015,20 +1034,31 @@ function MainAppContent() {
 
   const myPaidCommissionText = sumByCurrency(
     providerBookings.filter(
-      (b) => b.status === "completed" && b.is_commission_paid,
+      (b) =>
+        b.status === "completed" &&
+        b.is_commission_paid &&
+        !b.is_manual_booking,
     ),
     commissionRate,
   );
 
   const myUnpaidCommissionText = sumByCurrency(
     providerBookings.filter(
-      (b) => b.status === "completed" && !b.is_commission_paid,
+      (b) =>
+        b.status === "completed" &&
+        !b.is_commission_paid &&
+        !b.is_manual_booking,
     ),
     commissionRate,
   );
 
   const totalUnpaidNumeric = providerBookings
-    .filter((b) => b.status === "completed" && !b.is_commission_paid)
+    .filter(
+      (b) =>
+        b.status === "completed" &&
+        !b.is_commission_paid &&
+        !b.is_manual_booking,
+    )
     .reduce(
       (acc, b) =>
         acc + calculateFinancials(b, commissionRate).platformCommission,
@@ -1323,7 +1353,6 @@ function MainAppContent() {
                     "لم تقم الإدارة بإضافة حسابات بنكية حتى الآن."}
                 </div>
 
-                {/* ✨ التحديث الذكي والمهني للملاحظة المالية المباشرة وتوجيه الحوالات للإيميل الرسمي للمحاسبة ✨ */}
                 <div
                   style={{
                     marginTop: "20px",
@@ -1350,11 +1379,10 @@ function MainAppContent() {
                     <br />
                     📬 للتأكيد أو للاستفسارات المالية السريعة:{" "}
                     <a
-                      href="mailto:finance@bookonmap.com   bookonmap@hotmail.com"
+                      href="mailto:finance@bookonmap.com"
                       style={{ color: "#2563eb", textDecoration: "underline" }}
                     >
-                      finance@bookonmap.com . الادارة المالية لbookonmap او وكيل
-                      خدمات العملاء bookonmap@hotmail.com
+                      finance@bookonmap.com
                     </a>
                   </p>
                   <button
@@ -1436,7 +1464,9 @@ function MainAppContent() {
                       id: providerBookings
                         .filter(
                           (b) =>
-                            b.status === "completed" && !b.is_commission_paid,
+                            b.status === "completed" &&
+                            !b.is_commission_paid &&
+                            !b.is_manual_booking,
                         )
                         .map((b) => b.id)
                         .join(","),
@@ -1520,7 +1550,6 @@ function MainAppContent() {
                 </select>
               </div>
 
-              {/* ✨ حقول رفع الإيصال الذكية تظهر فقط عند اختيار "إرفاق إيصال" ليتلقاها المدير المالي ✨ */}
               {contactForm.type === "receipt" && (
                 <div
                   style={{
@@ -2717,7 +2746,10 @@ function MainAppContent() {
                             }}
                           >
                             <div
-                              style={{ fontSize: "4rem", marginBottom: "15px" }}
+                              style={{
+                                fontSize: "4rem",
+                                marginBottom: "15px",
+                              }}
                             >
                               📭
                             </div>
@@ -2745,7 +2777,7 @@ function MainAppContent() {
                             </button>
                           </div>
                         )}
-                        {myOfferings.map((off) => {
+                        {myOfferings.map((off, index) => {
                           const modelLabels = {
                             fixed: "مهمة",
                             hourly: "ساعة",
@@ -2756,6 +2788,7 @@ function MainAppContent() {
                             free: "تطوع",
                           };
                           const curr = off.currency || "USD";
+
                           return (
                             <div
                               key={off.id}
@@ -2796,17 +2829,39 @@ function MainAppContent() {
                                   flex: 1,
                                 }}
                               >
-                                <h3
+                                <div
                                   style={{
-                                    margin: "0 0 12px 0",
-                                    fontSize: "1.25rem",
-                                    color: "#1e293b",
-                                    fontWeight: "900",
-                                    lineHeight: "1.5",
+                                    display: "flex",
+                                    alignItems: "flex-start",
+                                    gap: "10px",
+                                    marginBottom: "12px",
                                   }}
                                 >
-                                  {off.title}
-                                </h3>
+                                  <span
+                                    style={{
+                                      backgroundColor: "#f1f5f9",
+                                      color: "#64748b",
+                                      padding: "4px 10px",
+                                      borderRadius: "8px",
+                                      fontWeight: "900",
+                                      fontSize: "1.1rem",
+                                    }}
+                                  >
+                                    #{index + 1}
+                                  </span>
+                                  <h3
+                                    style={{
+                                      margin: 0,
+                                      fontSize: "1.25rem",
+                                      color: "#1e293b",
+                                      fontWeight: "900",
+                                      lineHeight: "1.5",
+                                      flex: 1,
+                                    }}
+                                  >
+                                    {off.title}
+                                  </h3>
+                                </div>
                                 <p
                                   style={{
                                     fontSize: "0.9rem",
@@ -2903,7 +2958,39 @@ function MainAppContent() {
                                       </span>
                                     )}
                                   </div>
-                                  <div style={{ display: "flex", gap: "10px" }}>
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      gap: "8px",
+                                      alignItems: "center",
+                                    }}
+                                  >
+                                    <button
+                                      onClick={() => {
+                                        navigate(
+                                          `/@${userProfile?.username || ""}`,
+                                        );
+                                      }}
+                                      style={{
+                                        border: "1px solid #a7f3d0",
+                                        background: "#f0fdf4",
+                                        color: "#059669",
+                                        padding: "10px 12px",
+                                        borderRadius: "12px",
+                                        cursor: "pointer",
+                                        fontWeight: "bold",
+                                        fontSize: "0.85rem",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        gap: "4px",
+                                        height: "45px",
+                                        transition: "0.2s",
+                                      }}
+                                      title="عرض الخدمة في المتجر أو مشاركتها"
+                                    >
+                                      🔗 عرض
+                                    </button>
                                     <button
                                       onClick={() => openEditModal(off)}
                                       style={{
@@ -2913,7 +3000,6 @@ function MainAppContent() {
                                         padding: "10px",
                                         borderRadius: "12px",
                                         cursor: "pointer",
-                                        fontWeight: "bold",
                                         fontSize: "1.1rem",
                                         display: "flex",
                                         alignItems: "center",
@@ -2922,14 +3008,6 @@ function MainAppContent() {
                                         height: "45px",
                                         transition: "0.2s",
                                       }}
-                                      onMouseOver={(e) =>
-                                        (e.currentTarget.style.background =
-                                          "#dbeafe")
-                                      }
-                                      onMouseOut={(e) =>
-                                        (e.currentTarget.style.background =
-                                          "#eff6ff")
-                                      }
                                       title="تعديل الخدمة"
                                     >
                                       ✏️
@@ -2954,14 +3032,6 @@ function MainAppContent() {
                                         height: "45px",
                                         transition: "0.2s",
                                       }}
-                                      onMouseOver={(e) =>
-                                        (e.currentTarget.style.background =
-                                          "#fee2e2")
-                                      }
-                                      onMouseOut={(e) =>
-                                        (e.currentTarget.style.background =
-                                          "#fef2f2")
-                                      }
                                       title="حذف الخدمة"
                                     >
                                       🗑️
@@ -3049,7 +3119,6 @@ function MainAppContent() {
                                 return;
                               }
 
-                              // ✅ التعديل هنا: استخدام الرابط المباشر للمنصة لحل مشكلة لوكال هوست
                               const platformDomain =
                                 "https://www.bookonmap.com";
                               const storeUrl = `${platformDomain}/@${userProfile.username}`;
@@ -3068,7 +3137,6 @@ function MainAppContent() {
                                     );
                                   })
                                   .catch((err) => {
-                                    // الحل البديل (Fallback)
                                     const textArea =
                                       document.createElement("textarea");
                                     textArea.value = storeUrl;
@@ -3082,7 +3150,6 @@ function MainAppContent() {
                                     );
                                   });
                               } else {
-                                // الحل البديل للأجهزة القديمة
                                 const textArea =
                                   document.createElement("textarea");
                                 textArea.value = storeUrl;
@@ -3135,6 +3202,7 @@ function MainAppContent() {
                             gap: "25px",
                           }}
                         >
+                          {/* كرت أرباح المنصة الصافية */}
                           <div
                             style={{
                               background:
@@ -3190,7 +3258,7 @@ function MainAppContent() {
                                   letterSpacing: "0.5px",
                                 }}
                               >
-                                إجمالي الأرباح الصافية
+                                أرباح المنصة الصافية
                               </h3>
                             </div>
                             <div
@@ -3207,7 +3275,92 @@ function MainAppContent() {
                             >
                               {sumByCurrency(
                                 providerBookings.filter(
-                                  (b) => b.status === "completed",
+                                  (b) =>
+                                    b.status === "completed" &&
+                                    !b.is_manual_booking,
+                                ),
+                                commissionRate,
+                                "providerNet",
+                              )}
+                            </div>
+                          </div>
+
+                          {/* ✨ كرت أرباح الحجوزات الخاصة (خارج المنصة) ✨ */}
+                          <div
+                            style={{
+                              background:
+                                "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)",
+                              padding: "30px",
+                              borderRadius: "24px",
+                              color: "white",
+                              boxShadow: "0 15px 35px rgba(99, 102, 241, 0.25)",
+                              display: "flex",
+                              flexDirection: "column",
+                              justifyContent: "center",
+                              transition: "0.3s",
+                              position: "relative",
+                              overflow: "hidden",
+                            }}
+                            onMouseOver={(e) =>
+                              (e.currentTarget.style.transform =
+                                "translateY(-5px)")
+                            }
+                            onMouseOut={(e) =>
+                              (e.currentTarget.style.transform =
+                                "translateY(0)")
+                            }
+                          >
+                            <div
+                              style={{
+                                position: "absolute",
+                                right: "-20px",
+                                top: "-20px",
+                                fontSize: "8rem",
+                                opacity: 0.1,
+                              }}
+                            >
+                              📞
+                            </div>
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "12px",
+                                marginBottom: "15px",
+                                opacity: 0.9,
+                                position: "relative",
+                                zIndex: 1,
+                              }}
+                            >
+                              <span style={{ fontSize: "1.8rem" }}>📞</span>
+                              <h3
+                                style={{
+                                  margin: 0,
+                                  fontSize: "1.2rem",
+                                  fontWeight: "bold",
+                                  letterSpacing: "0.5px",
+                                }}
+                              >
+                                أرباح الحجوزات الخاصة
+                              </h3>
+                            </div>
+                            <div
+                              style={{
+                                fontSize: "1.8rem",
+                                fontWeight: "900",
+                                direction: "ltr",
+                                textAlign: "right",
+                                textShadow: "0 4px 10px rgba(0,0,0,0.15)",
+                                position: "relative",
+                                zIndex: 1,
+                                wordBreak: "break-word",
+                              }}
+                            >
+                              {sumByCurrency(
+                                providerBookings.filter(
+                                  (b) =>
+                                    b.status === "completed" &&
+                                    b.is_manual_booking,
                                 ),
                                 commissionRate,
                                 "providerNet",
