@@ -597,11 +597,9 @@ export default function AddOffering({
                       <option value="ساعتان">ساعتان</option>
                       <option value="4 ساعات">4 ساعات</option>
                       <option value="5 ساعات">5 ساعات</option>
-                      <option value="8 ساعات (دوام كامل)">
-                        8 ساعات (دوام كامل)
-                      </option>
+                      <option value="8 ساعات ">8 ساعات </option>
                       <option value="12 ساعة">12 ساعة</option>
-                      <option value="مفتوح (حسب الإنجاز)">
+                      <option value="مفتوح(حسب الإنجاز)">
                         مفتوح (حسب الإنجاز)
                       </option>
                     </>
@@ -610,12 +608,8 @@ export default function AddOffering({
                     pricingModel === "yearly") && (
                     <>
                       <option value="ساعتان يومياً">ساعتان يومياً</option>
-                      <option value="4 ساعات يومياً (نصف دوام)">
-                        4 ساعات يومياً (نصف دوام)
-                      </option>
-                      <option value="8 ساعات يومياً (دوام كامل)">
-                        8 ساعات يومياً (دوام كامل)
-                      </option>
+                      <option value="4 ساعات يومياً">4 ساعات يومياً</option>
+                      <option value="8 ساعات يومياً">8 ساعات يومياً</option>
                       <option value="مرن (حسب الاتفاق)">
                         مرن (حسب الاتفاق)
                       </option>

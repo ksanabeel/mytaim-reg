@@ -89,18 +89,11 @@ export default function ClientMarketplace({
     sat: "السبت",
   };
 
-  useEffect(() => {
-    const timer = setInterval(() => setLiveTime(new Date()), 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  // 🚀 ✨ دالة ذكية لحساب التقييمات اللحظية من قاعدة البيانات مباشرة ✨ 🚀
   const enrichWithRatings = async (offeringsList) => {
     if (!offeringsList || offeringsList.length === 0) return [];
     const offeringIds = offeringsList.map((o) => o.id);
 
     try {
-      // جلب جميع التقييمات لهذه الخدمات
       const { data: ratingsData } = await supabase
         .from("bookings")
         .select("offering_id, rating")
@@ -165,10 +158,8 @@ export default function ClientMarketplace({
     const { data: offs } = await query.range(0, ITEMS_PER_PAGE - 1);
 
     if (offs && offs.length > 0) {
-      // حقن التقييمات اللحظية
       let enrichedOffs = await enrichWithRatings(offs);
 
-      // الترتيب الذكي: الأعلى تقييماً أولاً (يعتمد على التقييم اللحظي، وإذا لم يوجد يعتمد على الافتراضي)
       enrichedOffs.sort((a, b) => {
         const ratingA =
           a.dynamic_rating !== null
@@ -894,16 +885,15 @@ export default function ClientMarketplace({
   };
 
   const modelLabels = {
-    fixed: t("task"),
-    hourly: t("hour"),
-    period: t("period"),
-    daily: t("day"),
-    monthly: t("month"),
-    yearly: t("year"),
-    free: t("volunteer"),
+    fixed: "مهمة",
+    hourly: "ساعة",
+    period: "فترة",
+    daily: "يوم",
+    monthly: "شهر",
+    yearly: "سنة",
+    free: "تطوع",
   };
 
-  // 🚀 دالة عرض النجوم المعدلة لاختيار التقييم الحقيقي 🚀
   const renderStars = (dynamicRating, profileRating) => {
     const finalRating = dynamicRating !== null ? dynamicRating : profileRating;
     return "⭐ " + (finalRating ? finalRating.toFixed(1) : "5.0");
@@ -1460,6 +1450,14 @@ export default function ClientMarketplace({
             const itemThemeColor = item.profiles?.theme_color || "#7c3aed";
             const isLastElement = filtered.length === index + 1;
 
+            // متغير ذكي يبحث عن تفاصيل المدة في الأعمدة المحتملة بقاعدة البيانات
+            const durationText =
+              item.duration ||
+              item.duration_details ||
+              item.work_duration ||
+              item.period ||
+              item.time_details;
+
             return (
               <div
                 ref={isLastElement ? lastElementRef : null}
@@ -1554,7 +1552,6 @@ export default function ClientMarketplace({
                         borderRadius: "10px",
                       }}
                     >
-                      {/* ✨ التقييم اللحظي المعالج ✨ */}
                       {renderStars(item.dynamic_rating, item.profiles?.rating)}
                     </div>
                   </div>
@@ -1642,36 +1639,63 @@ export default function ClientMarketplace({
                   </div>
 
                   <div style={cardFooterS}>
-                    <div style={{ display: "flex", flexDirection: "column" }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        maxWidth: "160px",
+                      }}
+                    >
                       <span
                         style={{
                           fontWeight: "900",
-                          fontSize: isAgreement ? "0.95rem" : "1.2rem",
+                          fontSize: isAgreement ? "0.95rem" : "1.25rem",
                           color: isAgreement
                             ? "#3b82f6"
                             : isFree
                             ? "#10b981"
                             : itemThemeColor,
+                          lineHeight: "1.1",
                         }}
                       >
                         {isAgreement
                           ? "حسب الاتفاق 🤝"
                           : isFree
-                          ? t("free")
-                          : `${item.price} SAR`}
+                          ? "مجاني (تطوع) 💚"
+                          : `${item.price} ${item.currency || "SAR"}`}
                       </span>
-                      {!isAgreement && (
-                        <span
-                          style={{
-                            fontSize: "0.7rem",
-                            color: "#64748b",
-                            fontWeight: "bold",
-                          }}
-                        >
-                          {t("per")}{" "}
-                          {modelLabels[item.pricing_model || "fixed"]}
-                        </span>
-                      )}
+
+                      <div style={{ marginTop: "4px", lineHeight: "1.4" }}>
+                        {/* عرض المسمى وآلية الحساب فقط إذا كان هناك سعر أو تسعيرة */}
+                        {!isAgreement && !isFree && (
+                          <span
+                            style={{
+                              fontSize: "0.75rem",
+                              color: "#475569",
+                              fontWeight: "900",
+                              display: "block",
+                            }}
+                          >
+                            {item.provider_role ? `${item.provider_role} ` : ""}
+                            لكل {modelLabels[item.pricing_model || "fixed"]}
+                          </span>
+                        )}
+
+                        {/* 🔥 هنا الإضافة الذكية: المدة تظهر للجميع سواء كان حسب الاتفاق أو لا 🔥 */}
+                        {durationText && (
+                          <span
+                            style={{
+                              fontSize: "0.75rem",
+                              color: itemThemeColor,
+                              fontWeight: "bold",
+                              display: "block",
+                              marginTop: "2px",
+                            }}
+                          >
+                            ⏳ {durationText}
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     <div
@@ -1864,7 +1888,6 @@ export default function ClientMarketplace({
                     fontWeight: "bold",
                   }}
                 >
-                  {/* ✨ التقييم اللحظي للخدمة المختارة ✨ */}
                   {renderStars(
                     selected.dynamic_rating,
                     selected.profiles?.rating,
@@ -2716,7 +2739,7 @@ const cardDescriptionS = {
 const cardFooterS = {
   display: "flex",
   justifyContent: "space-between",
-  alignItems: "center",
+  alignItems: "flex-end",
   borderTop: "1px solid #f1f5f9",
   paddingTop: "15px",
 };
@@ -2818,8 +2841,4 @@ const locOk = {
   color: "#059669",
   fontWeight: "bold",
   fontSize: "0.9rem",
-};
-const renderStars = (dynamicRating, profileRating) => {
-  const finalRating = dynamicRating !== null ? dynamicRating : profileRating;
-  return "⭐ " + (finalRating ? finalRating.toFixed(1) : "5.0");
 };
