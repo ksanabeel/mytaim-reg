@@ -237,7 +237,7 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
         .single();
       const rate = settings?.commission_rate || 0.1;
 
-      // ✨ التعديل: إذا كان החجز يدوياً (خاصاً) تكون عمولة المنصة صفر
+      // ✨ التعديل: إذا كان الحجز يدوياً (خاصاً) تكون عمولة المنصة صفر
       const isManual = booking.is_manual_booking === true;
       const commissionAmount = isManual ? 0 : currentTotal * rate;
       const netProfit = currentTotal - commissionAmount;
@@ -435,27 +435,23 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
     fontFamily: "inherit",
   };
 
-  // ✨ استخراج أوقات البدء والانتهاء (بصيغة متقدمة: اليوم + الميلادي كامل + الهجري) ✨
+  // ✨ استخراج أوقات البدء والانتهاء ✨
   const isRTL = i18n.language === "ar";
   const dateLocale = isRTL ? "ar-SA" : "en-US";
 
-  // دوال مساعدة لتنسيق التاريخ
   const getFullFormattedDate = (dateObj) => {
     if (!dateObj) return "";
 
-    // 1. استخراج اسم اليوم
     const dayName = new Intl.DateTimeFormat(dateLocale, {
       weekday: "long",
     }).format(dateObj);
 
-    // 2. استخراج التاريخ الميلادي كاملاً (اليوم، الشهر، السنة)
     const gregDate = new Intl.DateTimeFormat(dateLocale, {
       day: "numeric",
       month: "long",
       year: "numeric",
     }).format(dateObj);
 
-    // 3. استخراج التاريخ الهجري كاملاً
     const hijriDate = new Intl.DateTimeFormat("ar-SA-u-ca-islamic-umalqura", {
       day: "numeric",
       month: "long",
@@ -519,7 +515,6 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
             }}
           >
             💰 {priceDisplay}
-            {/* ✨ إعادة إضافة العدد بجوار السعر هنا ✨ */}
             {booking.quantity >= 1 && (
               <span
                 style={{
@@ -572,7 +567,7 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
         </span>
       </div>
 
-      {/* ✨ شبكة تفاصيل الموعد (البدء والانتهاء) ✨ */}
+      {/* ✨ شبكة تفاصيل الموعد ✨ */}
       <div
         style={{
           display: "grid",
@@ -586,7 +581,6 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
           textAlign: isRTL ? "right" : "left",
         }}
       >
-        {/* قسم تاريخ ووقت البدء */}
         <div>
           <div
             style={{
@@ -623,7 +617,6 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
           </div>
         </div>
 
-        {/* قسم تاريخ ووقت الانتهاء */}
         <div>
           <div
             style={{
@@ -1201,6 +1194,98 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
                     إلغاء الحجز ❌
                   </button>
                 </div>
+              </div>
+            )}
+
+            {/* ✨ نظام التقييم للعميل عند اكتمال الخدمة ✨ */}
+            {status === "completed" && !booking.rating && (
+              <div
+                style={{
+                  width: "100%",
+                  marginTop: "10px",
+                  padding: "15px",
+                  backgroundColor: "#fffbeb",
+                  borderRadius: "12px",
+                  border: "1px dashed #fde68a",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "10px",
+                }}
+              >
+                <strong style={{ color: "#d97706", fontSize: "0.95rem" }}>
+                  ⭐ كيف كانت تجربتك مع المزود؟
+                </strong>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: "8px",
+                    fontSize: "1.8rem",
+                    cursor: "pointer",
+                    direction: "ltr",
+                    justifyContent: "flex-end",
+                  }}
+                >
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <span
+                      key={star}
+                      onClick={() => setRating(star)}
+                      style={{
+                        color: star <= rating ? "#f59e0b" : "#d1d5db",
+                        transition: "0.2s",
+                      }}
+                    >
+                      ★
+                    </span>
+                  ))}
+                </div>
+                <textarea
+                  placeholder="اكتب تعليقك لتساعد الآخرين في اختيار المزود (اختياري)..."
+                  value={reviewText}
+                  onChange={(e) => setReviewText(e.target.value)}
+                  style={{
+                    ...inputS,
+                    resize: "vertical",
+                    minHeight: "70px",
+                    backgroundColor: "#fff",
+                    borderColor: "#fde68a",
+                  }}
+                />
+                <button
+                  onClick={submitReview}
+                  disabled={isSubmittingReview}
+                  style={{
+                    ...btnOrange,
+                    width: "100%",
+                    opacity: isSubmittingReview ? 0.7 : 1,
+                  }}
+                >
+                  {isSubmittingReview ? "جاري الإرسال..." : "إرسال التقييم 🚀"}
+                </button>
+              </div>
+            )}
+
+            {/* إظهار نتيجة التقييم إذا كان مقيماً مسبقاً */}
+            {status === "completed" && booking.rating && (
+              <div
+                style={{
+                  width: "100%",
+                  marginTop: "10px",
+                  padding: "12px",
+                  backgroundColor: "#f0fdf4",
+                  borderRadius: "12px",
+                  border: "1px dashed #6ee7b7",
+                  textAlign: "center",
+                }}
+              >
+                <span
+                  style={{
+                    color: "#059669",
+                    fontWeight: "bold",
+                    fontSize: "0.9rem",
+                  }}
+                >
+                  ✅ لقد قمت بتقييم هذه الخدمة: {"⭐".repeat(booking.rating)}
+                </span>
               </div>
             )}
           </div>

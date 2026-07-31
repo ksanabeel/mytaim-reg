@@ -1428,7 +1428,7 @@ export default function PlatformManagement({
         </div>
       )}
 
-      {/* ================= تبويب السياسات ================= */}
+      {/* ================= تبويب السياسات (محدث مع الخصوصية والاسترجاع) ================= */}
       {activeAdminTab === "policies" && !isFin && (
         <div
           style={{
@@ -1441,6 +1441,7 @@ export default function PlatformManagement({
             border: "1px solid #e2e8f0",
           }}
         >
+          {/* الشروط والأحكام */}
           <div
             style={{
               backgroundColor: "#fff",
@@ -1472,6 +1473,73 @@ export default function PlatformManagement({
               }}
             />
           </div>
+
+          {/* سياسة الخصوصية */}
+          <div
+            style={{
+              backgroundColor: "#fff",
+              padding: "20px",
+              borderRadius: "16px",
+              border: "1px solid #cbd5e1",
+            }}
+          >
+            <strong
+              style={{
+                color: "#1e293b",
+                fontSize: "1.1rem",
+                display: "block",
+                marginBottom: "10px",
+              }}
+            >
+              🔐 سياسة الخصوصية:
+            </strong>
+            <textarea
+              value={inputPrivacy}
+              onChange={(e) => setInputPrivacy(e.target.value)}
+              style={{
+                ...smInput,
+                width: "100%",
+                boxSizing: "border-box",
+                height: "150px",
+                resize: "vertical",
+                backgroundColor: "#f8fafc",
+              }}
+            />
+          </div>
+
+          {/* سياسات الدفع والاسترجاع */}
+          <div
+            style={{
+              backgroundColor: "#fff",
+              padding: "20px",
+              borderRadius: "16px",
+              border: "1px solid #cbd5e1",
+            }}
+          >
+            <strong
+              style={{
+                color: "#1e293b",
+                fontSize: "1.1rem",
+                display: "block",
+                marginBottom: "10px",
+              }}
+            >
+              💳 سياسات الدفع والاسترجاع:
+            </strong>
+            <textarea
+              value={inputRefund}
+              onChange={(e) => setInputRefund(e.target.value)}
+              style={{
+                ...smInput,
+                width: "100%",
+                boxSizing: "border-box",
+                height: "150px",
+                resize: "vertical",
+                backgroundColor: "#f8fafc",
+              }}
+            />
+          </div>
+
           <button
             onClick={handleUpdatePolicies}
             style={{
@@ -1632,7 +1700,7 @@ export default function PlatformManagement({
                         justifyContent: "center",
                       }}
                     >
-                      {/* ✨ زر التعديل الجديد ✨ */}
+                      {/* ✨ زر التعديل ✨ */}
                       <button
                         onClick={() => openEditCategory(c)}
                         style={{
