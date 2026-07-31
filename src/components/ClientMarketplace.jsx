@@ -89,40 +89,6 @@ export default function ClientMarketplace({
     sat: "السبت",
   };
 
-  const enrichWithRatings = async (offeringsList) => {
-    if (!offeringsList || offeringsList.length === 0) return [];
-    const offeringIds = offeringsList.map((o) => o.id);
-
-    try {
-      const { data: ratingsData } = await supabase
-        .from("bookings")
-        .select("offering_id, rating")
-        .in("offering_id", offeringIds)
-        .not("rating", "is", null);
-
-      const ratingMap = {};
-      if (ratingsData) {
-        ratingsData.forEach((r) => {
-          if (!ratingMap[r.offering_id])
-            ratingMap[r.offering_id] = { sum: 0, count: 0 };
-          ratingMap[r.offering_id].sum += r.rating;
-          ratingMap[r.offering_id].count += 1;
-        });
-      }
-
-      return offeringsList.map((o) => {
-        let avg = null;
-        if (ratingMap[o.id] && ratingMap[o.id].count > 0) {
-          avg = ratingMap[o.id].sum / ratingMap[o.id].count;
-        }
-        return { ...o, dynamic_rating: avg };
-      });
-    } catch (err) {
-      console.error("Error fetching dynamic ratings:", err);
-      return offeringsList;
-    }
-  };
-
   const fetchInitialData = async () => {
     setLoading(true);
 
@@ -153,26 +119,18 @@ export default function ClientMarketplace({
       .from("offerings")
       .select("*, profiles!inner(*)")
       .eq("profiles.is_active", true);
+
     if (username) query = query.eq("profiles.username", username);
+    // جلب البيانات مع الترتيب السريع بناءً على التقييم المخزن مسبقاً
+    query = query.order("rating", {
+      referencedTable: "profiles",
+      ascending: false,
+    });
 
     const { data: offs } = await query.range(0, ITEMS_PER_PAGE - 1);
 
     if (offs && offs.length > 0) {
-      let enrichedOffs = await enrichWithRatings(offs);
-
-      enrichedOffs.sort((a, b) => {
-        const ratingA =
-          a.dynamic_rating !== null
-            ? a.dynamic_rating
-            : a.profiles?.rating || 0;
-        const ratingB =
-          b.dynamic_rating !== null
-            ? b.dynamic_rating
-            : b.profiles?.rating || 0;
-        return ratingB - ratingA;
-      });
-
-      setOfferings(enrichedOffs);
+      setOfferings(offs);
       if (offs.length < ITEMS_PER_PAGE) setHasMore(false);
     }
     setLoading(false);
@@ -193,7 +151,12 @@ export default function ClientMarketplace({
       .from("offerings")
       .select("*, profiles!inner(*)")
       .eq("profiles.is_active", true);
+
     if (username) query = query.eq("profiles.username", username);
+    query = query.order("rating", {
+      referencedTable: "profiles",
+      ascending: false,
+    });
 
     const { data: newOffs } = await query.range(
       nextPage * ITEMS_PER_PAGE,
@@ -201,21 +164,7 @@ export default function ClientMarketplace({
     );
 
     if (newOffs && newOffs.length > 0) {
-      let enrichedNewOffs = await enrichWithRatings(newOffs);
-
-      enrichedNewOffs.sort((a, b) => {
-        const ratingA =
-          a.dynamic_rating !== null
-            ? a.dynamic_rating
-            : a.profiles?.rating || 0;
-        const ratingB =
-          b.dynamic_rating !== null
-            ? b.dynamic_rating
-            : b.profiles?.rating || 0;
-        return ratingB - ratingA;
-      });
-
-      setOfferings((prev) => [...prev, ...enrichedNewOffs]);
+      setOfferings((prev) => [...prev, ...newOffs]);
       setPage(nextPage);
       if (newOffs.length < ITEMS_PER_PAGE) setHasMore(false);
     } else {
@@ -894,9 +843,10 @@ export default function ClientMarketplace({
     free: "تطوع",
   };
 
-  const renderStars = (dynamicRating, profileRating) => {
-    const finalRating = dynamicRating !== null ? dynamicRating : profileRating;
-    return "⭐ " + (finalRating ? finalRating.toFixed(1) : "5.0");
+  const renderStars = (profileRating) => {
+    return (
+      "⭐ " + (profileRating ? parseFloat(profileRating).toFixed(1) : "5.0")
+    );
   };
 
   const defaultAvatar = (name, hexColor = "#7c3aed") =>
@@ -1450,13 +1400,16 @@ export default function ClientMarketplace({
             const itemThemeColor = item.profiles?.theme_color || "#7c3aed";
             const isLastElement = filtered.length === index + 1;
 
-            // متغير ذكي يبحث عن تفاصيل المدة في الأعمدة المحتملة بقاعدة البيانات
-            const durationText =
+            // متغير ذكي يبحث عن تفاصيل المدة ويمسح كلمة (دوام كامل) إذا وجدت
+            let durationText =
               item.duration ||
               item.duration_details ||
               item.work_duration ||
               item.period ||
               item.time_details;
+            if (durationText) {
+              durationText = durationText.replace("(دوام كامل)", "").trim();
+            }
 
             return (
               <div
@@ -1552,7 +1505,7 @@ export default function ClientMarketplace({
                         borderRadius: "10px",
                       }}
                     >
-                      {renderStars(item.dynamic_rating, item.profiles?.rating)}
+                      {renderStars(item.profiles?.rating)}
                     </div>
                   </div>
 
@@ -1681,15 +1634,15 @@ export default function ClientMarketplace({
                           </span>
                         )}
 
-                        {/* 🔥 هنا الإضافة الذكية: المدة تظهر للجميع سواء كان حسب الاتفاق أو لا 🔥 */}
+                        {/* 🔥 عرض المضمون فقط مع الأيقونة بخط أوضح 🔥 */}
                         {durationText && (
                           <span
                             style={{
-                              fontSize: "0.75rem",
+                              fontSize: "0.8rem",
                               color: itemThemeColor,
                               fontWeight: "bold",
                               display: "block",
-                              marginTop: "2px",
+                              marginTop: "4px",
                             }}
                           >
                             ⏳ {durationText}
@@ -1888,10 +1841,7 @@ export default function ClientMarketplace({
                     fontWeight: "bold",
                   }}
                 >
-                  {renderStars(
-                    selected.dynamic_rating,
-                    selected.profiles?.rating,
-                  )}
+                  {renderStars(selected.profiles?.rating)}
                 </div>
               </div>
             </div>
