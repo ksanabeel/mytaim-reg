@@ -121,7 +121,8 @@ export default function ClientMarketplace({
       .eq("profiles.is_active", true);
 
     if (username) query = query.eq("profiles.username", username);
-    // جلب البيانات مع الترتيب السريع بناءً على التقييم المخزن مسبقاً
+
+    // 🔥 ترتيب سريع ومباشر من قاعدة البيانات بدون حسابات معقدة 🔥
     query = query.order("rating", {
       referencedTable: "profiles",
       ascending: false,
@@ -843,6 +844,7 @@ export default function ClientMarketplace({
     free: "تطوع",
   };
 
+  // 🔥 دالة التقييم تعتمد على التقييم المخزن مسبقاً للسرعة القصوى 🔥
   const renderStars = (profileRating) => {
     return (
       "⭐ " + (profileRating ? parseFloat(profileRating).toFixed(1) : "5.0")
@@ -1418,6 +1420,7 @@ export default function ClientMarketplace({
                 className="smart-card"
                 style={smartCardS}
               >
+                {/* 🔴 الألوان الأصلية الفاقعة بدون شفافية 🔴 */}
                 <div style={cardCoverS(isFree, itemThemeColor)}>
                   <button
                     onClick={(e) => toggleFavorite(e, item.provider_id)}
@@ -2649,7 +2652,7 @@ const cardCoverS = (isFree, themeColor) => ({
   height: "90px",
   background: isFree
     ? "linear-gradient(135deg, #a7f3d0, #10b981)"
-    : `linear-gradient(135deg, ${themeColor}aa, ${themeColor})`,
+    : `linear-gradient(135deg, ${themeColor}, ${themeColor})`, // ⬅️ الألوان الفاقعة الصافية
   position: "relative",
 });
 const coverBadgeS = (bg, color) => ({
