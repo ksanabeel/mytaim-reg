@@ -5,29 +5,11 @@ import { useTranslation } from "react-i18next";
 // 🚀 تهيئة Capacitor لضمان الدخول داخل التطبيق (Native/In-App UX)
 import { Browser } from "@capacitor/browser";
 import { App } from "@capacitor/app";
-import { SignInWithApple } from "@capacitor-community/apple-sign-in"; // تم إضافة مكتبة الدخول الأصلي لأبل
-
-// نصوص الصفحات القانونية (تمت صياغتها بشكل احترافي)
-const legalDocs = {
-  terms: {
-    title: "شروط وأحكام الاستخدام",
-    content:
-      "مرحباً بك في منصتنا. باستخدامك لهذه المنصة، فإنك توافق على الالتزام بالشروط والأحكام التالية: \n\n1. دور المنصة: تعمل المنصة كوسيط بين مزودي الخدمات والعملاء، وتسهل عملية الحجز والدفع. \n2. العمولات: توافق كمزود خدمة على اقتطاع نسبة العمولة المحددة من قبل الإدارة على كل عملية مكتملة. \n3. المسؤولية: يلتزم المزود بتقديم الخدمة بالاحترافية المتفق عليها، وتخلي المنصة مسؤوليتها عن أي أضرار جانبية ناتجة عن سوء تقديم الخدمة. \n4. الاستخدام المقبول: يُمنع استخدام المنصة لأي أغراض غير قانونية أو تقديم خدمات تخالف أنظمة المملكة العربية السعودية.",
-  },
-  privacy: {
-    title: "سياسة الخصوصية",
-    content:
-      "نحن نأخذ خصوصيتك على محمل الجد. توضح هذه السياسة كيف نجمع بياناتك ونستخدمها: \n\n1. جمع البيانات: نجمع المعلومات الأساسية مثل (الاسم، البريد الإلكتروني، رقم الجوال، الموقع) لغرض تسهيل تقديم الخدمات والتواصل. \n2. حماية البيانات: يتم تخزين بياناتك بشكل آمن ومشفّر في قواعد بياناتنا، ولا يتم مشاركتها مع أي جهة خارجية لغرض التسويق. \n3. مشاركة البيانات: يتم مشاركة بياناتك الأساسية (مثل الجوال) فقط مع مزود الخدمة الذي قمت بحجزه لضمان تنفيذ طلبك بنجاح. \n4. حذف الحساب: يحق لك طلب حذف حسابك وكافة بياناتك في أي وقت بالتواصل مع الإدارة.",
-  },
-  refund: {
-    title: "سياسة الاسترجاع والإلغاء",
-    content:
-      "لضمان حقوق جميع الأطراف (العميل والمزود)، نطبق السياسة التالية: \n\n1. الإلغاء المبكر: يحق للعميل إلغاء الحجز واسترجاع المبلغ كاملاً إذا تم الإلغاء قبل موعد الخدمة بـ 24 ساعة على الأقل. \n2. الإلغاء المتأخر: في حال الإلغاء قبل الموعد بأقل من 24 ساعة، قد يتم خصم رسوم إدارية أو نسبة من قيمة الحجز لصالح المزود. \n3. عدم التنفيذ: إذا لم يقم المزود بتنفيذ الخدمة في الوقت المتفق عليه دون عذر قاهر، يحق للعميل استرجاع كامل مبلغه المدفوع. \n4. آلية الاسترجاع: تتم معالجة المبالغ المسترجعة وتعود لحساب العميل البنكي خلال 3 إلى 14 يوم عمل حسب سياسة البنك.",
-  },
-};
+import { SignInWithApple } from "@capacitor-community/apple-sign-in";
 
 const Login = () => {
   const { t, i18n } = useTranslation();
+  const isRTL = i18n.language === "ar";
 
   // حالات الدخول
   const [authMode, setAuthMode] = useState("email_login"); // 'email_login', 'email_signup', 'phone_login', 'phone_otp'
@@ -40,16 +22,69 @@ const Login = () => {
   const [otp, setOtp] = useState("");
 
   const [loading, setLoading] = useState(false);
-  const [activeLegalDoc, setActiveLegalDoc] = useState(null);
+  const [activeLegalDoc, setActiveLegalDoc] = useState(null); // 'terms', 'privacy', 'refund'
+
+  // ✨ تخزين النصوص القانونية (عربي وإنجليزي) لجلبها من قاعدة البيانات أو استخدام النصوص الافتراضية
+  const [legalContentAr, setLegalContentAr] = useState("");
+  const [legalContentEn, setLegalContentEn] = useState("");
+
+  // ✨ جلب أحدث السياسات من جدول platform_settings عند فتح نافذة قانونية
+  useEffect(() => {
+    if (!activeLegalDoc) return;
+
+    const fetchLegalTexts = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("platform_settings")
+          .select("*")
+          .eq("id", 1)
+          .maybeSingle();
+
+        if (!error && data) {
+          if (activeLegalDoc === "terms") {
+            setLegalContentAr(
+              data.terms_text_ar ||
+                data.terms_text ||
+                "شروط الاستخدام غير متوفرة حالياً.",
+            );
+            setLegalContentEn(
+              data.terms_text_en || "Terms of use are currently unavailable.",
+            );
+          } else if (activeLegalDoc === "privacy") {
+            setLegalContentAr(
+              data.privacy_text_ar ||
+                data.privacy_text ||
+                "سياسة الخصوصية غير متوفرة حالياً.",
+            );
+            setLegalContentEn(
+              data.privacy_text_en ||
+                "Privacy policy is currently unavailable.",
+            );
+          } else if (activeLegalDoc === "refund") {
+            setLegalContentAr(
+              data.refund_text_ar ||
+                data.refund_text ||
+                "سياسة الاسترجاع غير متوفرة حالياً.",
+            );
+            setLegalContentEn(
+              data.refund_text_en || "Refund policy is currently unavailable.",
+            );
+          }
+        }
+      } catch (err) {
+        console.error("Error fetching legal docs:", err);
+      }
+    };
+
+    fetchLegalTexts();
+  }, [activeLegalDoc]);
 
   // ✨ إعداد دائم داخل التطبيق لاستلام الرابط العميق (Deep Link Callback)
   useEffect(() => {
-    // 1. استماع للرابط العميق لإنهاء الدخول بـ Supabase
     const handleUrlOpener = (event) => {
       if (event.url.includes("com.bookonmap.app://auth-callback")) {
         const url = new URL(event.url);
         if (url.hash && url.hash.includes("#access_token")) {
-          // Supabase JS سيقوم تلقائياً بإنشاء الجلسة إذا كان التوكين موجوداً في الهاش
           console.log("Deep link received, session should create...");
         }
       }
@@ -57,7 +92,6 @@ const Login = () => {
 
     App.addListener("appUrlOpen", handleUrlOpener);
 
-    // تنظيف المستمع عند مسح الـ Component
     return () => {
       App.removeAllListeners("appUrlOpen");
     };
@@ -70,14 +104,11 @@ const Login = () => {
     document.documentElement.dir = newLang === "ar" ? "rtl" : "ltr";
   };
 
-  // ✨ تعديل تسجيل دخول جوجل ليعمل داخل التطبيق عبر Deep Link
   const handleGoogleLogin = async () => {
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          // 🚨 قم بتغيير com.bookonmap.app إلى الـ Bundle ID الحقيقي الخاص بك في Xcode
-          // redirectTo: window.location.origin -> MUST CHANGE
           redirectTo: "com.bookonmap.app://auth-callback",
         },
       });
@@ -87,30 +118,24 @@ const Login = () => {
     }
   };
 
-  // ✨ تعديل تسجيل دخول أبل ليعمل بشكل أصلي (Native) داخل التطبيق
   const handleAppleLogin = async () => {
     try {
-      // 1. استدعاء نافذة أبل الأصلية (بصمة الوجه/الإصبع)
       const { response } = await SignInWithApple.authorize({
         clientId: "com.bookonmap.app",
         scopes: "email name",
       });
 
-      // 2. استخراج رمز الأمان (Token) اللي عطتنا إياه أبل
       const idToken = response.identityToken;
-
       if (!idToken) {
         throw new Error("لم يتم إرجاع رمز تحقق من أبل");
       }
 
-      // 3. إرسال الرمز إلى Supabase لتسجيل الدخول بهدوء في الخلفية
       const { data, error } = await supabase.auth.signInWithIdToken({
         provider: "apple",
         token: idToken,
       });
 
       if (error) throw error;
-
       console.log("تم تسجيل الدخول بنجاح!", data);
     } catch (error) {
       console.error("حدث خطأ أثناء تسجيل الدخول بـ Apple:", error);
@@ -147,7 +172,6 @@ const Login = () => {
     }
   };
 
-  // ✉️ دالة استعادة كلمة المرور الجديدة
   const handleResetPassword = async () => {
     if (!email) {
       alert("الرجاء إدخال بريدك الإلكتروني في الحقل المخصص أولاً.");
@@ -169,115 +193,7 @@ const Login = () => {
     }
   };
 
-  // ✨ دالة إرسال الرمز الفعلي عبر Supabase (معطلة مؤقتاً)
-  const handlePhoneSubmit = async (e) => {
-    e.preventDefault();
-    if (!phone || phone.length < 9)
-      return alert("الرجاء إدخال رقم جوال صحيح مع رمز الدولة.");
-
-    setLoading(true);
-    try {
-      const { error } = await supabase.auth.signInWithOtp({
-        phone: phone,
-      });
-      if (error) throw error;
-
-      alert("تم إرسال رمز التحقق لجوالك بنجاح! 📲");
-      setAuthMode("phone_otp");
-    } catch (error) {
-      alert("حدث خطأ أثناء إرسال الرمز: " + error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // ✨ دالة التحقق من الرمز الفعلي عبر Supabase (معطلة مؤقتاً)
-  const handleVerifyOtp = async (e) => {
-    e.preventDefault();
-    if (!otp) return alert("الرجاء إدخال رمز التحقق.");
-
-    setLoading(true);
-    try {
-      const { error } = await supabase.auth.verifyOtp({
-        phone: phone,
-        token: otp,
-        type: "sms",
-      });
-
-      if (error) throw error;
-    } catch (error) {
-      alert("رمز التحقق غير صحيح أو منتهي الصلاحية ❌");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const renderFormContent = () => {
-    if (authMode === "phone_login") {
-      return (
-        <form onSubmit={handlePhoneSubmit} style={styles.form}>
-          <p style={{ ...styles.subtitle, marginBottom: "10px" }}>
-            أدخل رقم الجوال ليتم إرسال رمز التحقق (OTP)
-          </p>
-          <input
-            type="tel"
-            placeholder="رقم الجوال (مثال: 966500000000+)"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            style={styles.input}
-            required
-            dir="ltr"
-          />
-          <button type="submit" disabled={loading} style={styles.submitBtn}>
-            {loading ? "جاري الإرسال..." : "إرسال رمز التحقق"}
-          </button>
-          <button
-            type="button"
-            onClick={() => setAuthMode("email_login")}
-            style={styles.backBtn}
-          >
-            العودة للدخول بالإيميل
-          </button>
-        </form>
-      );
-    }
-
-    if (authMode === "phone_otp") {
-      return (
-        <form onSubmit={handleVerifyOtp} style={styles.form}>
-          <p style={{ ...styles.subtitle, marginBottom: "10px" }}>
-            تم إرسال رمز التحقق إلى: <span dir="ltr">{phone}</span>
-          </p>
-          <input
-            type="text"
-            placeholder="أدخل الرمز المكون من 6 أرقام"
-            value={otp}
-            onChange={(e) => setOtp(e.target.value)}
-            style={{
-              ...styles.input,
-              textAlign: "center",
-              letterSpacing: "5px",
-              fontSize: "1.2rem",
-            }}
-            required
-            dir="ltr"
-            maxLength="6"
-          />
-          <button type="submit" disabled={loading} style={styles.submitBtn}>
-            {loading ? "جاري التحقق..." : "تأكيد الدخول"}
-          </button>
-          <button
-            type="button"
-            onClick={() => setAuthMode("phone_login")}
-            style={styles.backBtn}
-          >
-            تغيير رقم الجوال
-          </button>
-        </form>
-      );
-    }
-
-    // Default Email Auth Form (Login or Signup)
     return (
       <form onSubmit={handleEmailAuth} style={styles.form}>
         {authMode === "email_signup" && (
@@ -288,7 +204,7 @@ const Login = () => {
             onChange={(e) => setFullName(e.target.value)}
             style={{
               ...styles.input,
-              textAlign: i18n.language === "ar" ? "right" : "left",
+              textAlign: isRTL ? "right" : "left",
             }}
             required
           />
@@ -313,7 +229,6 @@ const Login = () => {
           minLength="6"
         />
 
-        {/* 🚀 زر استعادة كلمة المرور يظهر فقط في شاشة تسجيل الدخول */}
         {authMode === "email_login" && (
           <button
             type="button"
@@ -325,7 +240,7 @@ const Login = () => {
               fontSize: "0.85rem",
               fontWeight: "bold",
               cursor: "pointer",
-              textAlign: i18n.language === "ar" ? "right" : "left",
+              textAlign: isRTL ? "right" : "left",
               textDecoration: "underline",
               marginTop: "-5px",
               marginBottom: "5px",
@@ -358,16 +273,6 @@ const Login = () => {
             {authMode === "email_login" ? "إنشاء حساب جديد" : "تسجيل الدخول"}
           </span>
         </p>
-
-        {/* 🚧 تم إخفاء زر الدخول برقم الجوال مؤقتاً لحين استخراج السجل التجاري والربط مع المزود المحلي 🚧
-        <button
-          type="button"
-          onClick={() => setAuthMode("phone_login")}
-          style={styles.phoneToggleBtn}
-        >
-          📱 الدخول برقم الجوال (OTP)
-        </button>
-        */}
       </form>
     );
   };
@@ -375,7 +280,7 @@ const Login = () => {
   return (
     <div style={styles.container}>
       <button onClick={toggleLanguage} style={styles.langToggle}>
-        🌐 {i18n.language === "ar" ? "English" : "العربية"}
+        🌐 {isRTL ? "English" : "العربية"}
       </button>
 
       <div style={styles.box}>
@@ -384,49 +289,45 @@ const Login = () => {
           <h2 style={styles.title}>BookOnMap</h2>
         </div>
 
-        {authMode !== "phone_otp" && (
-          <>
-            <p style={styles.subtitle}>سجل دخولك لبدء استخدام المنصة</p>
+        <p style={styles.subtitle}>سجل دخولك لبدء استخدام المنصة</p>
 
-            <div style={styles.socialBtnsContainer}>
-              <button onClick={handleGoogleLogin} style={styles.socialBtn}>
-                <img
-                  src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/google/google-original.svg"
-                  alt="Google"
-                  style={styles.socialIcon}
-                />
-                جوجل
-              </button>
+        <div style={styles.socialBtnsContainer}>
+          <button onClick={handleGoogleLogin} style={styles.socialBtn}>
+            <img
+              src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/google/google-original.svg"
+              alt="Google"
+              style={styles.socialIcon}
+            />
+            جوجل
+          </button>
 
-              <button
-                onClick={handleAppleLogin}
-                style={{
-                  ...styles.socialBtn,
-                  backgroundColor: "#000",
-                  color: "#fff",
-                  border: "none",
-                }}
-              >
-                <span
-                  style={{
-                    fontSize: "1.2rem",
-                    marginLeft: "5px",
-                    marginRight: "5px",
-                  }}
-                >
-                  
-                </span>
-                أبل
-              </button>
-            </div>
+          <button
+            onClick={handleAppleLogin}
+            style={{
+              ...styles.socialBtn,
+              backgroundColor: "#000",
+              color: "#fff",
+              border: "none",
+            }}
+          >
+            <span
+              style={{
+                fontSize: "1.2rem",
+                marginLeft: "5px",
+                marginRight: "5px",
+              }}
+            >
+              
+            </span>
+            أبل
+          </button>
+        </div>
 
-            <div style={styles.divider}>
-              <span style={styles.dividerLine}></span>
-              <span style={styles.dividerText}>أو</span>
-              <span style={styles.dividerLine}></span>
-            </div>
-          </>
-        )}
+        <div style={styles.divider}>
+          <span style={styles.dividerLine}></span>
+          <span style={styles.dividerText}>أو</span>
+          <span style={styles.dividerLine}></span>
+        </div>
 
         {renderFormContent()}
 
@@ -454,12 +355,24 @@ const Login = () => {
         </div>
       </div>
 
+      {/* نافذة عرض السياسات والشروط بنظام الجدول ذي العمودين (عربي يميناً، إنجليزي يساراً) */}
       {activeLegalDoc && (
         <div style={styles.modalOverlay}>
-          <div style={styles.modalContent}>
+          <div
+            style={{
+              ...styles.modalContent,
+              maxWidth: "950px",
+              direction: isRTL ? "rtl" : "ltr",
+            }}
+          >
             <div style={styles.modalHeader}>
-              <h3 style={{ margin: 0, color: "#1e293b" }}>
-                {legalDocs[activeLegalDoc].title}
+              <h3 style={{ margin: 0, color: "#1e293b", fontWeight: "900" }}>
+                {activeLegalDoc === "terms" &&
+                  "شروط وأحكام الاستخدام / Terms of Use"}
+                {activeLegalDoc === "privacy" &&
+                  "سياسة الخصوصية / Privacy Policy"}
+                {activeLegalDoc === "refund" &&
+                  "سياسة الاسترجاع / Refund Policy"}
               </h3>
               <button
                 onClick={() => setActiveLegalDoc(null)}
@@ -468,28 +381,116 @@ const Login = () => {
                 ✕
               </button>
             </div>
+
             <div style={styles.modalBody}>
-              {legalDocs[activeLegalDoc].content
-                .split("\n")
-                .map((paragraph, idx) => (
-                  <p
-                    key={idx}
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr
                     style={{
-                      lineHeight: "1.6",
-                      color: "#475569",
-                      marginBottom: "10px",
+                      backgroundColor: "#f8fafc",
+                      borderBottom: "2px solid #cbd5e1",
+                      position: "sticky",
+                      top: 0,
+                      zIndex: 1,
                     }}
                   >
-                    {paragraph}
-                  </p>
-                ))}
+                    <th
+                      style={{
+                        padding: "14px 16px",
+                        width: "50%",
+                        color: "#1e293b",
+                        textAlign: "right",
+                        fontSize: "0.95rem",
+                        fontWeight: "900",
+                      }}
+                    >
+                      العربية (Arabic)
+                    </th>
+                    <th
+                      style={{
+                        padding: "14px 16px",
+                        width: "50%",
+                        color: "#1e293b",
+                        textAlign: "left",
+                        direction: "ltr",
+                        fontSize: "0.95rem",
+                        fontWeight: "900",
+                        borderRight: "1px solid #e2e8f0",
+                      }}
+                    >
+                      English (الإنجليزية)
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(() => {
+                    const arLines = (legalContentAr || "")
+                      .split("\n")
+                      .filter((l) => l.trim() !== "");
+                    const enLines = (legalContentEn || "")
+                      .split("\n")
+                      .filter((l) => l.trim() !== "");
+                    const maxRows = Math.max(arLines.length, enLines.length, 1);
+
+                    return Array.from({ length: maxRows }).map((_, idx) => (
+                      <tr
+                        key={idx}
+                        style={{
+                          borderBottom: "1px solid #f1f5f9",
+                          backgroundColor: idx % 2 === 0 ? "#fff" : "#f8fafc",
+                        }}
+                      >
+                        <td
+                          style={{
+                            padding: "14px 16px",
+                            verticalAlign: "top",
+                            color: "#334155",
+                            lineHeight: "1.7",
+                            fontSize: "0.9rem",
+                            textAlign: "right",
+                          }}
+                        >
+                          {arLines[idx] || ""}
+                        </td>
+                        <td
+                          style={{
+                            padding: "14px 16px",
+                            verticalAlign: "top",
+                            color: "#334155",
+                            lineHeight: "1.7",
+                            fontSize: "0.9rem",
+                            direction: "ltr",
+                            textAlign: "left",
+                            borderRight: "1px solid #f1f5f9",
+                          }}
+                        >
+                          {enLines[idx] || ""}
+                        </td>
+                      </tr>
+                    ));
+                  })()}
+                </tbody>
+              </table>
             </div>
-            <button
-              onClick={() => setActiveLegalDoc(null)}
-              style={styles.acceptBtn}
-            >
-              موافق ومتابعة
-            </button>
+
+            <div style={{ marginTop: "20px", textAlign: "center" }}>
+              <button
+                onClick={() => setActiveLegalDoc(null)}
+                style={{
+                  backgroundColor: "#1e293b",
+                  color: "#fff",
+                  border: "none",
+                  padding: "12px 30px",
+                  borderRadius: "12px",
+                  fontWeight: "900",
+                  cursor: "pointer",
+                  fontSize: "1rem",
+                  width: "100%",
+                }}
+              >
+                إغلاق النافذة / Close
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -585,33 +586,13 @@ const styles = {
     padding: "14px",
     borderRadius: "12px",
     border: "none",
+    backgroundColor: "linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%)",
     backgroundColor: "#1e293b",
     color: "#fff",
     cursor: "pointer",
     fontSize: "16px",
     fontWeight: "bold",
     marginTop: "5px",
-  },
-  backBtn: {
-    padding: "10px",
-    background: "none",
-    border: "none",
-    color: "#64748b",
-    cursor: "pointer",
-    fontWeight: "bold",
-    fontSize: "0.9rem",
-    textDecoration: "underline",
-  },
-  phoneToggleBtn: {
-    marginTop: "10px",
-    padding: "12px",
-    backgroundColor: "#eff6ff",
-    color: "#2563eb",
-    border: "1px dashed #bfdbfe",
-    borderRadius: "12px",
-    fontWeight: "bold",
-    cursor: "pointer",
-    fontSize: "0.95rem",
   },
   footerText: {
     marginTop: "15px",
@@ -640,52 +621,51 @@ const styles = {
     position: "fixed",
     inset: 0,
     backgroundColor: "rgba(15, 23, 42, 0.7)",
+    backdropFilter: "blur(6px)",
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
-    zIndex: 1000,
+    zIndex: 99999,
     padding: "20px",
   },
   modalContent: {
     backgroundColor: "#fff",
-    padding: "25px",
-    borderRadius: "20px",
+    padding: "30px",
+    borderRadius: "24px",
     width: "100%",
-    maxWidth: "500px",
-    maxHeight: "80vh",
+    maxHeight: "85vh",
     display: "flex",
     flexDirection: "column",
+    boxShadow: "0 25px 50px rgba(0,0,0,0.15)",
   },
   modalHeader: {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
-    borderBottom: "1px solid #f1f5f9",
+    borderBottom: "2px solid #f1f5f9",
     paddingBottom: "15px",
-    marginBottom: "15px",
+    marginBottom: "20px",
   },
   closeBtn: {
-    background: "none",
+    background: "#f1f5f9",
     border: "none",
+    width: "35px",
+    height: "35px",
+    borderRadius: "50%",
     fontSize: "1.2rem",
     cursor: "pointer",
-    color: "#94a3b8",
+    color: "#64748b",
+    fontWeight: "bold",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
   },
   modalBody: {
     overflowY: "auto",
-    textAlign: "right",
-    paddingRight: "5px",
-    paddingLeft: "5px",
-  },
-  acceptBtn: {
-    marginTop: "20px",
-    padding: "12px",
-    backgroundColor: "#10b981",
-    color: "#fff",
-    border: "none",
-    borderRadius: "10px",
-    fontWeight: "bold",
-    cursor: "pointer",
+    flex: 1,
+    border: "1px solid #e2e8f0",
+    borderRadius: "12px",
+    backgroundColor: "#fff",
   },
 };
 

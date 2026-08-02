@@ -17,7 +17,6 @@ export default function AddOffering({
   );
   const [nickname, setNickname] = useState(editData?.nickname || "");
 
-  // ✨ الحقول الجديدة: المسمى والطاقة الاستيعابية ✨
   const [providerRole, setProviderRole] = useState(
     editData?.provider_role || "",
   );
@@ -27,7 +26,6 @@ export default function AddOffering({
   const [description, setDescription] = useState(editData?.description || "");
   const [price, setPrice] = useState(editData?.price || "");
 
-  // ✨ السعر حسب الاتفاق
   const [priceUponAgreement, setPriceUponAgreement] = useState(
     editData?.price_upon_agreement || false,
   );
@@ -35,10 +33,8 @@ export default function AddOffering({
   const [category, setCategory] = useState(editData?.category || "");
   const [dbCategories, setDbCategories] = useState([]);
 
-  // العملة
   const [currency, setCurrency] = useState(editData?.currency || "SAR");
 
-  // الحقول: الدولة والمدينة
   const [country, setCountry] = useState(editData?.country || "السعودية");
   const [city, setCity] = useState(editData?.city || "");
 
@@ -77,15 +73,15 @@ export default function AddOffering({
   const [legalAccepted, setLegalAccepted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // قاموس الأيام
+  // قاموس الأيام بالترجمة
   const dayMap = [
-    { id: "sun", label: "الأحد" },
-    { id: "mon", label: "الإثنين" },
-    { id: "tue", label: "الثلاثاء" },
-    { id: "wed", label: "الأربعاء" },
-    { id: "thu", label: "الخميس" },
-    { id: "fri", label: "الجمعة" },
-    { id: "sat", label: "السبت" },
+    { id: "sun", label: t("day_sun", "الأحد") },
+    { id: "mon", label: t("day_mon", "الإثنين") },
+    { id: "tue", label: t("day_tue", "الثلاثاء") },
+    { id: "wed", label: t("day_wed", "الأربعاء") },
+    { id: "thu", label: t("day_thu", "الخميس") },
+    { id: "fri", label: t("day_fri", "الجمعة") },
+    { id: "sat", label: t("day_sat", "السبت") },
   ];
 
   useEffect(() => {
@@ -108,7 +104,6 @@ export default function AddOffering({
     if (!editData) setDurationDetails("");
   }, [pricingModel]);
 
-  // مسح السعر الإجباري إذا اختار (مجاني) أو (حسب الاتفاق)
   useEffect(() => {
     if (pricingModel === "free" || priceUponAgreement) {
       setPrice("");
@@ -135,11 +130,7 @@ export default function AddOffering({
       setSnapchatUrl(data.snapchat_url || "");
       setWebsiteUrl(data.website_url || "");
       setWhatsappNumber(data.phone || "");
-      alert(
-        isRTL
-          ? "تم جلب الروابط من البروفايل بنجاح ✅"
-          : "Links fetched successfully ✅",
-      );
+      alert(t("links_fetched", "تم جلب الروابط من البروفايل بنجاح ✅"));
     }
   };
 
@@ -148,37 +139,29 @@ export default function AddOffering({
 
     if (!city) {
       return alert(
-        isRTL
-          ? "الرجاء تحديد المدينة لتسهيل وصول العملاء لخدمتك."
-          : "Please specify the city.",
+        t("city_required", "الرجاء تحديد المدينة لتسهيل وصول العملاء لخدمتك."),
       );
     }
     if (!legalAccepted)
       return alert(
-        isRTL
-          ? "يجب الموافقة على الإقرار القانوني أولاً."
-          : "Legal agreement is required.",
+        t("legal_required", "يجب الموافقة على الإقرار القانوني أولاً."),
       );
     if (availableDays.length === 0)
-      return alert(
-        isRTL
-          ? "يجب اختيار يوم عمل واحد على الأقل."
-          : "Select at least one working day.",
-      );
+      return alert(t("days_required", "يجب اختيار يوم عمل واحد على الأقل."));
     if (
       ["period", "daily", "monthly", "yearly", "free"].includes(pricingModel) &&
       !durationDetails
     ) {
       return alert(
-        isRTL
-          ? "الرجاء تحديد تفاصيل المدة/ساعات العمل لهذا النوع من التسعير."
-          : "Please select duration details.",
+        t(
+          "duration_required",
+          "الرجاء تحديد تفاصيل المدة/ساعات العمل لهذا النوع من التسعير.",
+        ),
       );
     }
 
     setIsSubmitting(true);
 
-    // تحديد السعر النهائي بناءً على الاختيارات
     let finalPrice = parseFloat(price);
     if (pricingModel === "free" || priceUponAgreement) {
       finalPrice = 0;
@@ -188,8 +171,8 @@ export default function AddOffering({
       provider_id: session.user.id,
       provider_name: providerName,
       nickname: nickname,
-      provider_role: providerRole, // ✨ إضافة المسمى
-      max_capacity: maxCapacity, // ✨ إضافة الطاقة الاستيعابية
+      provider_role: providerRole,
+      max_capacity: maxCapacity,
       title,
       description,
       price: finalPrice,
@@ -229,14 +212,13 @@ export default function AddOffering({
 
     setIsSubmitting(false);
     if (!error) {
-      alert(isRTL ? "تم حفظ الخدمة بنجاح ✅" : "Service saved successfully ✅");
+      alert(t("service_saved", "تم حفظ الخدمة بنجاح ✅"));
       onSuccess();
     } else {
       alert(t("error_prefix", "خطأ: ") + error.message);
     }
   };
 
-  // ✨ دالة توليد الأوقات في القائمة المنسدلة كل 15 دقيقة
   const timeOptions = [];
   for (let h = 0; h < 24; h++) {
     for (let m = 0; m < 60; m += 15) {
@@ -259,7 +241,6 @@ export default function AddOffering({
         overflow: "hidden",
       }}
     >
-      {/* ✨ أكواد CSS المدمجة للتأثيرات والتمرير المخفي ✨ */}
       <style>{`
         .smart-input { transition: all 0.3s ease; border: 1px solid #cbd5e1; background-color: #fff; }
         .smart-input:focus { border-color: #7c3aed !important; box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1) !important; outline: none; }
@@ -269,7 +250,6 @@ export default function AddOffering({
         .custom-scroll::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
       `}</style>
 
-      {/* الرأس (Header) */}
       <div
         style={{
           display: "flex",
@@ -320,7 +300,6 @@ export default function AddOffering({
         </button>
       </div>
 
-      {/* منطقة التمرير للنموذج (Body) */}
       <div
         className="custom-scroll"
         style={{ overflowY: "auto", padding: "25px", flex: 1 }}
@@ -330,9 +309,10 @@ export default function AddOffering({
           onSubmit={handleSubmit}
           style={{ display: "flex", flexDirection: "column", gap: "20px" }}
         >
-          {/* 📝 بطاقة: البيانات الأساسية */}
           <div style={cardS}>
-            <h3 style={cardTitleS}>📝 البيانات الأساسية للخدمة</h3>
+            <h3 style={cardTitleS}>
+              {t("basic_info_title", "📝 البيانات الأساسية للخدمة")}
+            </h3>
             <div
               style={{
                 display: "flex",
@@ -342,30 +322,36 @@ export default function AddOffering({
               }}
             >
               <div style={{ flex: 1, minWidth: "200px" }}>
-                <label style={labelS}>اسم مقدم الخدمة (اختياري):</label>
+                <label style={labelS}>
+                  {t("provider_name_label", "اسم مقدم الخدمة (اختياري):")}
+                </label>
                 <input
                   type="text"
                   className="smart-input"
                   value={providerName}
                   onChange={(e) => setProviderName(e.target.value)}
                   style={inputS}
-                  placeholder="مثال: أحمد محمد"
+                  placeholder={t(
+                    "provider_name_placeholder",
+                    "مثال: أحمد محمد",
+                  )}
                 />
               </div>
               <div style={{ flex: 1, minWidth: "200px" }}>
-                <label style={labelS}>اسم الشهرة / اللقب (اختياري):</label>
+                <label style={labelS}>
+                  {t("nickname_label", "اسم الشهرة / اللقب (اختياري):")}
+                </label>
                 <input
                   type="text"
                   className="smart-input"
                   value={nickname}
                   onChange={(e) => setNickname(e.target.value)}
                   style={inputS}
-                  placeholder="مثال: أبو طلال"
+                  placeholder={t("nickname_placeholder", "مثال: أبو طلال")}
                 />
               </div>
             </div>
 
-            {/* ✨ الحقول الجديدة: المسمى المهني والطاقة الاستيعابية للخدمة ✨ */}
             <div
               style={{
                 display: "flex",
@@ -375,14 +361,19 @@ export default function AddOffering({
               }}
             >
               <div style={{ flex: 1, minWidth: "200px" }}>
-                <label style={labelS}>مسمى مقدم الخدمة (اختياري):</label>
+                <label style={labelS}>
+                  {t("provider_role_label", "مسمى مقدم الخدمة (اختياري):")}
+                </label>
                 <input
                   type="text"
                   className="smart-input"
                   value={providerRole}
                   onChange={(e) => setProviderRole(e.target.value)}
                   style={inputS}
-                  placeholder="مثال: طبيب، ممرض، فرقة شعبية، شاعر..."
+                  placeholder={t(
+                    "provider_role_placeholder",
+                    "مثال: طبيب، ممرض، فرقة شعبية، شاعر...",
+                  )}
                 />
               </div>
 
@@ -399,7 +390,10 @@ export default function AddOffering({
                 <label
                   style={{ ...labelS, color: "#1e40af", marginBottom: "4px" }}
                 >
-                  👥 عدد مقدمي الخدمة المتاحين (الطاقة الاستيعابية):
+                  {t(
+                    "capacity_label",
+                    "👥 عدد مقدمي الخدمة المتاحين (الطاقة الاستيعابية):",
+                  )}
                 </label>
                 <p
                   style={{
@@ -409,8 +403,10 @@ export default function AddOffering({
                     lineHeight: "1.5",
                   }}
                 >
-                  إذا كنت تعمل بمفردك اترك الرقم (1). وإذا كنت متعهداً أو فريق
-                  عمل، حدد أقصى عدد متوفر لديك ليتمكن العميل من طلبهم معاً.
+                  {t(
+                    "capacity_hint",
+                    "إذا كنت تعمل بمفردك اترك الرقم (1). وإذا كنت متعهداً أو فريق عمل، حدد أقصى عدد متوفر لديك ليتمكن العميل من طلبهم معاً.",
+                  )}
                 </p>
                 <input
                   type="number"
@@ -419,7 +415,7 @@ export default function AddOffering({
                   value={maxCapacity}
                   onChange={(e) => {
                     let val = parseInt(e.target.value);
-                    if (isNaN(val) || val < 1) val = 1; // إجبار ألا يقل عن 1
+                    if (isNaN(val) || val < 1) val = 1;
                     setMaxCapacity(val);
                   }}
                   style={{
@@ -496,12 +492,13 @@ export default function AddOffering({
             </div>
           </div>
 
-          {/* 🌍 بطاقة: الموقع الجغرافي */}
           <div style={cardS}>
-            <h3 style={cardTitleS}>🌍 نطاق تقديم الخدمة</h3>
+            <h3 style={cardTitleS}>
+              {t("location_title", "🌍 نطاق تقديم الخدمة")}
+            </h3>
             <div style={{ display: "flex", gap: "15px", flexWrap: "wrap" }}>
               <div style={{ flex: 1, minWidth: "200px" }}>
-                <label style={labelS}>الدولة:</label>
+                <label style={labelS}>{t("country_label", "الدولة:")}</label>
                 <select
                   className="smart-input"
                   value={country}
@@ -509,19 +506,25 @@ export default function AddOffering({
                   style={inputS}
                   required
                 >
-                  <option value="السعودية">المملكة العربية السعودية</option>
-                  <option value="الإمارات">الإمارات العربية المتحدة</option>
-                  <option value="الكويت">الكويت</option>
-                  <option value="قطر">قطر</option>
-                  <option value="البحرين">البحرين</option>
-                  <option value="عمان">عُمان</option>
-                  <option value="مصر">مصر</option>
-                  <option value="أخرى">دولة أخرى</option>
+                  <option value="السعودية">
+                    {t("saudi_arabia", "المملكة العربية السعودية")}
+                  </option>
+                  <option value="الإمارات">
+                    {t("uae", "الإمارات العربية المتحدة")}
+                  </option>
+                  <option value="الكويت">{t("kuwait", "الكويت")}</option>
+                  <option value="قطر">{t("qatar", "قطر")}</option>
+                  <option value="البحرين">{t("bahrain", "البحرين")}</option>
+                  <option value="عمان">{t("oman", "عُمان")}</option>
+                  <option value="مصر">{t("egypt", "مصر")}</option>
+                  <option value="أخرى">
+                    {t("other_country", "دولة أخرى")}
+                  </option>
                 </select>
               </div>
               <div style={{ flex: 1, minWidth: "200px" }}>
                 <label style={labelS}>
-                  المدينة (مهم للبحث والاستكشاف):{" "}
+                  {t("city_label", "المدينة (مهم للبحث والاستكشاف): ")}
                   <span style={{ color: "#ef4444" }}>*</span>
                 </label>
                 <input
@@ -529,7 +532,10 @@ export default function AddOffering({
                   className="smart-input"
                   value={city}
                   onChange={(e) => setCity(e.target.value)}
-                  placeholder="مثال: الرياض، جدة، الدمام..."
+                  placeholder={t(
+                    "city_placeholder",
+                    "مثال: الرياض، جدة، الدمام...",
+                  )}
                   style={inputS}
                   required
                 />
@@ -537,9 +543,10 @@ export default function AddOffering({
             </div>
           </div>
 
-          {/* 💰 بطاقة: التسعير والمدة */}
           <div style={cardS}>
-            <h3 style={cardTitleS}>💰 خطة التسعير والمدة</h3>
+            <h3 style={cardTitleS}>
+              {t("pricing_title", "💰 خطة التسعير والمدة")}
+            </h3>
             <div style={{ marginBottom: "15px" }}>
               <label style={labelS}>
                 {t("pricing_type", "آلية احتساب السعر")}:
@@ -564,7 +571,6 @@ export default function AddOffering({
               </select>
             </div>
 
-            {/* تفاصيل المدة تظهر فقط لبعض النماذج */}
             {["period", "daily", "monthly", "yearly", "free"].includes(
               pricingModel,
             ) && (
@@ -579,8 +585,8 @@ export default function AddOffering({
               >
                 <label style={{ ...labelS, color: "#1e40af" }}>
                   {pricingModel === "free"
-                    ? "تحديد طبيعة التطوع:"
-                    : "تفاصيل المدة / معدل العمل:"}{" "}
+                    ? t("volunteer_type", "تحديد طبيعة التطوع:")
+                    : t("duration_details", "تفاصيل المدة / معدل العمل:")}{" "}
                   <span style={{ color: "#ef4444" }}>*</span>
                 </label>
                 <select
@@ -590,40 +596,54 @@ export default function AddOffering({
                   style={{ ...inputS, borderColor: "#bfdbfe" }}
                   required
                 >
-                  <option value="">-- يرجى الاختيار --</option>
+                  <option value="">
+                    {t("please_select", "-- يرجى الاختيار --")}
+                  </option>
                   {(pricingModel === "period" || pricingModel === "daily") && (
                     <>
-                      <option value="ساعة واحدة">ساعة واحدة</option>
-                      <option value="ساعتان">ساعتان</option>
-                      <option value="4 ساعات">4 ساعات</option>
-                      <option value="5 ساعات">5 ساعات</option>
-                      <option value="8 ساعات ">8 ساعات </option>
-                      <option value="12 ساعة">12 ساعة</option>
-                      <option value="مفتوح(حسب الإنجاز)">
-                        مفتوح (حسب الإنجاز)
+                      <option value="ساعة واحدة">
+                        {t("opt_1h", "ساعة واحدة")}
+                      </option>
+                      <option value="ساعتان">{t("opt_2h", "ساعتان")}</option>
+                      <option value="4 ساعات">{t("opt_4h", "4 ساعات")}</option>
+                      <option value="5 ساعات">{t("opt_5h", "5 ساعات")}</option>
+                      <option value="8 ساعات (دوام كامل)">
+                        {t("opt_8h_full", "8 ساعات (دوام كامل)")}
+                      </option>
+                      <option value="12 ساعة">{t("opt_12h", "12 ساعة")}</option>
+                      <option value="مفتوح (حسب الإنجاز)">
+                        {t("opt_open", "مفتوح (حسب الإنجاز)")}
                       </option>
                     </>
                   )}
                   {(pricingModel === "monthly" ||
                     pricingModel === "yearly") && (
                     <>
-                      <option value="ساعتان يومياً">ساعتان يومياً</option>
-                      <option value="4 ساعات يومياً">4 ساعات يومياً</option>
-                      <option value="8 ساعات يومياً">8 ساعات يومياً</option>
+                      <option value="ساعتان يومياً">
+                        {t("opt_2h_daily", "ساعتان يومياً")}
+                      </option>
+                      <option value="4 ساعات يومياً (نصف دوام)">
+                        {t("opt_4h_daily", "4 ساعات يومياً (نصف دوام)")}
+                      </option>
+                      <option value="8 ساعات يومياً (دوام كامل)">
+                        {t("opt_8h_daily", "8 ساعات يومياً (دوام كامل)")}
+                      </option>
                       <option value="مرن (حسب الاتفاق)">
-                        مرن (حسب الاتفاق)
+                        {t("opt_flexible", "مرن (حسب الاتفاق)")}
                       </option>
                     </>
                   )}
                   {pricingModel === "free" && (
                     <>
                       <option value="مهمة ثابتة (إنجاز عمل محدد)">
-                        مهمة ثابتة (إنجاز عمل محدد)
+                        {t("opt_fixed_task", "مهمة ثابتة (إنجاز عمل محدد)")}
                       </option>
-                      <option value="ساعتان">ساعتان</option>
-                      <option value="4 ساعات يومياً">4 ساعات يومياً</option>
+                      <option value="ساعتان">{t("opt_2h", "ساعتان")}</option>
+                      <option value="4 ساعات يومياً">
+                        {t("opt_4h_daily_only", "4 ساعات يومياً")}
+                      </option>
                       <option value="عمل مرن (حسب الحاجة)">
-                        عمل مرن (حسب الحاجة)
+                        {t("opt_flexible_work", "عمل مرن (حسب الحاجة)")}
                       </option>
                     </>
                   )}
@@ -631,7 +651,6 @@ export default function AddOffering({
               </div>
             )}
 
-            {/* تحديد السعر الفعلي */}
             {pricingModel !== "free" && (
               <div
                 style={{
@@ -661,7 +680,10 @@ export default function AddOffering({
                     onChange={(e) => setPriceUponAgreement(e.target.checked)}
                     style={{ transform: "scale(1.3)", accentColor: "#10b981" }}
                   />
-                  🤝 السعر حسب الاتفاق (تحديد السعر لاحقاً بعد تواصل العميل)
+                  {t(
+                    "price_upon_agreement_label",
+                    "🤝 السعر حسب الاتفاق (تحديد السعر لاحقاً بعد تواصل العميل)",
+                  )}
                 </label>
 
                 {!priceUponAgreement && (
@@ -692,26 +714,46 @@ export default function AddOffering({
                           fontWeight: "bold",
                           color: "#7c3aed",
                         }}
-                        placeholder="مثال: 150"
+                        placeholder="150"
                       />
                     </div>
                     <div style={{ flex: 1 }}>
-                      <label style={labelS}>العملة:</label>
+                      <label style={labelS}>
+                        {t("currency_label", "العملة:")}
+                      </label>
                       <select
                         className="smart-input"
                         value={currency}
                         onChange={(e) => setCurrency(e.target.value)}
                         style={inputS}
                       >
-                        <option value="SAR">ريال سعودي (SAR)</option>
-                        <option value="USD">دولار أمريكي (USD)</option>
-                        <option value="AED">درهم إماراتي (AED)</option>
-                        <option value="KWD">دينار كويتي (KWD)</option>
-                        <option value="QAR">ريال قطري (QAR)</option>
-                        <option value="BHD">دينار بحريني (BHD)</option>
-                        <option value="OMR">ريال عماني (OMR)</option>
-                        <option value="EGP">جنيه مصري (EGP)</option>
-                        <option value="EUR">يورو (EUR)</option>
+                        <option value="SAR">
+                          {t("sar_currency", "ريال سعودي (SAR)")}
+                        </option>
+                        <option value="USD">
+                          {t("usd_currency", "دولار أمريكي (USD)")}
+                        </option>
+                        <option value="AED">
+                          {t("aed_currency", "درهم إماراتي (AED)")}
+                        </option>
+                        <option value="KWD">
+                          {t("kwd_currency", "دينار كويتي (KWD)")}
+                        </option>
+                        <option value="QAR">
+                          {t("qar_currency", "ريال قطري (QAR)")}
+                        </option>
+                        <option value="BHD">
+                          {t("bhd_currency", "دينار بحريني (BHD)")}
+                        </option>
+                        <option value="OMR">
+                          {t("omr_currency", "ريال عماني (OMR)")}
+                        </option>
+                        <option value="EGP">
+                          {t("egp_currency", "جنيه مصري (EGP)")}
+                        </option>
+                        <option value="EUR">
+                          {t("eur_currency", "يورو (EUR)")}
+                        </option>
                       </select>
                     </div>
                   </div>
@@ -720,11 +762,12 @@ export default function AddOffering({
             )}
           </div>
 
-          {/* ⏰ بطاقة: أوقات وأيام العمل */}
           <div style={cardS}>
-            <h3 style={cardTitleS}>⏰ التواجد وأوقات العمل</h3>
+            <h3 style={cardTitleS}>
+              {t("availability_title", "⏰ التواجد وأوقات العمل")}
+            </h3>
             <label style={labelS}>
-              الأيام المتاحة لتقديم الخدمة:{" "}
+              {t("available_days_label", "الأيام المتاحة لتقديم الخدمة: ")}
               <span style={{ color: "#ef4444" }}>*</span>
             </label>
             <div
@@ -735,46 +778,37 @@ export default function AddOffering({
                 marginBottom: "20px",
               }}
             >
-              <div
-                style={{
-                  display: "flex",
-                  gap: "8px",
-                  flexWrap: "wrap",
-                  marginBottom: "20px",
-                }}
-              >
-                {dayMap.map((d) => {
-                  const isSelected = availableDays.includes(d.id);
-                  return (
-                    <button
-                      type="button"
-                      key={d.id}
-                      onClick={() => toggleDay(d.id)}
-                      style={{
-                        padding: "8px 18px",
-                        borderRadius: "20px",
-                        border: isSelected
-                          ? "2px solid #7c3aed"
-                          : "1px solid #cbd5e1",
-                        backgroundColor: isSelected ? "#f3e8ff" : "#fff",
-                        color: isSelected ? "#7c3aed" : "#64748b",
-                        fontWeight: "900",
-                        fontSize: "0.85rem",
-                        cursor: "pointer",
-                        transition: "all 0.2s ease",
-                        boxShadow: isSelected
-                          ? "0 4px 12px rgba(124, 58, 237, 0.2)"
-                          : "none",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "6px",
-                      }}
-                    >
-                      {isSelected ? "✅" : "➕"} {d.label}
-                    </button>
-                  );
-                })}
-              </div>
+              {dayMap.map((d) => {
+                const isSelected = availableDays.includes(d.id);
+                return (
+                  <button
+                    type="button"
+                    key={d.id}
+                    onClick={() => toggleDay(d.id)}
+                    style={{
+                      padding: "8px 18px",
+                      borderRadius: "20px",
+                      border: isSelected
+                        ? "2px solid #7c3aed"
+                        : "1px solid #cbd5e1",
+                      backgroundColor: isSelected ? "#f3e8ff" : "#fff",
+                      color: isSelected ? "#7c3aed" : "#64748b",
+                      fontWeight: "900",
+                      fontSize: "0.85rem",
+                      cursor: "pointer",
+                      transition: "all 0.2s ease",
+                      boxShadow: isSelected
+                        ? "0 4px 12px rgba(124, 58, 237, 0.2)"
+                        : "none",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                    }}
+                  >
+                    {isSelected ? "✅" : "➕"} {d.label}
+                  </button>
+                );
+              })}
             </div>
 
             <div
@@ -802,7 +836,10 @@ export default function AddOffering({
                   onChange={(e) => setIs24x7(e.target.checked)}
                   style={{ transform: "scale(1.3)", accentColor: "#10b981" }}
                 />
-                🟢 الخدمة متاحة 24 ساعة (أو لا ترتبط بوقت محدد)
+                {t(
+                  "available_24_7",
+                  "🟢 الخدمة متاحة 24 ساعة (أو لا ترتبط بوقت محدد)",
+                )}
               </label>
 
               {!is24x7 && (
@@ -816,7 +853,9 @@ export default function AddOffering({
                   }}
                 >
                   <div style={{ flex: 1 }}>
-                    <label style={labelS}>تبدأ من الساعة:</label>
+                    <label style={labelS}>
+                      {t("start_time_label", "تبدأ من الساعة:")}
+                    </label>
                     <select
                       className="smart-input"
                       value={workStart || ""}
@@ -831,7 +870,7 @@ export default function AddOffering({
                       required
                     >
                       <option value="" disabled>
-                        اختر وقت البدء
+                        {t("select_start_time", "اختر وقت البدء")}
                       </option>
                       {timeOptions.map((time) => (
                         <option key={`start-${time}`} value={time}>
@@ -841,7 +880,9 @@ export default function AddOffering({
                     </select>
                   </div>
                   <div style={{ flex: 1 }}>
-                    <label style={labelS}>تنتهي الساعة:</label>
+                    <label style={labelS}>
+                      {t("end_time_label", "تنتهي الساعة:")}
+                    </label>
                     <select
                       className="smart-input"
                       value={workEnd || ""}
@@ -856,7 +897,7 @@ export default function AddOffering({
                       required
                     >
                       <option value="" disabled>
-                        اختر وقت الانتهاء
+                        {t("select_end_time", "اختر وقت الانتهاء")}
                       </option>
                       {timeOptions.map((time) => (
                         <option key={`end-${time}`} value={time}>
@@ -870,7 +911,6 @@ export default function AddOffering({
             </div>
           </div>
 
-          {/* 📱 بطاقة: السوشيال ميديا */}
           <div style={cardS}>
             <div
               style={{
@@ -893,7 +933,7 @@ export default function AddOffering({
                   gap: "8px",
                 }}
               >
-                📱 وسائل التواصل للخدمة (اختياري)
+                {t("social_media_title", "📱 وسائل التواصل للخدمة (اختياري)")}
               </h3>
               <button
                 type="button"
@@ -916,7 +956,7 @@ export default function AddOffering({
                   (e.currentTarget.style.backgroundColor = "#eff6ff")
                 }
               >
-                🔄 استيراد من ملفي
+                {t("import_from_profile", "🔄 استيراد من ملفي")}
               </button>
             </div>
             <div
@@ -927,7 +967,9 @@ export default function AddOffering({
               }}
             >
               <div>
-                <label style={labelS}>رقم الواتساب:</label>
+                <label style={labelS}>
+                  {t("whatsapp_label", "رقم الواتساب:")}
+                </label>
                 <input
                   type="tel"
                   dir="ltr"
@@ -939,7 +981,9 @@ export default function AddOffering({
                 />
               </div>
               <div>
-                <label style={labelS}>انستقرام:</label>
+                <label style={labelS}>
+                  {t("instagram_label", "انستقرام:")}
+                </label>
                 <input
                   type="url"
                   dir="ltr"
@@ -951,7 +995,7 @@ export default function AddOffering({
                 />
               </div>
               <div>
-                <label style={labelS}>تويتر (X):</label>
+                <label style={labelS}>{t("twitter_label", "تويتر (X):")}</label>
                 <input
                   type="url"
                   dir="ltr"
@@ -963,7 +1007,7 @@ export default function AddOffering({
                 />
               </div>
               <div>
-                <label style={labelS}>تيك توك:</label>
+                <label style={labelS}>{t("tiktok_label", "تيك توك:")}</label>
                 <input
                   type="url"
                   dir="ltr"
@@ -975,7 +1019,7 @@ export default function AddOffering({
                 />
               </div>
               <div>
-                <label style={labelS}>سناب شات:</label>
+                <label style={labelS}>{t("snapchat_label", "سناب شات:")}</label>
                 <input
                   type="url"
                   dir="ltr"
@@ -987,7 +1031,9 @@ export default function AddOffering({
                 />
               </div>
               <div>
-                <label style={labelS}>قناة اليوتيوب:</label>
+                <label style={labelS}>
+                  {t("youtube_label", "قناة اليوتيوب:")}
+                </label>
                 <input
                   type="url"
                   dir="ltr"
@@ -1001,7 +1047,6 @@ export default function AddOffering({
             </div>
           </div>
 
-          {/* ⚖️ الإقرار القانوني */}
           <div
             style={{
               backgroundColor: "#fffbeb",
@@ -1037,10 +1082,10 @@ export default function AddOffering({
                   lineHeight: "1.6",
                 }}
               >
-                أقر وأتعهد بأنني أتحمل المسؤولية القانونية والمهنية الكاملة عن
-                تقديم ومشروعية هذه الخدمة، وأوافق على أن المنصة تُعتبر وسيطاً
-                تقنياً وإعلانياً فقط، وتخلي مسؤوليتها تماماً عن جودة التنفيذ أو
-                أي نزاعات تنشأ مع العملاء.{" "}
+                {t(
+                  "legal_agreement_text",
+                  "أقر وأتعهد بأنني أتحمل المسؤولية القانونية والمهنية الكاملة عن تقديم ومشروعية هذه الخدمة، وأوافق على أن المنصة تُعتبر وسيطاً تقنياً وإعلانياً فقط، وتخلي مسؤوليتها تماماً عن جودة التنفيذ أو أي نزاعات تنشأ مع العملاء.",
+                )}{" "}
                 <span style={{ color: "#ef4444" }}>*</span>
               </span>
             </label>
@@ -1048,7 +1093,6 @@ export default function AddOffering({
         </form>
       </div>
 
-      {/* تذييل النافذة (Footer) مع زر الحفظ العائم */}
       <div
         style={{
           padding: "20px 25px",
@@ -1078,7 +1122,7 @@ export default function AddOffering({
           }}
         >
           {isSubmitting
-            ? "⏳ جاري المعالجة والحفظ..."
+            ? t("saving_processing", "⏳ جاري المعالجة والحفظ...")
             : t("save_btn", "حفظ الخدمة ونشرها في المنصة 🚀")}
         </button>
       </div>

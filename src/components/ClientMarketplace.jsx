@@ -1633,7 +1633,7 @@ export default function ClientMarketplace({
                             }}
                           >
                             {item.provider_role ? `${item.provider_role} ` : ""}
-                            لكل {modelLabels[item.pricing_model || "fixed"]}
+                            {modelLabels[item.pricing_model || "fixed"]}
                           </span>
                         )}
 
@@ -1648,7 +1648,7 @@ export default function ClientMarketplace({
                               marginTop: "4px",
                             }}
                           >
-                            ⏳ {durationText}
+                            {durationText}
                           </span>
                         )}
                       </div>

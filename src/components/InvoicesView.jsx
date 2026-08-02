@@ -8,7 +8,7 @@ export default function InvoicesView({
   platName = "المنصة",
   platLogo = "📍",
 }) {
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   // ✨ حالات الفلترة والبحث ✨
   const [searchTerm, setSearchTerm] = useState("");
@@ -93,7 +93,7 @@ export default function InvoicesView({
     backgroundColor: "#fff",
   };
 
-  const isRTL = i18n?.language === "ar" || true;
+  const isRTL = i18n?.language === "ar";
   const dateLocale = isRTL ? "ar-SA" : "en-US";
 
   const getFullFormattedDate = (dateObj) => {
@@ -195,7 +195,12 @@ export default function InvoicesView({
       {/* ========================================================= */}
       <div
         className={selectedInvoice ? "hide-on-print" : ""}
-        style={{ display: "flex", flexDirection: "column", gap: "25px" }}
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: "25px",
+          direction: isRTL ? "rtl" : "ltr",
+        }}
       >
         <div style={{ textAlign: "center", marginBottom: "10px" }}>
           <h2
@@ -206,10 +211,13 @@ export default function InvoicesView({
               fontWeight: "900",
             }}
           >
-            السجل المالي والفواتير
+            {t("financial_history_title", "السجل المالي والفواتير")}
           </h2>
           <p style={{ color: "#64748b", margin: 0, fontSize: "0.95rem" }}>
-            استعرض كافة فواتير حجوزاتك كعميل أو إيراداتك كمزود خدمة.
+            {t(
+              "financial_history_desc",
+              "استعرض كافة فواتير حجوزاتك كعميل أو إيراداتك كمزود خدمة.",
+            )}
           </p>
         </div>
 
@@ -241,13 +249,14 @@ export default function InvoicesView({
                 color: "#475569",
               }}
             >
-              البحث الشامل:
+              {t("comprehensive_search", "البحث الشامل:")}
             </label>
             <div style={{ position: "relative" }}>
               <span
                 style={{
                   position: "absolute",
-                  right: "12px",
+                  right: isRTL ? "12px" : "auto",
+                  left: isRTL ? "auto" : "12px",
                   top: "50%",
                   transform: "translateY(-50%)",
                   fontSize: "1.1rem",
@@ -257,13 +266,17 @@ export default function InvoicesView({
               </span>
               <input
                 type="text"
-                placeholder="رقم الفاتورة، اسم المستخدم..."
+                placeholder={t(
+                  "search_invoices_placeholder",
+                  "رقم الفاتورة، اسم المستخدم...",
+                )}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 style={{
                   ...inputStyle,
                   width: "100%",
-                  paddingRight: "40px",
+                  paddingRight: isRTL ? "40px" : "15px",
+                  paddingLeft: isRTL ? "15px" : "40px",
                   boxSizing: "border-box",
                 }}
               />
@@ -284,16 +297,22 @@ export default function InvoicesView({
                 color: "#475569",
               }}
             >
-              تصنيف الفواتير:
+              {t("categorize_invoices", "تصنيف الفواتير:")}
             </label>
             <select
               value={roleFilter}
               onChange={(e) => setRoleFilter(e.target.value)}
               style={{ ...inputStyle, width: "100%", cursor: "pointer" }}
             >
-              <option value="all">📁 عرض جميع الفواتير</option>
-              <option value="provider">💼 إيراداتي (كمزود)</option>
-              <option value="client">🛍️ مشترياتي (كعميل)</option>
+              <option value="all">
+                {t("filter_all_invoices", "📁 عرض جميع الفواتير")}
+              </option>
+              <option value="provider">
+                {t("filter_provider_revenues", "💼 إيراداتي (كمزود)")}
+              </option>
+              <option value="client">
+                {t("filter_client_purchases", "🛍️ مشترياتي (كعميل)")}
+              </option>
             </select>
           </div>
           <div
@@ -311,15 +330,19 @@ export default function InvoicesView({
                 color: "#475569",
               }}
             >
-              ترتيب حسب:
+              {t("sort_by", "ترتيب حسب:")}
             </label>
             <select
               value={sortOrder}
               onChange={(e) => setSortOrder(e.target.value)}
               style={{ ...inputStyle, width: "100%", cursor: "pointer" }}
             >
-              <option value="newest">🔽 الأحدث تاريخاً</option>
-              <option value="oldest">🔼 الأقدم تاريخاً</option>
+              <option value="newest">
+                {t("sort_newest", "🔽 الأحدث تاريخاً")}
+              </option>
+              <option value="oldest">
+                {t("sort_oldest", "🔼 الأقدم تاريخاً")}
+              </option>
             </select>
           </div>
         </div>
@@ -328,7 +351,9 @@ export default function InvoicesView({
           <div
             style={{ fontSize: "0.9rem", color: "#10b981", fontWeight: "bold" }}
           >
-            ✅ تم العثور على ({processedBookings.length}) فاتورة مطابقة.
+            {t("invoices_found_match", "✅ تم العثور على")} (
+            {processedBookings.length}){" "}
+            {t("invoices_matched_end", "فاتورة مطابقة.")}
           </div>
         )}
 
@@ -356,7 +381,7 @@ export default function InvoicesView({
               <h3
                 style={{ margin: "0", fontSize: "1.2rem", fontWeight: "bold" }}
               >
-                لا توجد فواتير مطابقة لبحثك
+                {t("no_matching_invoices", "لا توجد فواتير مطابقة لبحثك")}
               </h3>
             </div>
           ) : (
@@ -396,7 +421,8 @@ export default function InvoicesView({
                         fontWeight: "bold",
                       }}
                     >
-                      ملخص فاتورة #{shortId}
+                      {t("invoice_summary_prefix", "ملخص فاتورة #")}
+                      {shortId}
                     </span>
                     {/* ✨ تمييز كرت الحجز الخاص ✨ */}
                     {b.is_manual_booking ? (
@@ -410,7 +436,7 @@ export default function InvoicesView({
                           fontWeight: "bold",
                         }}
                       >
-                        📞 حجز خاص
+                        {t("private_booking_badge", "📞 حجز خاص")}
                       </span>
                     ) : (
                       <span
@@ -423,7 +449,9 @@ export default function InvoicesView({
                           fontWeight: "bold",
                         }}
                       >
-                        {isProvider ? "إيراد 💼" : "مشتريات 🛍️"}
+                        {isProvider
+                          ? t("revenue_badge", "إيراد 💼")
+                          : t("purchases_badge", "مشترياتي 🛍️")}
                       </span>
                     )}
                   </div>
@@ -449,11 +477,16 @@ export default function InvoicesView({
                     >
                       <span>{b.offerings?.title}</span>
                       <span style={{ fontSize: "0.85rem", color: "#64748b" }}>
-                        (العدد: {b.quantity || 1})
+                        ({t("quantity_text", "العدد: ")}
+                        {b.quantity || 1})
                       </span>
                     </h3>
                     <div style={{ fontSize: "0.85rem", color: "#475569" }}>
-                      <strong>{isProvider ? "العميل:" : "المزود:"}</strong>{" "}
+                      <strong>
+                        {isProvider
+                          ? t("client_label_inv", "العميل:")
+                          : t("provider_label_inv", "المزود:")}
+                      </strong>{" "}
                       {isProvider
                         ? b.profiles?.full_name
                         : b.offerings?.profiles?.full_name}
@@ -468,7 +501,7 @@ export default function InvoicesView({
                       alignItems: "center",
                     }}
                   >
-                    <div style={{ textAlign: "left" }}>
+                    <div style={{ textAlign: isRTL ? "right" : "left" }}>
                       <span
                         style={{
                           display: "block",
@@ -477,7 +510,9 @@ export default function InvoicesView({
                           fontWeight: "bold",
                         }}
                       >
-                        {isProvider ? "صافي الربح" : "المبلغ المدفوع"}
+                        {isProvider
+                          ? t("net_profit_label", "صافي الربح")
+                          : t("paid_amount_label", "المبلغ المدفوع")}
                       </span>
                       <strong
                         style={{
@@ -507,7 +542,7 @@ export default function InvoicesView({
                         transition: "0.2s",
                       }}
                     >
-                      📄 عرض الفاتورة
+                      {t("view_invoice_btn", "📄 عرض الفاتورة")}
                     </button>
                   </div>
                 </div>
@@ -549,7 +584,7 @@ export default function InvoicesView({
               padding: "40px",
               borderRadius: "24px",
               boxShadow: "0 25px 50px rgba(0,0,0,0.2)",
-              direction: "rtl",
+              direction: isRTL ? "rtl" : "ltr",
             }}
           >
             {/* أزرار التحكم العلوية (تختفي في الطباعة بفضل الكلاس no-print) */}
@@ -579,7 +614,7 @@ export default function InvoicesView({
                   alignItems: "center",
                 }}
               >
-                🖨️ طباعة الفاتورة
+                🖨️ {t("print_invoice_btn", "طباعة الفاتورة")}
               </button>
               <button
                 onClick={() => setSelectedInvoice(null)}
@@ -594,7 +629,7 @@ export default function InvoicesView({
                   fontSize: "1rem",
                 }}
               >
-                ✖ إغلاق
+                ✖ {t("close_modal_btn", "إغلاق")}
               </button>
             </div>
 
@@ -645,11 +680,11 @@ export default function InvoicesView({
                       fontWeight: "bold",
                     }}
                   >
-                    منصة الخدمات الموثوقة
+                    {t("trusted_services_platform", "منصة الخدمات الموثوقة")}
                   </span>
                 </div>
               </div>
-              <div style={{ textAlign: "left" }}>
+              <div style={{ textAlign: isRTL ? "left" : "right" }}>
                 <h2
                   style={{
                     margin: 0,
@@ -658,8 +693,10 @@ export default function InvoicesView({
                     fontWeight: "900",
                   }}
                 >
-                  فاتورة خدمة{" "}
-                  {selectedInvoice.booking.is_manual_booking ? "(خاصة)" : ""}
+                  {t("service_invoice_title", "فاتورة خدمة")}{" "}
+                  {selectedInvoice.booking.is_manual_booking
+                    ? t("private_tag", "(خاصة)")
+                    : ""}
                 </h2>
                 <div
                   style={{
@@ -668,7 +705,7 @@ export default function InvoicesView({
                     marginTop: "5px",
                   }}
                 >
-                  <strong>رقم الفاتورة:</strong> #
+                  <strong>{t("invoice_num_label", "رقم الفاتورة:")}</strong> #
                   {selectedInvoice.booking.id.split("-")[0].toUpperCase()}
                 </div>
                 <div
@@ -678,8 +715,8 @@ export default function InvoicesView({
                     marginTop: "5px",
                   }}
                 >
-                  <strong>تاريخ الإصدار:</strong>{" "}
-                  {new Date().toLocaleDateString("ar-SA")}
+                  <strong>{t("issue_date_label", "تاريخ الإصدار:")}</strong>{" "}
+                  {new Date().toLocaleDateString(dateLocale)}
                 </div>
               </div>
             </div>
@@ -698,7 +735,10 @@ export default function InvoicesView({
                   fontWeight: "bold",
                 }}
               >
-                📞 هذا الحجز تم إدخاله يدوياً كحجز خارجي (معفى من عمولة المنصة)
+                {t(
+                  "manual_invoice_banner",
+                  "📞 هذا الحجز تم إدخاله يدوياً كحجز خارجي (معفى من عمولة المنصة)",
+                )}
               </div>
             )}
 
@@ -720,7 +760,7 @@ export default function InvoicesView({
                     fontSize: "0.9rem",
                   }}
                 >
-                  🏢 بيانات المزود:
+                  {t("provider_data_title", "🏢 بيانات المزود:")}
                 </h3>
                 <strong
                   style={{
@@ -731,7 +771,7 @@ export default function InvoicesView({
                   }}
                 >
                   {selectedInvoice.booking.offerings?.profiles?.full_name ||
-                    "مزود الخدمة"}
+                    t("service_provider_default", "مزود الخدمة")}
                 </strong>
                 {selectedInvoice.booking.offerings?.profiles?.username && (
                   <div style={{ color: "#475569", fontSize: "0.9rem" }}>
@@ -755,7 +795,7 @@ export default function InvoicesView({
                     fontSize: "0.9rem",
                   }}
                 >
-                  👤 بيانات العميل:
+                  {t("client_data_title", "👤 بيانات العميل:")}
                 </h3>
                 <strong
                   style={{
@@ -765,7 +805,8 @@ export default function InvoicesView({
                     marginBottom: "5px",
                   }}
                 >
-                  {selectedInvoice.booking.profiles?.full_name || "العميل"}
+                  {selectedInvoice.booking.profiles?.full_name ||
+                    t("client_default", "العميل")}
                 </strong>
                 {selectedInvoice.booking.profiles?.username && (
                   <div style={{ color: "#475569", fontSize: "0.9rem" }}>
@@ -797,7 +838,7 @@ export default function InvoicesView({
                     fontSize: "0.85rem",
                   }}
                 >
-                  تاريخ ووقت البدء:
+                  {t("start_date_time_label", "تاريخ ووقت البدء:")}
                 </h4>
                 {selectedInvoice.startFormatted ? (
                   <div
@@ -818,7 +859,9 @@ export default function InvoicesView({
                     </div>
                   </div>
                 ) : (
-                  <div style={{ color: "#64748b" }}>غير محدد</div>
+                  <div style={{ color: "#64748b" }}>
+                    {t("not_specified", "غير محدد")}
+                  </div>
                 )}
               </div>
 
@@ -831,7 +874,7 @@ export default function InvoicesView({
                     fontSize: "0.85rem",
                   }}
                 >
-                  تاريخ ووقت الانتهاء:
+                  {t("end_date_time_label", "تاريخ ووقت الانتهاء:")}
                 </h4>
                 <div
                   style={{
@@ -850,10 +893,12 @@ export default function InvoicesView({
                       </div>
                     </>
                   ) : (
-                    <>🏁 نفس تاريخ البدء</>
+                    <>🏁 {t("same_start_date", "نفس تاريخ البدء")}</>
                   )}
                   <div style={{ marginTop: "4px" }}>
-                    ⌛ {selectedInvoice.endTimeStr || "غير محدد"}
+                    ⌛{" "}
+                    {selectedInvoice.endTimeStr ||
+                      t("not_specified", "غير محدد")}
                   </div>
                 </div>
               </div>
@@ -875,7 +920,7 @@ export default function InvoicesView({
                       fontSize: "0.85rem",
                     }}
                   >
-                    📍 موقع تقديم الخدمة:
+                    📍 {t("service_location_label", "موقع تقديم الخدمة:")}
                   </h4>
                   <div
                     style={{
@@ -895,7 +940,10 @@ export default function InvoicesView({
                           textDecoration: "underline",
                         }}
                       >
-                        رابط الموقع على الخريطة (اضغط للفتح)
+                        {t(
+                          "map_link_text",
+                          "رابط الموقع على الخريطة (اضغط للفتح)",
+                        )}
                       </a>
                     ) : (
                       selectedInvoice.booking.location
@@ -913,7 +961,7 @@ export default function InvoicesView({
                 fontSize: "1.1rem",
               }}
             >
-              التفاصيل المالية للخدمة المنفذة:
+              {t("financial_details_title", "التفاصيل المالية للخدمة المنفذة:")}
             </h3>
             <table
               style={{
@@ -927,23 +975,23 @@ export default function InvoicesView({
                   <th
                     style={{
                       padding: "12px 15px",
-                      textAlign: "right",
-                      borderRadius: "0 10px 10px 0",
+                      textAlign: isRTL ? "right" : "left",
+                      borderRadius: isRTL ? "0 10px 10px 0" : "10px 0 0 10px",
                     }}
                   >
-                    الخدمة
+                    {t("table_service", "الخدمة")}
                   </th>
                   <th style={{ padding: "12px 15px", textAlign: "center" }}>
-                    العدد
+                    {t("table_quantity", "العدد")}
                   </th>
                   <th
                     style={{
                       padding: "12px 15px",
-                      textAlign: "left",
-                      borderRadius: "10px 0 0 0",
+                      textAlign: isRTL ? "left" : "right",
+                      borderRadius: isRTL ? "10px 0 0 10px" : "0 10px 10px 0",
                     }}
                   >
-                    الإجمالي
+                    {t("table_total", "الإجمالي")}
                   </th>
                 </tr>
               </thead>
@@ -975,7 +1023,7 @@ export default function InvoicesView({
                       padding: "15px",
                       borderBottom: "1px solid #e2e8f0",
                       color: "#334155",
-                      textAlign: "left",
+                      textAlign: isRTL ? "left" : "right",
                       fontWeight: "bold",
                       direction: "ltr",
                     }}
@@ -988,7 +1036,12 @@ export default function InvoicesView({
             </table>
 
             {/* --- الملخص المالي --- */}
-            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: isRTL ? "flex-end" : "flex-start",
+              }}
+            >
               <div
                 style={{
                   width: "350px",
@@ -1007,7 +1060,7 @@ export default function InvoicesView({
                     fontSize: "0.95rem",
                   }}
                 >
-                  <span>المبلغ الأساسي:</span>
+                  <span>{t("base_amount_label", "المبلغ الأساسي:")}</span>
                   <span style={{ direction: "ltr", fontWeight: "bold" }}>
                     {selectedInvoice.fin.baseTotal.toFixed(2)}{" "}
                     {selectedInvoice.currency}
@@ -1024,7 +1077,7 @@ export default function InvoicesView({
                       fontSize: "0.95rem",
                     }}
                   >
-                    <span>إضافات ومصاريف أخرى:</span>
+                    <span>{t("additions_label", "إضافات ومصاريف أخرى:")}</span>
                     <span style={{ direction: "ltr", fontWeight: "bold" }}>
                       {selectedInvoice.fin.additional.toFixed(2)}{" "}
                       {selectedInvoice.currency}
@@ -1046,7 +1099,10 @@ export default function InvoicesView({
                         borderBottom: "1px dashed #cbd5e1",
                       }}
                     >
-                      <span>رسوم المنصة ({commissionRate * 100}%):</span>
+                      <span>
+                        {t("platform_fees_label", "رسوم المنصة")} (
+                        {commissionRate * 100}%):
+                      </span>
                       <span style={{ direction: "ltr", fontWeight: "bold" }}>
                         - {selectedInvoice.fin.platformCommission.toFixed(2)}{" "}
                         {selectedInvoice.currency}
@@ -1067,7 +1123,9 @@ export default function InvoicesView({
                         borderBottom: "1px dashed #cbd5e1",
                       }}
                     >
-                      <span>رسوم المنصة (معفى):</span>
+                      <span>
+                        {t("platform_fees_exempt", "رسوم المنصة (معفى):")}
+                      </span>
                       <span style={{ direction: "ltr", fontWeight: "bold" }}>
                         0.00 {selectedInvoice.currency}
                       </span>
@@ -1089,8 +1147,8 @@ export default function InvoicesView({
                 >
                   <strong style={{ fontWeight: "900" }}>
                     {selectedInvoice.isProvider
-                      ? "صافي المستحق للمزود:"
-                      : "إجمالي المدفوع:"}
+                      ? t("net_payable_provider", "صافي المستحق للمزود:")
+                      : t("total_paid_client", "إجمالي المدفوع:")}
                   </strong>
                   <strong style={{ direction: "ltr", fontWeight: "900" }}>
                     {(selectedInvoice.isProvider
@@ -1114,9 +1172,12 @@ export default function InvoicesView({
                 paddingTop: "20px",
               }}
             >
-              تم إصدار هذه الفاتورة إلكترونياً من نظام{" "}
+              {t(
+                "invoice_footer_text_1",
+                "تم إصدار هذه الفاتورة إلكترونياً من نظام",
+              )}{" "}
               <strong>{platName}</strong>.<br />
-              شكراً لثقتكم وتعاملكم معنا.
+              {t("invoice_footer_text_2", "شكراً لثقتكم وتعاملكم معنا.")}
             </div>
           </div>
         </div>

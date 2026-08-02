@@ -1,7 +1,11 @@
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "../lib/supabase";
+import { useTranslation } from "react-i18next"; // ✨ استدعاء الترجمة
 
 export default function ProfileSettings({ session, onUpdate }) {
+  const { t, i18n } = useTranslation(); // ✨ تفعيل دالة الترجمة
+  const isRTL = i18n.language === "ar"; // ✨ تحديد اتجاه اللغة
+
   const [loading, setLoading] = useState(true);
   const [fullName, setFullName] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
@@ -162,7 +166,7 @@ export default function ProfileSettings({ session, onUpdate }) {
     try {
       setIsUploading(true);
       if (!event.target.files || event.target.files.length === 0)
-        throw new Error("يجب اختيار صورة.");
+        throw new Error(t("must_choose_image", "يجب اختيار صورة."));
       const file = event.target.files[0];
       const fileName = `${session.user.id}-${Math.random()}.${file.name
         .split(".")
@@ -174,10 +178,15 @@ export default function ProfileSettings({ session, onUpdate }) {
       const { data } = supabase.storage.from("avatars").getPublicUrl(fileName);
       if (data) {
         setAvatarUrl(data.publicUrl);
-        alert('تم رفع الصورة مؤقتاً! اضغط "حفظ التعديلات" لتثبيتها ✅');
+        alert(
+          t(
+            "avatar_uploaded_temp",
+            'تم رفع الصورة مؤقتاً! اضغط "حفظ التعديلات" لتثبيتها ✅',
+          ),
+        );
       }
     } catch (error) {
-      alert("خطأ: " + error.message);
+      alert(t("error_prefix", "خطأ: ") + error.message);
     } finally {
       setIsUploading(false);
     }
@@ -185,11 +194,19 @@ export default function ProfileSettings({ session, onUpdate }) {
 
   const handleVerificationRequest = async () => {
     if (!nationalId || !bankIban)
-      return alert("الرجاء إدخال رقم الهوية ورقم الآيبان البنكي لتقديم الطلب.");
+      return alert(
+        t(
+          "national_iban_required",
+          "الرجاء إدخال رقم الهوية ورقم الآيبان البنكي لتقديم الطلب.",
+        ),
+      );
 
     if (
       window.confirm(
-        "هل أنت متأكد من صحة البيانات؟ (لن تتمكن من تعديلها أثناء المراجعة)",
+        t(
+          "confirm_verification_data",
+          "هل أنت متأكد من صحة البيانات؟ (لن تتمكن من تعديلها أثناء المراجعة)",
+        ),
       )
     ) {
       setIsSubmitting(true);
@@ -206,9 +223,16 @@ export default function ProfileSettings({ session, onUpdate }) {
 
       if (!error) {
         setVerificationStatus("pending");
-        alert("تم إرسال طلب التوثيق للإدارة بنجاح! سيتم مراجعته قريباً ✅");
+        alert(
+          t(
+            "verification_sent_success",
+            "تم إرسال طلب التوثيق للإدارة بنجاح! سيتم مراجعته قريباً ✅",
+          ),
+        );
       } else {
-        alert("حدث خطأ أثناء الإرسال: " + error.message);
+        alert(
+          t("send_error_prefix", "حدث خطأ أثناء الإرسال: ") + error.message,
+        );
       }
     }
   };
@@ -223,7 +247,10 @@ export default function ProfileSettings({ session, onUpdate }) {
       usernameStatus === "too_short" // منع الحفظ الصارم إذا كان اسم المستخدم المسجل غير مستوف للطول المطلوب
     ) {
       alert(
-        "يرجى اختيار اسم مستخدم (Username) صحيح ومتاح ومكون من 4 خانات على الأقل قبل الحفظ 🛑",
+        t(
+          "username_requirements_error",
+          "يرجى اختيار اسم مستخدم (Username) صحيح ومتاح ومكون من 4 خانات على الأقل قبل الحفظ 🛑",
+        ),
       );
       return;
     }
@@ -243,7 +270,12 @@ export default function ProfileSettings({ session, onUpdate }) {
           error.message.includes("different from the old password") ||
           error.status === 422
         ) {
-          console.warn("تجاهل تحديث كلمة المرور (مطابقة للقديمة)");
+          console.warn(
+            t(
+              "ignore_password_update",
+              "تجاهل تحديث كلمة المرور (مطابقة للقديمة)",
+            ),
+          );
         } else {
           authUpdateError = error;
         }
@@ -262,7 +294,10 @@ export default function ProfileSettings({ session, onUpdate }) {
 
     if (authUpdateError) {
       setIsSubmitting(false);
-      alert("حدث خطأ أثناء تحديث بيانات الدخول: " + authUpdateError.message);
+      alert(
+        t("auth_update_error", "حدث خطأ أثناء تحديث بيانات الدخول: ") +
+          authUpdateError.message,
+      );
       return;
     }
 
@@ -301,19 +336,29 @@ export default function ProfileSettings({ session, onUpdate }) {
 
       if (emailConfirmationSent) {
         alert(
-          "تم حفظ البيانات الشاملة بنجاح ✅\n\n⚠️ تنبيه بخصوص الإيميل:\nلقد تم إرسال رابط تأكيد إلى بريدك الجديد.\nيجب عليك فتحه والضغط على الرابط ليتم التغيير الفعلي، وإلا سيبقى حسابك على الإيميل القديم.",
+          t(
+            "profile_saved_email_notice",
+            "تم حفظ البيانات الشاملة بنجاح ✅\n\n⚠️ تنبيه بخصوص الإيميل:\nلقد تم إرسال رابط تأكيد إلى بريدك الجديد.\nيجب عليك فتحه والضغط على الرابط ليتم التغيير الفعلي، وإلا سيبقى حسابك على الإيميل القديم.",
+          ),
         );
       } else {
-        alert("تم تحديث الملف الشخصي بنجاح ✅");
+        alert(t("profile_updated_success", "تم تحديث الملف الشخصي بنجاح ✅"));
       }
 
       if (onUpdate) onUpdate();
     } else {
       if (error.code === "23505") {
-        alert("عذراً! اسم المستخدم هذا تم حجزه للتو، الرجاء اختيار اسم آخر.");
+        alert(
+          t(
+            "username_just_taken",
+            "عذراً! اسم المستخدم هذا تم حجزه للتو، الرجاء اختيار اسم آخر.",
+          ),
+        );
         setUsernameStatus("taken");
       } else {
-        alert("خطأ في تحديث البيانات: " + error.message);
+        alert(
+          t("update_data_error", "خطأ في تحديث البيانات: ") + error.message,
+        );
       }
     }
   };
@@ -322,7 +367,10 @@ export default function ProfileSettings({ session, onUpdate }) {
   const handleDeleteAccount = async () => {
     if (
       !window.confirm(
-        "⚠️ هل أنت متأكد تماماً من حذف حسابك؟ هذا الإجراء نهائي ولا يمكن التراجع عنه سيتم حذف جميع بياناتك وحجوزاتك نهائياً!",
+        t(
+          "confirm_delete_account",
+          "⚠️ هل أنت متأكد تماماً من حذف حسابك؟ هذا الإجراء نهائي ولا يمكن التراجع عنه سيتم حذف جميع بياناتك وحجوزاتك نهائياً!",
+        ),
       )
     ) {
       return;
@@ -331,12 +379,6 @@ export default function ProfileSettings({ session, onUpdate }) {
     setIsDeletingAccount(true);
 
     try {
-      // *** تنبيه هام للمطور نبيل ***
-      // نظام Supabase لا يسمح للمستخدم بحذف حسابه من جدول auth.users مباشرة باستخدام مفتاح الأمان العام.
-      // يجب عليك إنشاء وظيفة (RPC) في قاعة البيانات أو خادم خلفي (Backend) يستخدم مفتاح "Service Role" لإتمام الحذف الفعلي من جدول Auth و Profiles.
-      // الكود التالي هو استدعاء افتراضي لوظيفة RPC قمت أنت بإنشائها مسبقاً (مثلاً باسم process_user_deletion).
-
-      // الكود الافتراضي لطلب API الخاص بك (استبدله برابط الـ Backend الفعلي الخاص بك):
       const { error } = await supabase.rpc("process_user_deletion", {
         user_id_param: session.user.id,
       });
@@ -345,14 +387,18 @@ export default function ProfileSettings({ session, onUpdate }) {
         throw error;
       }
 
-      // إذا تم حذف البيانات بنجاح، نقوم بتسجيل الخروج من الجلسة في الواجهة
       await supabase.auth.signOut();
       alert(
-        "تم حذف حسابك وبياناتك بنجاح. نأسف لمغادرتك، ونتمنى رؤيتك مرة أخرى! 👋",
+        t(
+          "account_deleted_success",
+          "تم حذف حسابك وبياناتك بنجاح. نأسف لمغادرتك، ونتمنى رؤيتك مرة أخرى! 👋",
+        ),
       );
-      // يمكنك إضافة توجيه (Redirect) هنا إذا لزم الأمر، أو الاعتماد على تحديث حالة الجلسة (Session State).
     } catch (error) {
-      alert("حدث خطأ أثناء محاولة حذف الحساب: " + error.message);
+      alert(
+        t("account_delete_error", "حدث خطأ أثناء محاولة حذف الحساب: ") +
+          error.message,
+      );
     } finally {
       setIsDeletingAccount(false);
     }
@@ -361,7 +407,7 @@ export default function ProfileSettings({ session, onUpdate }) {
   if (loading)
     return (
       <div style={{ textAlign: "center", padding: "50px" }}>
-        ⏳ جاري التحميل...
+        {t("loading_text", "⏳ جاري التحميل...")}
       </div>
     );
 
@@ -378,7 +424,7 @@ export default function ProfileSettings({ session, onUpdate }) {
         border: "1px solid #f1f5f9",
         maxWidth: "800px",
         margin: "0 auto",
-        direction: "rtl",
+        direction: isRTL ? "rtl" : "ltr", // ✨ تحديث الاتجاه الديناميكي
       }}
     >
       <h2
@@ -392,7 +438,8 @@ export default function ProfileSettings({ session, onUpdate }) {
           fontWeight: "900",
         }}
       >
-        <span style={{ fontSize: "2rem" }}>👤</span> إعدادات الحساب الشخصي
+        <span style={{ fontSize: "2rem" }}>👤</span>{" "}
+        {t("profile_settings_title", "إعدادات الحساب الشخصي")}
       </h2>
 
       {/* ✨ بطاقة الهوية الذكية ✨ */}
@@ -431,7 +478,8 @@ export default function ProfileSettings({ session, onUpdate }) {
             style={{
               position: "absolute",
               bottom: "0",
-              right: "0",
+              right: isRTL ? "0" : "auto", // ✨ تحديث التموضع للغتين
+              left: isRTL ? "auto" : "0", // ✨ تحديث التموضع للغتين
               backgroundColor: themeColor,
               color: "#fff",
               border: "none",
@@ -445,7 +493,7 @@ export default function ProfileSettings({ session, onUpdate }) {
               boxShadow: "0 2px 5px rgba(0,0,0,0.2)",
               transition: "all 0.3s ease",
             }}
-            title="تغيير الصورة"
+            title={t("change_avatar_tooltip", "تغيير الصورة")}
           >
             {isUploading ? "⏳" : "📷"}
           </button>
@@ -466,7 +514,7 @@ export default function ProfileSettings({ session, onUpdate }) {
             fontWeight: "900",
           }}
         >
-          {fullName || "بدون اسم"}
+          {fullName || t("no_name", "بدون اسم")}
         </h3>
         {username &&
           usernameStatus !== "taken" &&
@@ -491,8 +539,8 @@ export default function ProfileSettings({ session, onUpdate }) {
           style={{ margin: "0 0 20px 0", color: "#64748b", fontSize: "0.9rem" }}
         >
           {providerType === "institution"
-            ? "/متعهد/قائد فريق او مجموعه/ مؤسسة / شركة"
-            : "فرد (مستقل)"}
+            ? t("institution_desc", "/متعهد/قائد فريق او مجموعه/ مؤسسة / شركة")
+            : t("individual_desc", "فرد (مستقل)")}
         </p>
 
         <div
@@ -510,7 +558,7 @@ export default function ProfileSettings({ session, onUpdate }) {
               fontSize: "0.95rem",
             }}
           >
-            🎨 اختر لون هويتك البصرية
+            🎨 {t("choose_theme_color", "اختر لون هويتك البصرية")}
           </h4>
           <div
             style={{
@@ -568,8 +616,8 @@ export default function ProfileSettings({ session, onUpdate }) {
               gap: "8px",
             }}
           >
-            <span style={{ fontSize: "1.3rem" }}>🔗</span> الهوية الرقمية
-            والانضمام
+            <span style={{ fontSize: "1.3rem" }}>🔗</span>{" "}
+            {t("digital_identity_title", "الهوية الرقمية والانضمام")}
           </h3>
 
           <div style={{ marginBottom: "20px" }}>
@@ -584,12 +632,12 @@ export default function ProfileSettings({ session, onUpdate }) {
               <label
                 style={{ fontWeight: "bold", color: "#475569", margin: 0 }}
               >
-                اسم المستخدم (Username):
+                {t("username_label", "اسم المستخدم (Username):")}
               </label>
               <div>
                 {usernameStatus === "checking" && (
                   <span style={{ fontSize: "0.85rem", color: "#64748b" }}>
-                    ⏳ جاري الفحص...
+                    ⏳ {t("checking_username", "جاري الفحص...")}
                   </span>
                 )}
                 {usernameStatus === "available" &&
@@ -601,7 +649,7 @@ export default function ProfileSettings({ session, onUpdate }) {
                         fontWeight: "bold",
                       }}
                     >
-                      ✅ متاح
+                      {t("username_available", "✅ متاح")}
                     </span>
                   )}
                 {usernameStatus === "taken" && (
@@ -612,7 +660,7 @@ export default function ProfileSettings({ session, onUpdate }) {
                       fontWeight: "bold",
                     }}
                   >
-                    ❌ مستخدم مسبقاً
+                    {t("username_taken", "❌ مستخدم مسبقاً")}
                   </span>
                 )}
                 {usernameStatus === "invalid" && (
@@ -623,10 +671,9 @@ export default function ProfileSettings({ session, onUpdate }) {
                       fontWeight: "bold",
                     }}
                   >
-                    ⚠️ حروف إنجليزية وأرقام فقط
+                    {t("username_invalid", "⚠️ حروف إنجليزية وأرقام فقط")}
                   </span>
                 )}
-                {/* ✨ التنبيه الفوري الجديد المضاف لواجهة التسجيل لتعريف الطول الأدنى للمستخدم المادي */}
                 {usernameStatus === "too_short" && (
                   <span
                     style={{
@@ -635,7 +682,10 @@ export default function ProfileSettings({ session, onUpdate }) {
                       fontWeight: "bold",
                     }}
                   >
-                    ⚠️ يجب أن يتكون من 4 خانات على الأقل
+                    {t(
+                      "username_too_short",
+                      "⚠️ يجب أن يتكون من 4 خانات على الأقل",
+                    )}
                   </span>
                 )}
               </div>
@@ -645,7 +695,8 @@ export default function ProfileSettings({ session, onUpdate }) {
               <span
                 style={{
                   position: "absolute",
-                  right: "12px",
+                  right: isRTL ? "12px" : "auto", // ✨ تحديث RTL
+                  left: isRTL ? "auto" : "12px", // ✨ تحديث LTR
                   top: "12px",
                   color: "#94a3b8",
                   fontWeight: "bold",
@@ -661,7 +712,8 @@ export default function ProfileSettings({ session, onUpdate }) {
                 placeholder="nabeel88"
                 style={{
                   ...inpS,
-                  paddingRight: "35px",
+                  paddingRight: isRTL ? "35px" : "15px", // ✨ تحديث RTL
+                  paddingLeft: isRTL ? "15px" : "35px", // ✨ تحديث LTR
                   borderColor:
                     usernameStatus === "taken" ||
                     usernameStatus === "invalid" ||
@@ -680,7 +732,8 @@ export default function ProfileSettings({ session, onUpdate }) {
                   marginTop: "10px",
                   padding: "10px",
                   backgroundColor: "#fef2f2",
-                  borderRight: "4px solid #ef4444",
+                  borderRight: isRTL ? "4px solid #ef4444" : "none", // ✨ تحديث RTL
+                  borderLeft: isRTL ? "none" : "4px solid #ef4444", // ✨ تحديث LTR
                   borderRadius: "8px",
                   color: "#991b1b",
                   fontSize: "0.85rem",
@@ -691,12 +744,17 @@ export default function ProfileSettings({ session, onUpdate }) {
               >
                 <span>⚠️</span>
                 <span>
-                  <strong>تنبيه هام:</strong> تغيير اسم المستخدم سيؤدي إلى تغيير
-                  الرابط الخاص بملفك، وسيتوقف الرابط القديم عن العمل.
+                  <strong>تنبيه هام:</strong>{" "}
+                  {t(
+                    "username_change_warning",
+                    "تغيير اسم المستخدم سيؤدي إلى تغيير الرابط الخاص بملفك، وسيتوقف الرابط القديم عن العمل.",
+                  )}
                   <br />
                   <small>
-                    * لا يمكنك تغيير اسم المستخدم مرة أخرى إلا بعد مرور 30
-                    يوماً.
+                    {t(
+                      "username_change_rule",
+                      "* لا يمكنك تغيير اسم المستخدم مرة أخرى إلا بعد مرور 30 يوماً.",
+                    )}
                   </small>
                 </span>
               </div>
@@ -709,7 +767,10 @@ export default function ProfileSettings({ session, onUpdate }) {
                   marginTop: "6px",
                 }}
               >
-                * سيتم استخدامه كرابط مباشر لملفك الشخصي وللتسويق.
+                {t(
+                  "username_hint",
+                  "* سيتم استخدامه كرابط مباشر لملفك الشخصي وللتسويق.",
+                )}
               </small>
             )}
           </div>
@@ -722,22 +783,36 @@ export default function ProfileSettings({ session, onUpdate }) {
             }}
           >
             <div>
-              <label style={lblS}>كيف تعرفت علينا؟</label>
+              <label style={lblS}>
+                {t("how_did_you_know_us", "كيف تعرفت علينا؟")}
+              </label>
               <select
                 style={{ ...inpS, cursor: "pointer" }}
                 value={marketingSource}
                 onChange={(e) => setMarketingSource(e.target.value)}
               >
-                <option value="">اختر من القائمة...</option>
-                <option value="twitter">تويتر (X)</option>
-                <option value="snapchat">سناب شات</option>
-                <option value="friend">(المسوق)شريك Book On Map </option>
-                <option value="search">محرك بحث (جوجل)</option>
-                <option value="other">أخرى</option>
+                <option value="">
+                  {t("select_from_list", "اختر من القائمة...")}
+                </option>
+                <option value="twitter">
+                  {t("source_twitter", "تويتر (X)")}
+                </option>
+                <option value="snapchat">
+                  {t("source_snapchat", "سناب شات")}
+                </option>
+                <option value="friend">
+                  {t("source_friend", "(المسوق)شريك Book On Map ")}
+                </option>
+                <option value="search">
+                  {t("source_search", "محرك بحث (جوجل)")}
+                </option>
+                <option value="other">{t("source_other", "أخرى")}</option>
               </select>
             </div>
             <div>
-              <label style={lblS}>كود المسوق (إذا دعاك شخص للمنصة):</label>
+              <label style={lblS}>
+                {t("marketer_code_label", "كود المسوق (إذا دعاك شخص للمنصة):")}
+              </label>
               <input
                 type="text"
                 dir="ltr"
@@ -749,7 +824,10 @@ export default function ProfileSettings({ session, onUpdate }) {
                 }}
                 value={referredBy}
                 onChange={(e) => setReferredBy(e.target.value)}
-                placeholder="أدخل Username الخاص بالمسوق"
+                placeholder={t(
+                  "marketer_code_placeholder",
+                  "أدخل Username الخاص بالمسوق",
+                )}
               />
             </div>
           </div>
@@ -757,7 +835,9 @@ export default function ProfileSettings({ session, onUpdate }) {
 
         {/* 📝 البيانات الأساسية */}
         <div style={sectionS}>
-          <h3 style={secTitle}>البيانات الأساسية والتواصل</h3>
+          <h3 style={secTitle}>
+            {t("basic_info_title", "البيانات الأساسية والتواصل")}
+          </h3>
           <div
             style={{
               display: "grid",
@@ -766,18 +846,25 @@ export default function ProfileSettings({ session, onUpdate }) {
             }}
           >
             <div>
-              <label style={lblS}>الاسم الكامل (أو اسم المؤسسة):</label>
+              <label style={lblS}>
+                {t("full_name_org_label", "الاسم الكامل (أو اسم المؤسسة):")}
+              </label>
               <input
                 type="text"
                 required
                 style={inpS}
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                placeholder="الاسم الذي يظهر للعملاء"
+                placeholder={t(
+                  "full_name_placeholder",
+                  "الاسم الذي يظهر للعملاء",
+                )}
               />
             </div>
             <div>
-              <label style={lblS}>رقم الجوال:</label>
+              <label style={lblS}>
+                {t("phone_number_label", "رقم الجوال:")}
+              </label>
               <input
                 type="tel"
                 style={{ ...inpS, textAlign: "left" }}
@@ -797,7 +884,7 @@ export default function ProfileSettings({ session, onUpdate }) {
               fontWeight: "900",
             }}
           >
-            روابط السوشيال ميديا (اختياري):
+            {t("social_links_title", "روابط السوشيال ميديا (اختياري):")}
           </h4>
           <div
             style={{
@@ -807,7 +894,7 @@ export default function ProfileSettings({ session, onUpdate }) {
             }}
           >
             <div>
-              <label style={lblS}>يوتيوب:</label>
+              <label style={lblS}>{t("youtube_label", "يوتيوب:")}</label>
               <input
                 type="url"
                 dir="ltr"
@@ -818,7 +905,7 @@ export default function ProfileSettings({ session, onUpdate }) {
               />
             </div>
             <div>
-              <label style={lblS}>انستقرام:</label>
+              <label style={lblS}>{t("instagram_label", "انستقرام:")}</label>
               <input
                 type="url"
                 dir="ltr"
@@ -829,7 +916,7 @@ export default function ProfileSettings({ session, onUpdate }) {
               />
             </div>
             <div>
-              <label style={lblS}>تويتر (X):</label>
+              <label style={lblS}>{t("twitter_label", "تويتر (X):")}</label>
               <input
                 type="url"
                 dir="ltr"
@@ -840,7 +927,7 @@ export default function ProfileSettings({ session, onUpdate }) {
               />
             </div>
             <div>
-              <label style={lblS}>تيك توك:</label>
+              <label style={lblS}>{t("tiktok_label", "تيك توك:")}</label>
               <input
                 type="url"
                 dir="ltr"
@@ -889,20 +976,26 @@ export default function ProfileSettings({ session, onUpdate }) {
                 fontSize: "1.2rem",
               }}
             >
-              <span style={{ fontSize: "1.5rem" }}>🛡️</span> التوثيق المالي
-              (اختياري)
+              <span style={{ fontSize: "1.5rem" }}>🛡️</span>{" "}
+              {t("financial_verification_title", "التوثيق المالي (اختياري)")}
             </h3>
             {verificationStatus === "verified" && (
-              <span style={badgeS("#10b981")}>✅ موثق رسمياً</span>
+              <span style={badgeS("#10b981")}>
+                {t("verified_officially", "✅ موثق رسمياً")}
+              </span>
             )}
             {verificationStatus === "pending" && (
-              <span style={badgeS("#f59e0b")}>⏳ قيد المراجعة</span>
+              <span style={badgeS("#f59e0b")}>
+                {t("pending_review", "⏳ قيد المراجعة")}
+              </span>
             )}
             {verificationStatus === "rejected" && (
-              <span style={badgeS("#ef4444")}>❌ مرفوض</span>
+              <span style={badgeS("#ef4444")}>{t("rejected", "❌ مرفوض")}</span>
             )}
             {verificationStatus === "unverified" && (
-              <span style={badgeS("#94a3b8")}>غير موثق</span>
+              <span style={badgeS("#94a3b8")}>
+                {t("unverified", "غير موثق")}
+              </span>
             )}
           </div>
 
@@ -915,8 +1008,10 @@ export default function ProfileSettings({ session, onUpdate }) {
                 fontWeight: "bold",
               }}
             >
-              حسابك موثق ومؤهل لاستقبال الحوالات المالية. ستظهر شارة التوثيق في
-              صفحتك.
+              {t(
+                "verification_success_msg",
+                "حسابك موثق ومؤهل لاستقبال الحوالات المالية. ستظهر شارة التوثيق في صفحتك.",
+              )}
             </p>
           ) : (
             <div>
@@ -928,8 +1023,10 @@ export default function ProfileSettings({ session, onUpdate }) {
                   fontWeight: "bold",
                 }}
               >
-                أكمل بيانات التوثيق لضمان سلاسة التحويلات المالية عند تنفيذ
-                الخدمات.
+                {t(
+                  "verification_hint_msg",
+                  "أكمل بيانات التوثيق لضمان سلاسة التحويلات المالية عند تنفيذ الخدمات.",
+                )}
               </p>
               <div
                 style={{
@@ -941,7 +1038,7 @@ export default function ProfileSettings({ session, onUpdate }) {
               >
                 <div>
                   <label style={{ ...lblS, color: "#1e40af" }}>
-                    رقم الهوية / الإقامة:
+                    {t("national_id_label", "رقم الهوية / الإقامة:")}
                   </label>
                   <input
                     type="text"
@@ -949,12 +1046,15 @@ export default function ProfileSettings({ session, onUpdate }) {
                     value={nationalId}
                     onChange={(e) => setNationalId(e.target.value)}
                     disabled={verificationStatus === "pending"}
-                    placeholder="مثال: 10xxxxxxxxx"
+                    placeholder={t(
+                      "national_id_placeholder",
+                      "مثال: 10xxxxxxxxx",
+                    )}
                   />
                 </div>
                 <div>
                   <label style={{ ...lblS, color: "#1e40af" }}>
-                    الآيبان (IBAN):
+                    {t("iban_label", "الآيبان (IBAN):")}
                   </label>
                   <input
                     type="text"
@@ -987,7 +1087,9 @@ export default function ProfileSettings({ session, onUpdate }) {
                     transition: "0.2s",
                   }}
                 >
-                  {isSubmitting ? "⏳ جاري..." : "إرسال طلب التوثيق الآن 🚀"}
+                  {isSubmitting
+                    ? t("saving_btn", "⏳ جاري الحفظ...")
+                    : t("send_verification_btn", "إرسال طلب التوثيق الآن 🚀")}
                 </button>
               )}
             </div>
@@ -1003,12 +1105,16 @@ export default function ProfileSettings({ session, onUpdate }) {
           }}
         >
           <div style={sectionS}>
-            <h3 style={secTitle}>الضرائب والتراخيص (اختياري)</h3>
+            <h3 style={secTitle}>
+              {t("taxes_licenses_title", "الضرائب والتراخيص (اختياري)")}
+            </h3>
             <div
               style={{ display: "flex", flexDirection: "column", gap: "15px" }}
             >
               <div>
-                <label style={lblS}>الرقم الضريبي (إن وجد):</label>
+                <label style={lblS}>
+                  {t("tax_number_optional", "الرقم الضريبي (إن وجد):")}
+                </label>
                 <input
                   type="text"
                   style={inpS}
@@ -1019,14 +1125,20 @@ export default function ProfileSettings({ session, onUpdate }) {
               </div>
               <div>
                 <label style={lblS}>
-                  رقم الترخيص / وثيقة العمل الحر (إن وجد):
+                  {t(
+                    "license_doc_optional",
+                    "رقم الترخيص / وثيقة العمل الحر (إن وجد):",
+                  )}
                 </label>
                 <input
                   type="text"
                   style={inpS}
                   value={licenseInfo}
                   onChange={(e) => setLicenseInfo(e.target.value)}
-                  placeholder="سيظهر للعملاء لزيادة الثقة.."
+                  placeholder={t(
+                    "license_placeholder_msg",
+                    "سيظهر للعملاء لزيادة الثقة..",
+                  )}
                 />
               </div>
             </div>
@@ -1055,7 +1167,10 @@ export default function ProfileSettings({ session, onUpdate }) {
               gap: "10px",
             }}
           >
-            🔒 بيانات الدخول والأمان (اذا اردت تغيير البريد او كلمة المرور)
+            {t(
+              "login_security_title",
+              "🔒 بيانات الدخول والأمان (اذا اردت تغيير البريد او كلمة المرور)",
+            )}
           </h3>
 
           <div
@@ -1076,7 +1191,7 @@ export default function ProfileSettings({ session, onUpdate }) {
                   fontSize: "0.95rem",
                 }}
               >
-                البريد الإلكتروني (Email):
+                {t("email_address_label", "البريد الإلكتروني (Email):")}
               </label>
               <input
                 type="email"
@@ -1107,7 +1222,10 @@ export default function ProfileSettings({ session, onUpdate }) {
                   marginTop: "6px",
                 }}
               >
-                * عند تغيير البريد، سيتم إرسال رابط تأكيد للإيميل الجديد.
+                {t(
+                  "email_change_hint",
+                  "* عند تغيير البريد، سيتم إرسال رابط تأكيد للإيميل الجديد.",
+                )}
               </small>
             </div>
 
@@ -1122,7 +1240,7 @@ export default function ProfileSettings({ session, onUpdate }) {
                   fontSize: "0.95rem",
                 }}
               >
-                كلمة المرور الجديدة:
+                {t("new_password_label", "كلمة المرور الجديدة:")}
               </label>
               <input
                 type="password"
@@ -1152,7 +1270,10 @@ export default function ProfileSettings({ session, onUpdate }) {
                   marginTop: "6px",
                 }}
               >
-                * اترك الحقل فارغاً إذا لم ترغب في تغيير كلمة المرور.
+                {t(
+                  "password_change_hint",
+                  "* اترك الحقل فارغاً إذا لم ترغب في تغيير كلمة المرور.",
+                )}
               </small>
             </div>
           </div>
@@ -1177,8 +1298,8 @@ export default function ProfileSettings({ session, onUpdate }) {
               gap: "10px",
             }}
           >
-            <span style={{ fontSize: "1.5rem" }}>⚠️</span> منطقة الخطر - حذف
-            الحساب
+            <span style={{ fontSize: "1.5rem" }}>⚠️</span>{" "}
+            {t("danger_zone_title", "منطقة الخطر - حذف الحساب")}
           </h3>
 
           <div
@@ -1197,12 +1318,13 @@ export default function ProfileSettings({ session, onUpdate }) {
                 margin: "0 0 10px 0",
               }}
             >
-              ⚠️ تحذير نهائي وحاسم:
+              {t("final_warning", "⚠️ تحذير نهائي وحاسم:")}
             </p>
             <ul
               style={{
                 margin: 0,
-                paddingRight: "20px",
+                paddingRight: isRTL ? "20px" : "0", // ✨ تحديث RTL
+                paddingLeft: isRTL ? "0" : "20px", // ✨ تحديث LTR
                 color: "#475569",
                 fontSize: "0.9rem",
                 lineHeight: "1.6",
@@ -1210,15 +1332,22 @@ export default function ProfileSettings({ session, onUpdate }) {
               }}
             >
               <li>
-                سيتم حذف جميع بياناتك الشخصية وحجوزاتك وملفك التعريفي نهائياً.
+                {t(
+                  "delete_warning_1",
+                  "سيتم حذف جميع بياناتك الشخصية وحجوزاتك وملفك التعريفي نهائياً.",
+                )}
               </li>
               <li>
-                لن تتمكن من استعادة بياناتك أو الوصول إلى حسابك مرة أخرى بعد هذه
-                الخطوة.
+                {t(
+                  "delete_warning_2",
+                  "لن تتمكن من استعادة بياناتك أو الوصول إلى حسابك مرة أخرى بعد هذه الخطوة.",
+                )}
               </li>
               <li>
-                هذا الإجراء ضروري لاستيفاء شروط متجر تطبيقات آبل للخصوصية
-                (Guideline 5.1.1).
+                {t(
+                  "delete_warning_3",
+                  "هذا الإجراء ضروري لاستيفاء شروط متجر تطبيقات آبل للخصوصية (Guideline 5.1.1).",
+                )}
               </li>
             </ul>
 
@@ -1247,8 +1376,8 @@ export default function ProfileSettings({ session, onUpdate }) {
               }}
             >
               {isDeletingAccount
-                ? "⏳ جاري حذف الحساب..."
-                : "تأكيد حذف حسابي نهائياً 🗑️"}
+                ? t("deleting_account_btn", "⏳ جاري حذف الحساب...")
+                : t("confirm_delete_account_btn", "تأكيد حذف حسابي نهائياً 🗑️")}
             </button>
           </div>
         </div>
@@ -1295,7 +1424,9 @@ export default function ProfileSettings({ session, onUpdate }) {
                   : `0 4px 15px ${themeColor}50`,
             }}
           >
-            {isSubmitting ? "⏳ جاري الحفظ..." : "حفظ التعديلات الشاملة ✅"}
+            {isSubmitting
+              ? t("saving_btn", "⏳ جاري الحفظ...")
+              : t("save_all_changes_btn", "حفظ التعديلات الشاملة ✅")}
           </button>
         </div>
       </form>

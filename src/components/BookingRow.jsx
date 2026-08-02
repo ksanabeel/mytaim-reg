@@ -25,7 +25,8 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
 
   const status = booking.status;
   const currency = booking.offerings?.currency || "SAR";
-  const serviceTitle = booking.offerings?.title || "الخدمة";
+  const serviceTitle =
+    booking.offerings?.title || t("default_service", "الخدمة");
 
   // 💰 الحسبة المالية الذكية الأساسية
   const isFree = booking.offerings?.pricing_model === "free";
@@ -35,14 +36,14 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
 
   let priceDisplay = "";
   if (status === "awaiting_pricing") {
-    priceDisplay = "بانتظار تحديد السعر ⏳";
+    priceDisplay = t("awaiting_pricing_status", "بانتظار تحديد السعر ⏳");
   } else if (isFree) {
-    priceDisplay = "مجاني (تطوع) 💚";
+    priceDisplay = t("free_volunteer_status", "مجاني (تطوع) 💚");
   } else if (
     booking.offerings?.price_upon_agreement &&
     !booking.proposed_price
   ) {
-    priceDisplay = "حسب الاتفاق 🤝";
+    priceDisplay = t("upon_agreement_status", "حسب الاتفاق 🤝");
   } else {
     const finalPrice = booking.proposed_price || baseTotalPrice;
     priceDisplay = `${finalPrice} ${currency}`;
@@ -123,8 +124,8 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
       fetchMessages();
       await notifyUser(
         receiverId,
-        "رسالة جديدة 💬",
-        `توجد رسالة جديدة بخصوص حجز "${serviceTitle}"`,
+        t("new_message_title", "رسالة جديدة 💬"),
+        t("new_message_body", `توجد رسالة جديدة بخصوص حجز "${serviceTitle}"`),
       );
     }
   };
@@ -146,20 +147,28 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
       setHidden(true); // إخفاء فوري من الشاشة
       if (onRefresh) onRefresh();
     } else {
-      alert("حدث خطأ أثناء أرشفة الطلب: " + error.message);
+      alert(t("archive_error", "حدث خطأ أثناء أرشفة الطلب: ") + error.message);
     }
   };
 
   // ❌ دالة إلغاء الحجز المؤكد مع ذكر السبب ❌
   const handleCancelWithReason = async () => {
     const reason = window.prompt(
-      "الرجاء كتابة سبب الإلغاء ليتم إشعار الطرف الآخر:",
+      t(
+        "cancel_reason_prompt",
+        "الرجاء كتابة سبب الإلغاء ليتم إشعار الطرف الآخر:",
+      ),
     );
 
     if (reason === null) return;
 
     if (reason.trim() === "") {
-      return alert("لا يمكن إلغاء الحجز المؤكد بدون ذكر السبب!");
+      return alert(
+        t(
+          "cancel_reason_required",
+          "لا يمكن إلغاء الحجز المؤكد بدون ذكر السبب!",
+        ),
+      );
     }
 
     setLoading(true);
@@ -180,23 +189,32 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
           booking_id: booking.id,
           sender_id: senderId,
           receiver_id: receiverId,
-          text_content: `⚠️ تم إلغاء الحجز المؤكد. السبب: ${reason.trim()}`,
+          text_content: t(
+            "cancel_msg_db",
+            `⚠️ تم إلغاء الحجز المؤكد. السبب: ${reason.trim()}`,
+          ),
         },
       ]);
 
+      const actingUser = isProviderView
+        ? t("provider", "المزود")
+        : t("client", "العميل");
       await notifyUser(
         receiverId,
-        "تم إلغاء الحجز المؤكد ❌",
-        `قام ${
-          isProviderView ? "المزود" : "العميل"
-        } بإلغاء الحجز لخدمة "${serviceTitle}". السبب: ${reason.trim()}`,
+        t("cancel_notif_title", "تم إلغاء الحجز المؤكد ❌"),
+        t(
+          "cancel_notif_body",
+          `قام ${actingUser} بإلغاء الحجز لخدمة "${serviceTitle}". السبب: ${reason.trim()}`,
+        ),
       );
 
-      alert("تم إلغاء الحجز بنجاح وإرسال السبب للطرف الآخر.");
+      alert(
+        t("cancel_success", "تم إلغاء الحجز بنجاح وإرسال السبب للطرف الآخر."),
+      );
       fetchMessages();
       if (onRefresh) onRefresh();
     } else {
-      alert("حدث خطأ أثناء الإلغاء: " + error.message);
+      alert(t("cancel_error", "حدث خطأ أثناء الإلغاء: ") + error.message);
     }
     setLoading(false);
   };
@@ -212,10 +230,13 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
       const customerId = booking.customer_id;
       await notifyUser(
         customerId,
-        "تم قبول طلبك ✅",
-        `قام المزود بقبول طلب الحجز لخدمة "${serviceTitle}".`,
+        t("accept_notif_title", "تم قبول طلبك ✅"),
+        t(
+          "accept_notif_body",
+          `قام المزود بقبول طلب الحجز لخدمة "${serviceTitle}".`,
+        ),
       );
-      alert("تم تأكيد الحجز! ✅");
+      alert(t("accept_success", "تم تأكيد الحجز! ✅"));
       if (onRefresh) onRefresh();
     }
   };
@@ -223,7 +244,10 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
   const handleComplete = async () => {
     if (
       !window.confirm(
-        "هل تأكدت من إنهاء الخدمة؟ سيتم تحويل الأرباح للمحفظة الآن.",
+        t(
+          "confirm_complete",
+          "هل تأكدت من إنهاء الخدمة؟ سيتم تحويل الأرباح للمحفظة الآن.",
+        ),
       )
     )
       return;
@@ -265,16 +289,24 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
       const targetUserId = isProviderView ? booking.customer_id : providerId;
       await notifyUser(
         targetUserId,
-        "تم إنجاز الخدمة بنجاح 🏁",
-        `تم تأكيد إنهاء واستلام خدمة "${serviceTitle}".`,
+        t("complete_notif_title", "تم إنجاز الخدمة بنجاح 🏁"),
+        t(
+          "complete_notif_body",
+          `تم تأكيد إنهاء واستلام خدمة "${serviceTitle}".`,
+        ),
       );
 
       alert(
-        `تم الإنجاز بنجاح! ✅ دخل جيبك الصافي: ${netProfit} ريال | عمولة المنصة: ${commissionAmount} ريال`,
+        t(
+          "complete_success_msg",
+          `تم الإنجاز بنجاح! ✅ دخل جيبك الصافي: ${netProfit} ريال | عمولة المنصة: ${commissionAmount} ريال`,
+        ),
       );
       if (onRefresh) onRefresh();
     } catch (err) {
-      alert("خطأ في العمليات الحسابية للمحفظة: " + err.message);
+      alert(
+        t("wallet_error", "خطأ في العمليات الحسابية للمحفظة: ") + err.message,
+      );
     } finally {
       setLoading(false);
     }
@@ -282,7 +314,7 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
 
   const handleSendPrice = async () => {
     if (!previewFinalPrice || previewFinalPrice <= 0)
-      return alert("أدخل سعر صحيح");
+      return alert(t("invalid_price", "أدخل سعر صحيح"));
     setLoading(true);
     const { error } = await supabase
       .from("bookings")
@@ -298,8 +330,11 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
       const customerId = booking.customer_id;
       await notifyUser(
         customerId,
-        "تكاليف إضافية لطلبك 💰",
-        `أضاف المزود تكاليف لخدمة "${serviceTitle}". الإجمالي أصبح ${previewFinalPrice} ${currency}.`,
+        t("extra_costs_notif_title", "تكاليف إضافية لطلبك 💰"),
+        t(
+          "extra_costs_notif_body",
+          `أضاف المزود تكاليف لخدمة "${serviceTitle}". الإجمالي أصبح ${previewFinalPrice} ${currency}.`,
+        ),
       );
       setIsNegotiating(false);
       onRefresh();
@@ -321,24 +356,36 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
         notifMsg = "";
 
       if (isProviderView && newStatus === "cancelled") {
-        notifTitle = "تم رفض/إلغاء طلبك ❌";
-        notifMsg = `نعتذر, قام المزود بإلغاء طلب الحجز لخدمة "${serviceTitle}".`;
+        notifTitle = t("reject_notif_title", "تم رفض/إلغاء طلبك ❌");
+        notifMsg = t(
+          "reject_notif_body",
+          `نعتذر, قام المزود بإلغاء طلب الحجز لخدمة "${serviceTitle}".`,
+        );
       } else if (!isProviderView) {
         if (newStatus === "confirmed") {
-          notifTitle = "العميل وافق على السعر 🎉";
-          notifMsg = `وافق العميل على التسعير لخدمة "${serviceTitle}". الحجز مؤكد الآن!`;
+          notifTitle = t("client_approved_title", "العميل وافق على السعر 🎉");
+          notifMsg = t(
+            "client_approved_body",
+            `وافق العميل على التسعير لخدمة "${serviceTitle}". الحجز مؤكد الآن!`,
+          );
         } else if (newStatus === "cancelled") {
-          notifTitle = "العميل رفض السعر/الطلب ❌";
-          notifMsg = `قام العميل بإلغاء الطلب لخدمة "${serviceTitle}".`;
+          notifTitle = t("client_rejected_title", "العميل رفض السعر/الطلب ❌");
+          notifMsg = t(
+            "client_rejected_body",
+            `قام العميل بإلغاء الطلب لخدمة "${serviceTitle}".`,
+          );
         } else if (newStatus === "negotiating") {
-          notifTitle = "العميل يطلب التفاوض 🤝";
-          notifMsg = `طلب العميل التفاوض على السعر لخدمة "${serviceTitle}".`;
+          notifTitle = t("client_negotiate_title", "العميل يطلب التفاوض 🤝");
+          notifMsg = t(
+            "client_negotiate_body",
+            `طلب العميل التفاوض على السعر لخدمة "${serviceTitle}".`,
+          );
         }
       }
 
       if (notifTitle && targetUserId)
         await notifyUser(targetUserId, notifTitle, notifMsg);
-      alert(`تم ${actionName} بنجاح! ✅`);
+      alert(t("action_success_msg", `تم ${actionName} بنجاح! ✅`));
       if (onRefresh) onRefresh();
     }
   };
@@ -400,14 +447,19 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
       // 3. إشعار المزود بالتقييم
       await notifyUser(
         providerId,
-        "تقييم جديد لخدمتك ⭐️",
-        `قام العميل بتقييم خدمتك بـ ${rating} نجوم.`,
+        t("new_review_title", "تقييم جديد لخدمتك ⭐️"),
+        t("new_review_body", `قام العميل بتقييم خدمتك بـ ${rating} نجوم.`),
       );
 
-      alert("تم إرسال التقييم وتحديث ترتيب المزود بنجاح! شكراً لك. ✅");
+      alert(
+        t(
+          "review_success",
+          "تم إرسال التقييم وتحديث ترتيب المزود بنجاح! شكراً لك. ✅",
+        ),
+      );
       if (onRefresh) onRefresh();
     } catch (err) {
-      alert("حدث خطأ أثناء إرسال التقييم: " + err.message);
+      alert(t("review_error", "حدث خطأ أثناء إرسال التقييم: ") + err.message);
     } finally {
       setIsSubmittingReview(false);
     }
@@ -416,19 +468,47 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
   const getStatusBadge = (s) => {
     switch (s) {
       case "confirmed":
-        return { text: "مؤكد ✅", bg: "#d1fae5", color: "#059669" };
+        return {
+          text: t("badge_confirmed", "مؤكد ✅"),
+          bg: "#d1fae5",
+          color: "#059669",
+        };
       case "pending":
-        return { text: "طلب جديد 🆕", bg: "#dbeafe", color: "#2563eb" };
+        return {
+          text: t("badge_pending", "طلب جديد 🆕"),
+          bg: "#dbeafe",
+          color: "#2563eb",
+        };
       case "awaiting_pricing":
-        return { text: "يطلب تسعير 💰", bg: "#fef3c7", color: "#d97706" };
+        return {
+          text: t("badge_awaiting_pricing", "يطلب تسعير 💰"),
+          bg: "#fef3c7",
+          color: "#d97706",
+        };
       case "awaiting_client_approval":
-        return { text: "بانتظار الموافقة ⏳", bg: "#f3e8ff", color: "#7e22ce" };
+        return {
+          text: t("badge_awaiting_client", "بانتظار الموافقة ⏳"),
+          bg: "#f3e8ff",
+          color: "#7e22ce",
+        };
       case "negotiating":
-        return { text: "تفاوض 🤝", bg: "#ffedd5", color: "#b45309" };
+        return {
+          text: t("badge_negotiating", "تفاوض 🤝"),
+          bg: "#ffedd5",
+          color: "#b45309",
+        };
       case "cancelled":
-        return { text: "ملغي ❌", bg: "#fee2e2", color: "#dc2626" };
+        return {
+          text: t("badge_cancelled", "ملغي ❌"),
+          bg: "#fee2e2",
+          color: "#dc2626",
+        };
       case "completed":
-        return { text: "مكتمل 🏁", bg: "#e2e8f0", color: "#475569" };
+        return {
+          text: t("badge_completed", "مكتمل 🏁"),
+          bg: "#e2e8f0",
+          color: "#475569",
+        };
       default:
         return { text: s, bg: "#f1f5f9", color: "#64748b" };
     }
@@ -525,8 +605,8 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
         minute: "2-digit",
       })
     : isRTL
-    ? "غير محدد"
-    : "N/A";
+    ? t("not_specified", "غير محدد")
+    : t("na", "N/A");
 
   const startFormatted = getFullFormattedDate(startDateTime);
   const endFormatted = endDateTime ? getFullFormattedDate(endDateTime) : null;
@@ -574,7 +654,8 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
                   margin: "0 5px",
                 }}
               >
-                (العدد: {booking.quantity})
+                {t("quantity_label", "(العدد: ")}
+                {booking.quantity})
               </span>
             )}
           </div>
@@ -611,10 +692,15 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
             color: "#334155",
           }}
         >
-          👤 {isProviderView ? "العميل:" : "المزود:"}{" "}
+          👤{" "}
           {isProviderView
-            ? booking.profiles?.full_name || "عميل غير محدد"
-            : booking.offerings?.profiles?.full_name || "مزود غير محدد"}
+            ? t("user_client", "العميل:")
+            : t("user_provider", "المزود:")}{" "}
+          {isProviderView
+            ? booking.profiles?.full_name ||
+              t("unknown_client", "عميل غير محدد")
+            : booking.offerings?.profiles?.full_name ||
+              t("unknown_provider", "مزود غير محدد")}
         </span>
       </div>
 
@@ -641,7 +727,7 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
               fontWeight: "bold",
             }}
           >
-            تاريخ ووقت البدء
+            {t("start_date_time", "تاريخ ووقت البدء")}
           </div>
           <div
             style={{
@@ -658,7 +744,8 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
               style={{
                 fontSize: "0.8rem",
                 color: "#64748b",
-                paddingRight: "25px",
+                paddingRight: isRTL ? "25px" : "0",
+                paddingLeft: isRTL ? "0" : "25px",
                 marginTop: "-2px",
               }}
             >
@@ -677,7 +764,7 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
               fontWeight: "bold",
             }}
           >
-            تاريخ ووقت الانتهاء
+            {t("end_date_time", "تاريخ ووقت الانتهاء")}
           </div>
           <div
             style={{
@@ -696,7 +783,8 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
                   style={{
                     fontSize: "0.8rem",
                     color: "#64748b",
-                    paddingRight: "25px",
+                    paddingRight: isRTL ? "25px" : "0",
+                    paddingLeft: isRTL ? "0" : "25px",
                     marginTop: "-2px",
                   }}
                 >
@@ -714,7 +802,8 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
                   style={{
                     fontSize: "0.8rem",
                     color: "#64748b",
-                    paddingRight: "25px",
+                    paddingRight: isRTL ? "25px" : "0",
+                    paddingLeft: isRTL ? "0" : "25px",
                     marginTop: "-2px",
                   }}
                 >
@@ -742,7 +831,7 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
       >
         {booking.client_contact && (
           <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-            📞 <strong>رقم التواصل:</strong>
+            <strong>{t("contact_number", "📞 رقم التواصل:")}</strong>
             <a
               href={`tel:${booking.client_contact}`}
               style={{
@@ -758,7 +847,7 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
         )}
         {booking.location && (
           <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-            📍 <strong>الموقع:</strong>
+            <strong>{t("location", "📍 الموقع:")}</strong>
             {booking.location.startsWith("http") ? (
               <a
                 href={booking.location}
@@ -770,7 +859,7 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
                   fontWeight: "bold",
                 }}
               >
-                عرض الموقع على الخريطة 🗺️
+                {t("view_on_map", "عرض الموقع على الخريطة 🗺️")}
               </a>
             ) : (
               <span>{booking.location}</span>
@@ -788,7 +877,7 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
         }}
       >
         <strong style={{ fontSize: "0.9rem", color: "#475569" }}>
-          💬 الملاحظات والمراسلات الخاصة بالطلب:
+          {t("messages_notes_title", "💬 الملاحظات والمراسلات الخاصة بالطلب:")}
         </strong>
         <div
           style={{
@@ -809,7 +898,7 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
                 fontStyle: "italic",
               }}
             >
-              لا توجد رسائل مسجلة حتى الآن..
+              {t("no_messages", "لا توجد رسائل مسجلة حتى الآن..")}
             </span>
           ) : (
             messages.map((msg) => {
@@ -839,7 +928,11 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
                       opacity: 0.7,
                     }}
                   >
-                    {isMe ? "أنت:" : isProviderView ? "العميل:" : "المزود:"}
+                    {isMe
+                      ? t("you", "أنت:")
+                      : isProviderView
+                      ? t("client", "العميل:")
+                      : t("provider", "المزود:")}
                   </strong>
                   {msg.text_content}
                 </div>
@@ -855,7 +948,7 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
           >
             <input
               type="text"
-              placeholder="اكتب رسالتك هنا..."
+              placeholder={t("type_message_placeholder", "اكتب رسالتك هنا...")}
               value={messageText}
               onChange={(e) => setMessageText(e.target.value)}
               style={{ ...inputS, flex: 1, backgroundColor: "#fff" }}
@@ -870,7 +963,7 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
                 opacity: messageText.trim() ? 1 : 0.6,
               }}
             >
-              إرسال 🚀
+              {t("send_btn", "إرسال 🚀")}
             </button>
           </form>
         )}
@@ -891,7 +984,7 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
           <span
             style={{ color: "#94a3b8", fontWeight: "bold", fontSize: "0.9rem" }}
           >
-            ⏳ جاري التنفيذ...
+            {t("processing", "⏳ جاري التنفيذ...")}
           </span>
         ) : isProviderView ? (
           /* واجهة التحكم للمزود */
@@ -906,7 +999,7 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
                 }}
               >
                 <button onClick={handleAccept} style={{ ...btnGreen, flex: 1 }}>
-                  قبول الطلب ✅
+                  {t("accept_order_btn", "قبول الطلب ✅")}
                 </button>
                 <button
                   onClick={() => setIsNegotiating(true)}
@@ -918,13 +1011,13 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
                     border: "1px solid #3b82f6",
                   }}
                 >
-                  إضافة تكاليف / تفاوض 💬
+                  {t("add_costs_btn", "إضافة تكاليف / تفاوض 💬")}
                 </button>
                 <button
                   onClick={() => handleAction("cancelled", "refuse")}
                   style={{ ...btnRed, flex: 1 }}
                 >
-                  رفض وإلغاء ❌
+                  {t("reject_cancel_btn", "رفض وإلغاء ❌")}
                 </button>
               </div>
             )}
@@ -942,15 +1035,22 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
                   display: "flex",
                   flexDirection: "column",
                   gap: "10px",
+                  boxSizing: "border-box",
                 }}
               >
                 {status === "negotiating" && (
                   <strong style={{ color: "#b45309", fontSize: "0.9rem" }}>
-                    🤝 العميل يطلب التفاوض على السعر..
+                    {t(
+                      "client_negotiating_msg",
+                      "🤝 العميل يطلب التفاوض على السعر..",
+                    )}
                   </strong>
                 )}
                 <strong style={{ color: "#1e40af", fontSize: "0.95rem" }}>
-                  ➕ إضافة تكاليف للمشوار والمعدات (إن وجدت):
+                  {t(
+                    "add_extra_costs_label",
+                    "➕ إضافة تكاليف للمشوار والمعدات (إن وجدت):",
+                  )}
                 </strong>
 
                 <div
@@ -966,24 +1066,30 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
                   }}
                 >
                   <span>
-                    السعر الأساسي للطلب ({booking.quantity} ×{" "}
-                    {booking.offerings?.price || 0}):
+                    {t("base_price_label", "السعر الأساسي للطلب ")} (
+                    {booking.quantity} × {booking.offerings?.price || 0}):
                   </span>
-                  <strong style={{ color: "#1e293b" }}>
+                  <strong style={{ color: "#1e293b", direction: "ltr" }}>
                     {baseTotalPrice} {currency}
                   </strong>
                 </div>
 
                 <input
                   type="number"
-                  placeholder="مبلغ التسعير او  التكلفة الإضافية (ريال)"
+                  placeholder={t(
+                    "extra_cost_placeholder",
+                    "مبلغ التسعير او  التكلفة الإضافية (ريال)",
+                  )}
                   value={extraCostAmount}
                   onChange={(e) => setExtraCostAmount(e.target.value)}
                   style={inputS}
                 />
                 <input
                   type="text"
-                  placeholder="سبب التكلفة (مثال: تسعير جديد او رسوم سكن وتذاكر سفر)"
+                  placeholder={t(
+                    "extra_cost_reason_placeholder",
+                    "سبب التكلفة (مثال: تسعير جديد او رسوم سكن وتذاكر سفر)",
+                  )}
                   value={extraDetails}
                   onChange={(e) => setExtraDetails(e.target.value)}
                   style={inputS}
@@ -1003,8 +1109,10 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
                     marginTop: "5px",
                   }}
                 >
-                  <span>الإجمالي النهائي للعميل:</span>
                   <span>
+                    {t("final_total_client", "الإجمالي النهائي للعميل:")}
+                  </span>
+                  <span style={{ direction: "ltr" }}>
                     {previewFinalPrice} {currency}
                   </span>
                 </div>
@@ -1014,7 +1122,7 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
                     onClick={handleSendPrice}
                     style={{ ...btnGreen, flex: 2, backgroundColor: "#2563eb" }}
                   >
-                    إرسال السعر للعميل 🚀
+                    {t("send_price_btn", "إرسال السعر للعميل 🚀")}
                   </button>
                   {status === "pending" && (
                     <button
@@ -1027,7 +1135,7 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
                         border: "none",
                       }}
                     >
-                      إلغاء
+                      {t("cancel_btn", "إلغاء")}
                     </button>
                   )}
                   {status === "negotiating" && (
@@ -1035,7 +1143,7 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
                       onClick={() => handleAction("cancelled", "refuse")}
                       style={{ ...btnRed, flex: 1 }}
                     >
-                      إلغاء الطلب ❌
+                      {t("cancel_order_btn", "إلغاء الطلب ❌")}
                     </button>
                   )}
                 </div>
@@ -1050,8 +1158,9 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
                   fontWeight: "bold",
                 }}
               >
-                ⏳ تم إرسال السعر الإجمالي ({booking.proposed_price} {currency}
-                )، بانتظار موافقة العميل..
+                {t("price_sent_awaiting", "⏳ تم إرسال السعر الإجمالي (")}
+                {booking.proposed_price} {currency}
+                {t("awaiting_approval_end", ")، بانتظار موافقة العميل..")}
               </span>
             )}
 
@@ -1073,7 +1182,10 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
                     fontWeight: "bold",
                   }}
                 >
-                  👍 الحجز مؤكد، يرجى التنفيذ ثم الضغط على زر الإنجاز.
+                  {t(
+                    "booking_confirmed_provider_msg",
+                    "👍 الحجز مؤكد، يرجى التنفيذ ثم الضغط على زر الإنجاز.",
+                  )}
                 </span>
                 <div
                   style={{
@@ -1091,13 +1203,13 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
                       boxShadow: "0 4px 10px rgba(59, 130, 246, 0.3)",
                     }}
                   >
-                    تأكيد إنجاز الخدمة 🏁
+                    {t("confirm_completion_btn", "تأكيد إنجاز الخدمة 🏁")}
                   </button>
                   <button
                     onClick={handleCancelWithReason}
                     style={{ ...btnRed, flex: 1 }}
                   >
-                    إلغاء الحجز ❌
+                    {t("cancel_booking_btn", "إلغاء الحجز ❌")}
                   </button>
                 </div>
               </div>
@@ -1122,13 +1234,13 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
                     fontWeight: "bold",
                   }}
                 >
-                  ⏳ بانتظار رد المزود..
+                  {t("awaiting_provider_reply", "⏳ بانتظار رد المزود..")}
                 </span>
                 <button
                   onClick={() => handleAction("cancelled", "cancel")}
                   style={btnRed}
                 >
-                  إلغاء الطلب ❌
+                  {t("cancel_order_btn", "إلغاء الطلب ❌")}
                 </button>
               </div>
             )}
@@ -1143,8 +1255,13 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
                 }}
               >
                 <strong style={{ color: "#1e293b", fontSize: "0.95rem" }}>
-                  💰 الإجمالي المطلوب من المزود: {booking.proposed_price}{" "}
-                  {currency}
+                  {t(
+                    "total_requested_by_provider",
+                    "💰 الإجمالي المطلوب من المزود: ",
+                  )}{" "}
+                  <span style={{ direction: "ltr", display: "inline-block" }}>
+                    {booking.proposed_price} {currency}
+                  </span>
                 </strong>
                 {booking.extra_details && (
                   <p
@@ -1158,7 +1275,10 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
                       border: "1px solid #fde68a",
                     }}
                   >
-                    📝 <strong>ملاحظات التكاليف الإضافية:</strong>{" "}
+                    📝{" "}
+                    <strong>
+                      {t("extra_costs_notes", "ملاحظات التكاليف الإضافية:")}
+                    </strong>{" "}
                     {booking.extra_details}
                   </p>
                 )}
@@ -1167,19 +1287,19 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
                     onClick={() => handleAction("confirmed", "approve")}
                     style={{ ...btnGreen, flex: 2 }}
                   >
-                    موافقة وتأكيد الحجز ✅
+                    {t("approve_confirm_btn", "موافقة وتأكيد الحجز ✅")}
                   </button>
                   <button
                     onClick={() => handleAction("negotiating", "negotiate")}
                     style={{ ...btnOrange, flex: 1 }}
                   >
-                    طلب تفاوض 🤝
+                    {t("request_negotiation_btn", "طلب تفاوض 🤝")}
                   </button>
                   <button
                     onClick={() => handleAction("cancelled", "reject")}
                     style={{ ...btnRed, flex: 1 }}
                   >
-                    رفض ❌
+                    {t("reject_btn", "رفض ❌")}
                   </button>
                 </div>
               </div>
@@ -1193,7 +1313,10 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
                   fontWeight: "bold",
                 }}
               >
-                ⏳ بانتظار رد المزود على طلب التفاوض..
+                {t(
+                  "awaiting_negotiation_reply",
+                  "⏳ بانتظار رد المزود على طلب التفاوض..",
+                )}
               </span>
             )}
 
@@ -1215,7 +1338,10 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
                     fontWeight: "bold",
                   }}
                 >
-                  🎉 الحجز مؤكد وجاري التنفيذ!
+                  {t(
+                    "booking_confirmed_executing",
+                    "🎉 الحجز مؤكد وجاري التنفيذ!",
+                  )}
                 </span>
                 <div
                   style={{
@@ -1227,7 +1353,14 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
                 >
                   <button
                     onClick={() => {
-                      if (window.confirm("تأكيد استلام الخدمة؟"))
+                      if (
+                        window.confirm(
+                          t(
+                            "confirm_receiving_service",
+                            "تأكيد استلام الخدمة؟",
+                          ),
+                        )
+                      )
                         handleAction("completed", "complete");
                     }}
                     style={{
@@ -1236,13 +1369,13 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
                       boxShadow: "0 4px 10px rgba(59, 130, 246, 0.3)",
                     }}
                   >
-                    تأكيد إنجاز الخدمة 🏁
+                    {t("confirm_completion_btn", "تأكيد إنجاز الخدمة 🏁")}
                   </button>
                   <button
                     onClick={handleCancelWithReason}
                     style={{ ...btnRed, flex: 1 }}
                   >
-                    إلغاء الحجز ❌
+                    {t("cancel_booking_btn", "إلغاء الحجز ❌")}
                   </button>
                 </div>
               </div>
@@ -1261,10 +1394,11 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
                   display: "flex",
                   flexDirection: "column",
                   gap: "10px",
+                  boxSizing: "border-box",
                 }}
               >
                 <strong style={{ color: "#d97706", fontSize: "0.95rem" }}>
-                  ⭐ كيف كانت تجربتك مع المزود؟
+                  {t("how_was_experience", "⭐ كيف كانت تجربتك مع المزود؟")}
                 </strong>
                 <div
                   style={{
@@ -1273,7 +1407,7 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
                     fontSize: "1.8rem",
                     cursor: "pointer",
                     direction: "ltr",
-                    justifyContent: "flex-end",
+                    justifyContent: isRTL ? "flex-end" : "flex-start",
                   }}
                 >
                   {[1, 2, 3, 4, 5].map((star) => (
@@ -1290,7 +1424,10 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
                   ))}
                 </div>
                 <textarea
-                  placeholder="اكتب تعليقك لتساعد الآخرين في اختيار المزود (اختياري)..."
+                  placeholder={t(
+                    "review_placeholder",
+                    "اكتب تعليقك لتساعد الآخرين في اختيار المزود (اختياري)...",
+                  )}
                   value={reviewText}
                   onChange={(e) => setReviewText(e.target.value)}
                   style={{
@@ -1310,7 +1447,9 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
                     opacity: isSubmittingReview ? 0.7 : 1,
                   }}
                 >
-                  {isSubmittingReview ? "جاري الإرسال..." : "إرسال التقييم 🚀"}
+                  {isSubmittingReview
+                    ? t("sending", "جاري الإرسال...")
+                    : t("submit_review_btn", "إرسال التقييم 🚀")}
                 </button>
               </div>
             )}
@@ -1326,6 +1465,7 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
                   borderRadius: "12px",
                   border: "1px dashed #6ee7b7",
                   textAlign: "center",
+                  boxSizing: "border-box",
                 }}
               >
                 <span
@@ -1335,7 +1475,8 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
                     fontSize: "0.9rem",
                   }}
                 >
-                  ✅ لقد قمت بتقييم هذه الخدمة: {"⭐".repeat(booking.rating)}
+                  {t("you_rated_this", "✅ لقد قمت بتقييم هذه الخدمة: ")}{" "}
+                  {"⭐".repeat(booking.rating)}
                 </span>
               </div>
             )}
@@ -1360,7 +1501,7 @@ export default function BookingRow({ booking, onRefresh, isProviderView }) {
             transition: "0.2s",
           }}
         >
-          📂 إخفاء الطلب وأرشفته من قائمتي
+          {t("archive_order_btn", "📂 إخفاء الطلب وأرشفته من قائمتي")}
         </button>
       )}
     </div>

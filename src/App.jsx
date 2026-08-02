@@ -162,7 +162,6 @@ const calculateFinancials = (b, commissionRate) => {
       ? Number(b.proposed_price)
       : (Number(b.offerings?.price) || 0) * (b.quantity || 1);
 
-  // ✨ التحديث الجذري: إذا كان الحجز يدوياً (خاص)، عمولة المنصة صفر.
   const isManual = b.is_manual_booking === true;
   const platformCommission = isManual ? 0 : finalTotal * commissionRate;
   const providerNet = finalTotal - platformCommission;
@@ -248,9 +247,14 @@ function MainAppContent() {
   const [licenseName, setLicenseName] = useState("");
   const [licenseNumber, setLicenseNumber] = useState("");
   const [licenseLink, setLicenseLink] = useState("");
-  const [termsText, setTermsText] = useState("");
-  const [privacyText, setPrivacyText] = useState("");
-  const [refundText, setRefundText] = useState("");
+
+  // النصوص القانونية المستقلة (عربي وإنجليزي)
+  const [termsTextAr, setTermsTextAr] = useState("");
+  const [termsTextEn, setTermsTextEn] = useState("");
+  const [privacyTextAr, setPrivacyTextAr] = useState("");
+  const [privacyTextEn, setPrivacyTextEn] = useState("");
+  const [refundTextAr, setRefundTextAr] = useState("");
+  const [refundTextEn, setRefundTextEn] = useState("");
 
   const [activeLegalDoc, setActiveLegalDoc] = useState(null);
   const [mustAcceptTerms, setMustAcceptTerms] = useState(false);
@@ -271,16 +275,19 @@ function MainAppContent() {
 
   const dynamicLegalDocs = {
     terms: {
-      title: defaultLegalDocs.terms.title,
-      content: termsText || defaultLegalDocs.terms.content,
+      title: t("terms_doc_title", defaultLegalDocs.terms.title),
+      contentAr: termsTextAr || defaultLegalDocs.terms.content,
+      contentEn: termsTextEn || "",
     },
     privacy: {
-      title: defaultLegalDocs.privacy.title,
-      content: privacyText || defaultLegalDocs.privacy.content,
+      title: t("privacy_doc_title", defaultLegalDocs.privacy.title),
+      contentAr: privacyTextAr || defaultLegalDocs.privacy.content,
+      contentEn: privacyTextEn || "",
     },
     refund: {
-      title: defaultLegalDocs.refund.title,
-      content: refundText || defaultLegalDocs.refund.content,
+      title: t("refund_doc_title", defaultLegalDocs.refund.title),
+      contentAr: refundTextAr || defaultLegalDocs.refund.content,
+      contentEn: refundTextEn || "",
     },
   };
 
@@ -329,10 +336,31 @@ function MainAppContent() {
           setLicenseNumber(settingsData.license_number);
         if (settingsData.license_link)
           setLicenseLink(settingsData.license_link);
-        if (settingsData.terms_text) setTermsText(settingsData.terms_text);
-        if (settingsData.privacy_text)
-          setPrivacyText(settingsData.privacy_text);
-        if (settingsData.refund_text) setRefundText(settingsData.refund_text);
+
+        // جلب النصوص القانونية المنفصلة
+        if (settingsData.terms_text_ar)
+          setTermsTextAr(settingsData.terms_text_ar);
+        else if (settingsData.terms_text)
+          setTermsTextAr(settingsData.terms_text);
+
+        if (settingsData.terms_text_en)
+          setTermsTextEn(settingsData.terms_text_en);
+
+        if (settingsData.privacy_text_ar)
+          setPrivacyTextAr(settingsData.privacy_text_ar);
+        else if (settingsData.privacy_text)
+          setPrivacyTextAr(settingsData.privacy_text);
+
+        if (settingsData.privacy_text_en)
+          setPrivacyTextEn(settingsData.privacy_text_en);
+
+        if (settingsData.refund_text_ar)
+          setRefundTextAr(settingsData.refund_text_ar);
+        else if (settingsData.refund_text)
+          setRefundTextAr(settingsData.refund_text);
+
+        if (settingsData.refund_text_en)
+          setRefundTextEn(settingsData.refund_text_en);
       }
 
       if (!userId) {
@@ -521,7 +549,7 @@ function MainAppContent() {
         <h1
           style={{ color: "#ef4444", margin: "0 0 10px 0", fontSize: "2.5rem" }}
         >
-          حسابك موقوف
+          {t("account_suspended", "حسابك موقوف")}
         </h1>
         <p
           style={{
@@ -532,8 +560,10 @@ function MainAppContent() {
             lineHeight: "1.8",
           }}
         >
-          عذراً، تم إيقاف حسابك من قبل إدارة المنصة. يرجى التواصل مع الدعم الفني
-          للاستفسار أو مراجعة الشروط والأحكام.
+          {t(
+            "account_suspended_desc",
+            "عذراً، تم إيقاف حسابك من قبل إدارة المنصة. يرجى التواصل مع الدعم الفني للاستفسار أو مراجعة الشروط والأحكام.",
+          )}
         </p>
         <button
           onClick={handleLogout}
@@ -545,7 +575,7 @@ function MainAppContent() {
             boxShadow: "0 4px 15px rgba(239,68,68,0.3)",
           }}
         >
-          تسجيل الخروج
+          {t("logout", "تسجيل الخروج")}
         </button>
       </div>
     );
@@ -563,7 +593,7 @@ function MainAppContent() {
           color: "#64748b",
         }}
       >
-        ⏳ جاري تحميل المنصة...
+        {t("loading_platform", "⏳ جاري تحميل المنصة...")}
       </div>
     );
 
@@ -572,7 +602,11 @@ function MainAppContent() {
     setShowAddModal(true);
   };
   const handleDeleteOffering = async (id) => {
-    if (window.confirm("هل تريد حذف هذه الخدمة نهائياً؟")) {
+    if (
+      window.confirm(
+        t("confirm_delete_service", "هل تريد حذف هذه الخدمة نهائياً؟"),
+      )
+    ) {
       await supabase.from("offerings").delete().eq("id", id);
       fetchAllData(session.user.id);
     }
@@ -581,7 +615,10 @@ function MainAppContent() {
   const checkProfileCompletion = () => {
     if (!userProfile || !userProfile.phone || userProfile.phone.trim() === "") {
       alert(
-        "عذراً، يجب إضافة (رقم الجوال) في إعدادات حسابك لتتمكن من استخدام ميزات المزود.",
+        t(
+          "phone_required_provider",
+          "عذراً، يجب إضافة (رقم الجوال) في إعدادات حسابك لتتمكن من استخدام ميزات المزود.",
+        ),
       );
       navigate("/");
       setActiveTab("profile");
@@ -598,24 +635,39 @@ function MainAppContent() {
         .update({ terms_accepted: true })
         .eq("id", session.user.id);
       setMustAcceptTerms(false);
-      alert("تم تسجيل إقرارك وموافقتك قانونياً بنجاح ✅");
+      alert(
+        t(
+          "terms_accepted_success",
+          "تم تسجيل إقرارك وموافقتك قانونياً بنجاح ✅",
+        ),
+      );
     } catch (err) {
-      alert("حدث خطأ في التسجيل.");
+      alert(t("registration_error", "حدث خطأ في التسجيل."));
     }
     setIsAccepting(false);
   };
 
   const handleSubmitContact = async () => {
     if (!contactForm.subject || !contactForm.message)
-      return alert("الرجاء تعبئة العنوان والرسالة.");
+      return alert(t("fill_subject_message", "الرجاء تعبئة العنوان والرسالة."));
 
     let finalMessage = contactForm.message;
 
     if (contactForm.type === "receipt") {
       if (!bookingRef)
-        return alert("الرجاء إدخال رقم الحجز أو الخدمة المرتبطة بالعمولة.");
+        return alert(
+          t(
+            "enter_booking_ref",
+            "الرجاء إدخال رقم الحجز أو الخدمة المرتبطة بالعمولة.",
+          ),
+        );
       if (!receiptFile)
-        return alert("الرجاء رفع صورة الإيصال لإتمام المطابقة.");
+        return alert(
+          t(
+            "upload_receipt_required",
+            "الرجاء رفع صورة الإيصال لإتمام المطابقة.",
+          ),
+        );
 
       setIsSendingContact(true);
 
@@ -632,7 +684,10 @@ function MainAppContent() {
       if (uploadError) {
         setIsSendingContact(false);
         return alert(
-          "حدث خطأ في رفع الإيصال المالي! الرجاء المحاولة مرة أخرى.",
+          t(
+            "receipt_upload_error",
+            "حدث خطأ في رفع الإيصال المالي! الرجاء المحاولة مرة أخرى.",
+          ),
         );
       }
 
@@ -641,7 +696,12 @@ function MainAppContent() {
         .getPublicUrl(filePath);
       const receiptUrl = publicUrlData.publicUrl;
 
-      finalMessage = `ℹ️ رقم الحجز / الخدمة: ${bookingRef}\n\n📝 تفاصيل المرسل: ${contactForm.message}\n\n🔗 رابط الإيصال المرفق:\n${receiptUrl}`;
+      finalMessage = `ℹ️ ${t("booking_ref_label")} ${bookingRef}\n\n📝 ${t(
+        "message_body_label",
+      )} ${contactForm.message}\n\n🔗 ${t(
+        "receipt_link",
+        "رابط الإيصال المرفق:",
+      )}\n${receiptUrl}`;
     } else {
       setIsSendingContact(true);
     }
@@ -656,14 +716,17 @@ function MainAppContent() {
         },
       ]);
       alert(
-        "تم إرسال رسالتك للإدارة بنجاح، شكراً لتواصلك معنا! 📩 سنقوم بالرد عليك في أقرب وقت.",
+        t(
+          "contact_success",
+          "تم إرسال رسالتك للإدارة بنجاح، شكراً لتواصلك معنا! 📩 سنقوم بالرد عليك في أقرب وقت.",
+        ),
       );
       setShowContactModal(false);
       setContactForm({ type: "complaint", subject: "", message: "" });
       setBookingRef("");
       setReceiptFile(null);
     } catch (err) {
-      alert("حدث خطأ غير متوقع أثناء الإرسال.");
+      alert(t("unexpected_error", "حدث خطأ غير متوقع أثناء الإرسال."));
     }
     setIsSendingContact(false);
   };
@@ -671,10 +734,16 @@ function MainAppContent() {
   const hideProviderComment = async (bookingId) => {
     if (
       window.confirm(
-        "هل أنت متأكد من إخفاء هذا التعليق لكونه مسيئاً؟ (سيتم إخفاء النص فقط وستبقى النجوم لتجنب ظلم المزود)",
+        t(
+          "confirm_hide_comment",
+          "هل أنت متأكد من إخفاء هذا التعليق لكونه مسيئاً؟ (سيتم إخفاء النص فقط وستبقى النجوم لتجنب ظلم المزود)",
+        ),
       )
     ) {
-      const hiddenText = "🚫 تم إخفاء التعليق بواسطة المزود.";
+      const hiddenText = t(
+        "comment_hidden_by_provider",
+        "🚫 تم إخفاء التعليق بواسطة المزود.",
+      );
       try {
         const { data: bData } = await supabase
           .from("bookings")
@@ -694,11 +763,13 @@ function MainAppContent() {
           if ("feedback" in bData && bData.feedback)
             payload.feedback = hiddenText;
           await supabase.from("bookings").update(payload).eq("id", bookingId);
-          alert("تم إخفاء التعليق بنجاح ✅");
+          alert(t("comment_hidden_success", "تم إخفاء التعليق بنجاح ✅"));
           fetchAllData(session.user.id);
         }
       } catch (err) {
-        alert("حدث خطأ! تأكد من تحديث قاعدة البيانات أولاً.");
+        alert(
+          t("db_update_error", "حدث خطأ! تأكد من تحديث قاعدة البيانات أولاً."),
+        );
       }
     }
   };
@@ -716,7 +787,9 @@ function MainAppContent() {
   const handleReplyToAdmin = (n) => {
     setContactForm({
       type: "inquiry",
-      subject: `رد على رسالة الإدارة: ${n.title || ""}`,
+      subject: `${t("reply_to_admin", "رد على رسالة الإدارة: ")}${
+        n.title || ""
+      }`,
       message: "",
     });
     setShowNotifModal(false);
@@ -727,49 +800,49 @@ function MainAppContent() {
     const filtered = bookings.filter((b) => b.status === status);
     const titleMap = {
       awaiting_pricing: {
-        text: "طلبات بانتظار تسعيرك",
+        text: t("status_awaiting_pricing", "طلبات بانتظار تسعيرك"),
         icon: "💰",
         color: "#d97706",
         bg: "#fffbeb",
         border: "#fde68a",
       },
       awaiting_client_approval: {
-        text: "بانتظار موافقة العميل على السعر",
+        text: t("status_awaiting_client", "بانتظار موافقة العميل على السعر"),
         icon: "⏳",
         color: "#2563eb",
         bg: "#eff6ff",
         border: "#bfdbfe",
       },
       pending: {
-        text: "طلبات قيد الانتظار",
+        text: t("status_pending", "طلبات قيد الانتظار"),
         icon: "🆕",
         color: "#d97706",
         bg: "#fef3c7",
         border: "#fde68a",
       },
       negotiating: {
-        text: "بانتظار الموافقه",
+        text: t("status_negotiating", "بانتظار الموافقه"),
         icon: "🤝",
         color: "#d97706",
         bg: "#fef3c7",
         border: "#fde68a",
       },
       confirmed: {
-        text: "حجوزات مؤكدة",
+        text: t("status_confirmed", "حجوزات مؤكدة"),
         icon: "👍",
         color: "#059669",
         bg: "#ecfdf5",
         border: "#a7f3d0",
       },
       completed: {
-        text: "حجوزات منفذة",
+        text: t("status_completed", "حجوزات منفذة"),
         icon: "✅",
         color: "#15803d",
         bg: "#f0fdf4",
         border: "#bbf7d0",
       },
       cancelled: {
-        text: "ملغاة",
+        text: t("status_cancelled", "ملغاة"),
         icon: "❌",
         color: "#ef4444",
         bg: "#fef2f2",
@@ -888,7 +961,7 @@ function MainAppContent() {
                           fontWeight: "bold",
                         }}
                       >
-                        💬 تعليق العميل: "{hasComment}"
+                        {t("client_comment", "💬 تعليق العميل: ")}"{hasComment}"
                       </span>
                       <button
                         onClick={() => hideProviderComment(b.id)}
@@ -910,7 +983,7 @@ function MainAppContent() {
                           (e.currentTarget.style.background = "#fef2f2")
                         }
                       >
-                        🗑️ إخفاء التعليق
+                        {t("hide_comment_btn", "🗑️ إخفاء التعليق")}
                       </button>
                     </div>
                   )}
@@ -932,11 +1005,10 @@ function MainAppContent() {
                       zIndex: 0,
                     }}
                   >
-                    🚫 تم إخفاء التعليق
+                    {t("comment_hidden_badge", "🚫 تم إخفاء التعليق")}
                   </div>
                 )}
 
-                {/* ✨ تعديل شكل الملاحظة المالية ليظهر إذا كان الحجز خاصاً (بدون عمولة) ✨ */}
                 {isProvider && b.status === "completed" && (
                   <div
                     style={{
@@ -974,13 +1046,18 @@ function MainAppContent() {
                   >
                     {b.is_manual_booking ? (
                       <span>
-                        📞 حجز خاص (خارجي) - الإيرادات لك بالكامل ولا توجد عمولة
-                        للمنصة
+                        {t(
+                          "manual_booking_notice",
+                          "📞 حجز خاص (خارجي) - الإيرادات لك بالكامل ولا توجد عمولة للمنصة",
+                        )}
                       </span>
                     ) : (
                       <>
                         <span>
-                          💰 عمولة المنصة لهذا الحجز:{" "}
+                          {t(
+                            "platform_commission_notice",
+                            "💰 عمولة المنصة لهذا الحجز: ",
+                          )}
                           <strong
                             style={{
                               direction: "ltr",
@@ -1001,8 +1078,8 @@ function MainAppContent() {
                           }}
                         >
                           {b.is_commission_paid
-                            ? "✅ مسددة للمنصة"
-                            : "❌ مستحقة ولم تسدد بعد"}
+                            ? t("commission_paid", "✅ مسددة للمنصة")
+                            : t("commission_unpaid", "❌ مستحقة ولم تسدد بعد")}
                         </span>
                       </>
                     )}
@@ -1149,7 +1226,8 @@ function MainAppContent() {
                   textAlign: "center",
                 }}
               >
-                أهلاً بك في {platformName} 👋
+                {t("welcome_to", "أهلاً بك في ")}
+                {platformName} 👋
               </h2>
               <p
                 style={{
@@ -1159,8 +1237,10 @@ function MainAppContent() {
                   fontSize: "0.9rem",
                 }}
               >
-                يرجى تسجيل الدخول أو إنشاء حساب جديد لإتمام الحجز والتواصل مع
-                المزودين.
+                {t(
+                  "login_prompt_desc",
+                  "يرجى تسجيل الدخول أو إنشاء حساب جديد لإتمام الحجز والتواصل مع المزودين.",
+                )}
               </p>
               <Login />
             </div>
@@ -1168,47 +1248,144 @@ function MainAppContent() {
         </div>
       )}
 
+      {/* نافذة الموافقة الإجبارية على الشروط (محدثة بنظام الجدول ذي العمودين) */}
       {mustAcceptTerms && (
         <div style={{ ...modalOverlay, zIndex: 99999 }}>
           <div
-            style={{ ...modalContent, maxWidth: "600px", textAlign: "center" }}
+            style={{
+              backgroundColor: "#fff",
+              padding: "30px",
+              borderRadius: "24px",
+              maxWidth: "950px",
+              width: "100%",
+              maxHeight: "85vh",
+              display: "flex",
+              flexDirection: "column",
+              boxShadow: "0 25px 50px rgba(0,0,0,0.15)",
+              direction: i18n.language === "ar" ? "rtl" : "ltr",
+            }}
           >
-            <span style={{ fontSize: "3rem" }}>📜</span>
-            <h2 style={{ color: "#1e293b", marginTop: "10px" }}>
-              تحديث الشروط والأحكام
-            </h2>
-            <p
-              style={{
-                color: "#64748b",
-                lineHeight: "1.6",
-                marginBottom: "15px",
-                fontSize: "0.95rem",
-              }}
-            >
-              مرحباً بك! للاستمرار في استخدام المنصة والاستفادة من خدماتنا، يرجى
-              قراءة والموافقة على الشروط والأحكام أدناه:
-            </p>
+            <div style={{ textAlign: "center", marginBottom: "15px" }}>
+              <span style={{ fontSize: "2.5rem" }}>📜</span>
+              <h2 style={{ color: "#1e293b", margin: "10px 0 5px 0" }}>
+                {t("terms_update_title", "تحديث الشروط والأحكام")}
+              </h2>
+              <p
+                style={{
+                  color: "#64748b",
+                  fontSize: "0.9rem",
+                  margin: 0,
+                }}
+              >
+                {t(
+                  "terms_update_desc",
+                  "مرحباً بك! للاستمرار في استخدام المنصة، يرجى قراءة والموافقة على الشروط والأحكام أدناه:",
+                )}
+              </p>
+            </div>
+
             <div
               style={{
-                maxHeight: "250px",
                 overflowY: "auto",
-                textAlign: "right",
-                backgroundColor: "#f8fafc",
-                padding: "20px",
-                borderRadius: "16px",
-                border: "1px solid #cbd5e1",
+                flex: 1,
+                border: "1px solid #e2e8f0",
+                borderRadius: "12px",
+                backgroundColor: "#fff",
                 marginBottom: "20px",
-                fontSize: "0.9rem",
-                color: "#334155",
-                lineHeight: "1.8",
               }}
             >
-              {dynamicLegalDocs.terms.content.split("\n").map((p, idx) => (
-                <p key={idx} style={{ margin: "0 0 10px 0" }}>
-                  {p}
-                </p>
-              ))}
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr
+                    style={{
+                      backgroundColor: "#f8fafc",
+                      borderBottom: "2px solid #cbd5e1",
+                      position: "sticky",
+                      top: 0,
+                      zIndex: 1,
+                    }}
+                  >
+                    <th
+                      style={{
+                        padding: "14px 16px",
+                        width: "50%",
+                        color: "#1e293b",
+                        textAlign: "right",
+                        fontSize: "0.95rem",
+                        fontWeight: "900",
+                      }}
+                    >
+                      الشروط والأحكام (العربية)
+                    </th>
+                    <th
+                      style={{
+                        padding: "14px 16px",
+                        width: "50%",
+                        color: "#1e293b",
+                        textAlign: "left",
+                        direction: "ltr",
+                        fontSize: "0.95rem",
+                        fontWeight: "900",
+                        borderRight: "1px solid #e2e8f0",
+                      }}
+                    >
+                      Terms & Conditions (English)
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(() => {
+                    const arLines = (
+                      termsTextAr || defaultLegalDocs.terms.content
+                    )
+                      .split("\n")
+                      .filter((l) => l.trim() !== "");
+                    const enLines = (termsTextEn || "")
+                      .split("\n")
+                      .filter((l) => l.trim() !== "");
+                    const maxRows = Math.max(arLines.length, enLines.length, 1);
+
+                    return Array.from({ length: maxRows }).map((_, idx) => (
+                      <tr
+                        key={idx}
+                        style={{
+                          borderBottom: "1px solid #f1f5f9",
+                          backgroundColor: idx % 2 === 0 ? "#fff" : "#f8fafc",
+                        }}
+                      >
+                        <td
+                          style={{
+                            padding: "14px 16px",
+                            verticalAlign: "top",
+                            color: "#334155",
+                            lineHeight: "1.7",
+                            fontSize: "0.9rem",
+                            textAlign: "right",
+                          }}
+                        >
+                          {arLines[idx] || ""}
+                        </td>
+                        <td
+                          style={{
+                            padding: "14px 16px",
+                            verticalAlign: "top",
+                            color: "#334155",
+                            lineHeight: "1.7",
+                            fontSize: "0.9rem",
+                            direction: "ltr",
+                            textAlign: "left",
+                            borderRight: "1px solid #f1f5f9",
+                          }}
+                        >
+                          {enLines[idx] || ""}
+                        </td>
+                      </tr>
+                    ));
+                  })()}
+                </tbody>
+              </table>
             </div>
+
             <button
               onClick={handleAcceptTerms}
               disabled={isAccepting}
@@ -1225,7 +1402,9 @@ function MainAppContent() {
                 boxShadow: "0 4px 15px rgba(16, 185, 129, 0.3)",
               }}
             >
-              {isAccepting ? "جاري التأكيد..." : "قرأت وأوافق على الشروط ✅"}
+              {isAccepting
+                ? t("confirming", "جاري التأكيد...")
+                : t("accept_terms_btn", "قرأت وأوافق على الشروط ✅")}
             </button>
           </div>
         </div>
@@ -1260,7 +1439,7 @@ function MainAppContent() {
               }}
             >
               <h2 style={{ margin: 0, color: "#1e293b", fontSize: "1.3rem" }}>
-                طرق السداد المتاحة للمنصة 💳
+                {t("payment_methods_title", "طرق السداد المتاحة للمنصة 💳")}
               </h2>
               <button
                 onClick={() => setShowPaymentModal(false)}
@@ -1295,7 +1474,7 @@ function MainAppContent() {
                   transition: "0.3s",
                 }}
               >
-                🏦 تحويل بنكي
+                {t("bank_transfer", "🏦 تحويل بنكي")}
               </button>
               <button
                 onClick={() => setPaymentMethod("gateway")}
@@ -1313,7 +1492,7 @@ function MainAppContent() {
                   transition: "0.3s",
                 }}
               >
-                🌐 دفع إلكتروني
+                {t("online_payment", "🌐 دفع إلكتروني")}
               </button>
             </div>
             {paymentMethod === "bank" && (
@@ -1334,7 +1513,10 @@ function MainAppContent() {
                     fontSize: "1.1rem",
                   }}
                 >
-                  الحسابات البنكية المعتمدة للمنصة:
+                  {t(
+                    "approved_bank_accounts",
+                    "الحسابات البنكية المعتمدة للمنصة:",
+                  )}
                 </h4>
                 <div
                   style={{
@@ -1350,7 +1532,10 @@ function MainAppContent() {
                   }}
                 >
                   {bankAccounts ||
-                    "لم تقم الإدارة بإضافة حسابات بنكية حتى الآن."}
+                    t(
+                      "no_bank_accounts",
+                      "لم تقم الإدارة بإضافة حسابات بنكية حتى الآن.",
+                    )}
                 </div>
 
                 <div
@@ -1373,11 +1558,15 @@ function MainAppContent() {
                       lineHeight: "1.6",
                     }}
                   >
-                    * الرجاء تحويل المبلغ المستحق لأحد الحسابات أعلاه، ثم إرفاق
-                    الإيصال المالي بالزر أدناه ليقوم المدير المالي باعتماد رصيدك
-                    فوراً.
+                    {t(
+                      "bank_transfer_instructions",
+                      "* الرجاء تحويل المبلغ المستحق لأحد الحسابات أعلاه، ثم إرفاق الإيصال المالي بالزر أدناه ليقوم المدير المالي باعتماد رصيدك فوراً.",
+                    )}
                     <br />
-                    📬 للتأكيد أو للاستفسارات المالية السريعة:{" "}
+                    {t(
+                      "finance_contact",
+                      "📬 للتأكيد أو للاستفسارات المالية السريعة: ",
+                    )}
                     <a
                       href="mailto:finance@bookonmap.com"
                       style={{ color: "#2563eb", textDecoration: "underline" }}
@@ -1411,7 +1600,10 @@ function MainAppContent() {
                       (e.currentTarget.style.background = "#3b82f6")
                     }
                   >
-                    📤 أرفق إيصال الحوالة البنكية الآن
+                    {t(
+                      "attach_receipt_btn",
+                      "📤 أرفق إيصال الحوالة البنكية الآن",
+                    )}
                   </button>
                 </div>
               </div>
@@ -1433,7 +1625,7 @@ function MainAppContent() {
                     textAlign: "center",
                   }}
                 >
-                  بوابة الدفع (ميسر / Stripe)
+                  {t("payment_gateway", "بوابة الدفع (ميسر / Stripe)")}
                 </h3>
                 <p
                   style={{
@@ -1443,7 +1635,10 @@ function MainAppContent() {
                     marginBottom: "20px",
                   }}
                 >
-                  سيتم سداد إجمالي العمولات المستحقة:{" "}
+                  {t(
+                    "total_commission_due",
+                    "سيتم سداد إجمالي العمولات المستحقة: ",
+                  )}
                   <strong
                     style={{
                       color: "#ef4444",
@@ -1481,7 +1676,10 @@ function MainAppContent() {
                       padding: "15px",
                     }}
                   >
-                    لا توجد مستحقات أو عمولات معلقة حالياً ✅
+                    {t(
+                      "no_pending_dues",
+                      "لا توجد مستحقات أو عمولات معلقة حالياً ✅",
+                    )}
                   </div>
                 )}
               </div>
@@ -1504,7 +1702,7 @@ function MainAppContent() {
               }}
             >
               <h2 style={{ margin: 0, color: "#1e293b", fontSize: "1.3rem" }}>
-                ✉️ تواصل مع إدارة المنصة
+                {t("contact_admin_title", "✉️ تواصل مع إدارة المنصة")}
               </h2>
               <button
                 onClick={() => setShowContactModal(false)}
@@ -1534,7 +1732,7 @@ function MainAppContent() {
                     fontSize: "0.9rem",
                   }}
                 >
-                  نوع الرسالة:
+                  {t("message_type", "نوع الرسالة:")}
                 </strong>
                 <select
                   value={contactForm.type}
@@ -1543,10 +1741,18 @@ function MainAppContent() {
                   }
                   style={{ ...smInput, width: "100%", cursor: "pointer" }}
                 >
-                  <option value="complaint">🚨 لدي مشكلة أو شكوى</option>
-                  <option value="suggestion">💡 لدي فكرة أو اقتراح</option>
-                  <option value="receipt">🧾 إرفاق إيصال سداد عمولة</option>
-                  <option value="inquiry">❓ استفسار عام</option>
+                  <option value="complaint">
+                    {t("type_complaint", "🚨 لدي مشكلة أو شكوى")}
+                  </option>
+                  <option value="suggestion">
+                    {t("type_suggestion", "💡 لدي فكرة أو اقتراح")}
+                  </option>
+                  <option value="receipt">
+                    {t("type_receipt", "🧾 إرفاق إيصال سداد عمولة")}
+                  </option>
+                  <option value="inquiry">
+                    {t("type_inquiry", "❓ استفسار عام")}
+                  </option>
                 </select>
               </div>
 
@@ -1571,11 +1777,14 @@ function MainAppContent() {
                         fontSize: "0.9rem",
                       }}
                     >
-                      رقم الحجز أو اسم الخدمة:
+                      {t("booking_ref_label", "رقم الحجز أو اسم الخدمة:")}
                     </strong>
                     <input
                       type="text"
-                      placeholder="مثال: حجز رقم 1234..."
+                      placeholder={t(
+                        "booking_ref_placeholder",
+                        "مثال: حجز رقم 1234...",
+                      )}
                       value={bookingRef}
                       onChange={(e) => setBookingRef(e.target.value)}
                       style={{
@@ -1596,7 +1805,10 @@ function MainAppContent() {
                         fontSize: "0.9rem",
                       }}
                     >
-                      صورة الإيصال البنكي (إلزامي):
+                      {t(
+                        "receipt_image_label",
+                        "صورة الإيصال البنكي (إلزامي):",
+                      )}
                     </strong>
                     <input
                       type="file"
@@ -1626,7 +1838,7 @@ function MainAppContent() {
                     fontSize: "0.9rem",
                   }}
                 >
-                  عنوان الرسالة:
+                  {t("message_subject_label", "عنوان الرسالة:")}
                 </strong>
                 <input
                   type="text"
@@ -1636,8 +1848,14 @@ function MainAppContent() {
                   }
                   placeholder={
                     contactForm.type === "receipt"
-                      ? "مثال: إيصال سداد عمولة حجز"
-                      : "اكتب عنواناً مختصراً للرسالة..."
+                      ? t(
+                          "subject_receipt_placeholder",
+                          "مثال: إيصال سداد عمولة حجز",
+                        )
+                      : t(
+                          "subject_general_placeholder",
+                          "اكتب عنواناً مختصراً للرسالة...",
+                        )
                   }
                   style={{ ...smInput, width: "100%", boxSizing: "border-box" }}
                 />
@@ -1651,7 +1869,7 @@ function MainAppContent() {
                     fontSize: "0.9rem",
                   }}
                 >
-                  نص الرسالة التفصيلي:
+                  {t("message_body_label", "نص الرسالة التفصيلي:")}
                 </strong>
                 <textarea
                   value={contactForm.message}
@@ -1660,8 +1878,14 @@ function MainAppContent() {
                   }
                   placeholder={
                     contactForm.type === "receipt"
-                      ? "اكتب قيمة الحوالة وأي ملاحظات إضافية هنا لتسهيل المطابقة..."
-                      : "اكتب تفاصيل رسالتك أو استفسارك هنا بوضوح..."
+                      ? t(
+                          "body_receipt_placeholder",
+                          "اكتب قيمة الحوالة وأي ملاحظات إضافية هنا لتسهيل المطابقة...",
+                        )
+                      : t(
+                          "body_general_placeholder",
+                          "اكتب تفاصيل رسالتك أو استفسارك هنا بوضوح...",
+                        )
                   }
                   style={{
                     ...smInput,
@@ -1684,28 +1908,52 @@ function MainAppContent() {
                 }}
               >
                 {isSendingContact
-                  ? "جاري الرفع والإرسال المشفر للمالية..."
-                  : "إرسال الرسالة للإدارة 🚀"}
+                  ? t(
+                      "sending_securely",
+                      "جاري الرفع والإرسال المشفر للمالية...",
+                    )
+                  : t("send_to_admin_btn", "إرسال الرسالة للإدارة 🚀")}
               </button>
             </div>
           </div>
         </div>
       )}
 
+      {/* نافذة عرض الوثائق والشروط من أسفل الصفحة (محدثة باتجاهات صحيحة: عربي يمين، إنجليزي يسار) */}
       {activeLegalDoc && (
         <div style={{ ...modalOverlay, zIndex: 99999 }}>
-          <div style={{ ...modalContent, padding: "30px", maxWidth: "700px" }}>
+          <div
+            style={{
+              backgroundColor: "#fff",
+              padding: "30px",
+              borderRadius: "20px",
+              maxWidth: "950px",
+              width: "100%",
+              maxHeight: "85vh",
+              display: "flex",
+              flexDirection: "column",
+              boxShadow: "0 25px 50px rgba(0,0,0,0.15)",
+              direction: i18n.language === "ar" ? "rtl" : "ltr",
+            }}
+          >
             <div
               style={{
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
+                marginBottom: "20px",
                 borderBottom: "2px solid #f1f5f9",
                 paddingBottom: "15px",
-                marginBottom: "20px",
               }}
             >
-              <h3 style={{ margin: 0, color: "#1e293b", fontSize: "1.3rem" }}>
+              <h3
+                style={{
+                  margin: 0,
+                  color: "#1e293b",
+                  fontSize: "1.3rem",
+                  fontWeight: "900",
+                }}
+              >
                 {dynamicLegalDocs[activeLegalDoc].title}
               </h3>
               <button
@@ -1719,54 +1967,143 @@ function MainAppContent() {
                   fontSize: "1.2rem",
                   cursor: "pointer",
                   color: "#64748b",
+                  fontWeight: "bold",
                 }}
               >
                 ✕
               </button>
             </div>
+
             <div
               style={{
                 overflowY: "auto",
-                textAlign: "right",
-                padding: "10px 15px",
-                backgroundColor: "#f8fafc",
-                borderRadius: "16px",
+                flex: 1,
                 border: "1px solid #e2e8f0",
+                borderRadius: "12px",
+                backgroundColor: "#fff",
               }}
             >
-              {dynamicLegalDocs[activeLegalDoc].content
-                .split("\n")
-                .map((p, idx) => (
-                  <p
-                    key={idx}
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr
                     style={{
-                      lineHeight: "1.8",
-                      color: "#334155",
-                      marginBottom: "15px",
-                      fontSize: "0.95rem",
+                      backgroundColor: "#f8fafc",
+                      borderBottom: "2px solid #cbd5e1",
+                      position: "sticky",
+                      top: 0,
+                      zIndex: 1,
                     }}
                   >
-                    {p}
-                  </p>
-                ))}
+                    <th
+                      style={{
+                        padding: "14px 16px",
+                        width: "50%",
+                        color: "#1e293b",
+                        textAlign: "right",
+                        fontSize: "0.95rem",
+                        fontWeight: "900",
+                      }}
+                    >
+                      العربية (Arabic)
+                    </th>
+                    <th
+                      style={{
+                        padding: "14px 16px",
+                        width: "50%",
+                        color: "#1e293b",
+                        textAlign: "left",
+                        direction: "ltr",
+                        fontSize: "0.95rem",
+                        fontWeight: "900",
+                        borderRight: "1px solid #e2e8f0",
+                      }}
+                    >
+                      English (الإنجليزية)
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(() => {
+                    const docKey = activeLegalDoc;
+                    const arText =
+                      docKey === "terms"
+                        ? termsTextAr || defaultLegalDocs.terms.content
+                        : docKey === "privacy"
+                        ? privacyTextAr || defaultLegalDocs.privacy.content
+                        : refundTextAr || defaultLegalDocs.refund.content;
+                    const enText =
+                      docKey === "terms"
+                        ? termsTextEn
+                        : docKey === "privacy"
+                        ? privacyTextEn
+                        : refundTextEn;
+
+                    const arLines = (arText || "")
+                      .split("\n")
+                      .filter((l) => l.trim() !== "");
+                    const enLines = (enText || "")
+                      .split("\n")
+                      .filter((l) => l.trim() !== "");
+                    const maxRows = Math.max(arLines.length, enLines.length, 1);
+
+                    return Array.from({ length: maxRows }).map((_, idx) => (
+                      <tr
+                        key={idx}
+                        style={{
+                          borderBottom: "1px solid #f1f5f9",
+                          backgroundColor: idx % 2 === 0 ? "#fff" : "#f8fafc",
+                        }}
+                      >
+                        <td
+                          style={{
+                            padding: "14px 16px",
+                            verticalAlign: "top",
+                            color: "#334155",
+                            lineHeight: "1.7",
+                            fontSize: "0.9rem",
+                            textAlign: "right",
+                          }}
+                        >
+                          {arLines[idx] || ""}
+                        </td>
+                        <td
+                          style={{
+                            padding: "14px 16px",
+                            verticalAlign: "top",
+                            color: "#334155",
+                            lineHeight: "1.7",
+                            fontSize: "0.9rem",
+                            direction: "ltr",
+                            textAlign: "left",
+                            borderRight: "1px solid #f1f5f9",
+                          }}
+                        >
+                          {enLines[idx] || ""}
+                        </td>
+                      </tr>
+                    ));
+                  })()}
+                </tbody>
+              </table>
             </div>
-            <button
-              onClick={() => setActiveLegalDoc(null)}
-              style={{
-                marginTop: "25px",
-                padding: "15px",
-                backgroundColor: "#1e293b",
-                color: "#fff",
-                border: "none",
-                borderRadius: "14px",
-                fontWeight: "bold",
-                fontSize: "1.1rem",
-                cursor: "pointer",
-                boxShadow: "0 4px 15px rgba(0,0,0,0.1)",
-              }}
-            >
-              إغلاق النافذة
-            </button>
+
+            <div style={{ marginTop: "20px", textAlign: "center" }}>
+              <button
+                onClick={() => setActiveLegalDoc(null)}
+                style={{
+                  backgroundColor: "#1e293b",
+                  color: "#fff",
+                  border: "none",
+                  padding: "12px 30px",
+                  borderRadius: "12px",
+                  fontWeight: "900",
+                  cursor: "pointer",
+                  fontSize: "1rem",
+                }}
+              >
+                {t("close_window", "إغلاق النافذة")}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1803,7 +2140,8 @@ function MainAppContent() {
                   gap: "8px",
                 }}
               >
-                <span>🔔</span> الإشعارات والتنبيهات
+                <span>🔔</span>{" "}
+                {t("notifications_title", "الإشعارات والتنبيهات")}
               </h2>
               <button
                 onClick={() => setShowNotifModal(false)}
@@ -1835,7 +2173,7 @@ function MainAppContent() {
                     border: "1px dashed #cbd5e1",
                   }}
                 >
-                  لا توجد إشعارات جديدة حالياً 📭
+                  {t("no_new_notifications", "لا توجد إشعارات جديدة حالياً 📭")}
                 </div>
               ) : (
                 notifications.map((n) => (
@@ -1891,7 +2229,7 @@ function MainAppContent() {
                         }}
                       >
                         {new Date(n.created_at || new Date()).toLocaleString(
-                          "ar-SA",
+                          i18n.language === "ar" ? "ar-SA" : "en-US",
                         )}
                       </div>
                       <button
@@ -1914,7 +2252,7 @@ function MainAppContent() {
                           (e.currentTarget.style.background = "#e0e7ff")
                         }
                       >
-                        ↩️ للتواصل مع الإدارة
+                        {t("reply_to_admin_btn", "↩️ للتواصل مع الإدارة")}
                       </button>
                     </div>
                   </div>
@@ -1939,7 +2277,7 @@ function MainAppContent() {
                   boxShadow: "0 4px 15px rgba(16,185,129,0.2)",
                 }}
               >
-                تحديد الكل كمقروء ✅
+                {t("mark_all_read", "تحديد الكل كمقروء ✅")}
               </button>
             )}
           </div>
@@ -2114,7 +2452,8 @@ function MainAppContent() {
                     }}
                     style={addSkillBtn}
                   >
-                    <span style={{ fontSize: "1.2rem" }}>✨</span> إضافة خدمة
+                    <span style={{ fontSize: "1.2rem" }}>✨</span>{" "}
+                    {t("add_service_btn", "إضافة خدمة")}
                   </button>
 
                   <div
@@ -2158,7 +2497,8 @@ function MainAppContent() {
                           fontSize: "0.95rem",
                         }}
                       >
-                        {userProfile?.full_name || "المستخدم"}
+                        {userProfile?.full_name ||
+                          t("default_user", "المستخدم")}
                       </div>
                       {(isSuperAdmin || isSupervisor || isFinancialManager) && (
                         <div style={{ marginTop: "4px" }}>
@@ -2173,7 +2513,7 @@ function MainAppContent() {
                                 fontWeight: "bold",
                               }}
                             >
-                              👑 مدير المنصة
+                              {t("role_super_admin", "👑 مدير المنصة")}
                             </span>
                           )}
                           {isSupervisor && (
@@ -2187,7 +2527,7 @@ function MainAppContent() {
                                 fontWeight: "bold",
                               }}
                             >
-                              🛡️ مشرف عام
+                              {t("role_supervisor", "🛡️ مشرف عام")}
                             </span>
                           )}
                           {isFinancialManager && (
@@ -2201,7 +2541,7 @@ function MainAppContent() {
                                 fontWeight: "bold",
                               }}
                             >
-                              💰 مدير مالي
+                              {t("role_financial_manager", "💰 مدير مالي")}
                             </span>
                           )}
                         </div>
@@ -2270,7 +2610,7 @@ function MainAppContent() {
                 </div>
                 <button
                   onClick={handleLogout}
-                  title="تسجيل الخروج المأمون"
+                  title={t("secure_logout", "تسجيل الخروج المأمون")}
                   style={{
                     backgroundColor: "#fef2f2",
                     color: "#ef4444",
@@ -2313,7 +2653,7 @@ function MainAppContent() {
                   boxShadow: "0 4px 15px rgba(16, 185, 129, 0.25)",
                 }}
               >
-                دخول / حساب 🚀
+                {t("login_account_btn", "دخول / حساب 🚀")}
               </button>
             )}
           </div>
@@ -2353,7 +2693,7 @@ function MainAppContent() {
                     fontSize: "0.9rem",
                   }}
                 >
-                  {userProfile?.full_name || "المستخدم"}
+                  {userProfile?.full_name || t("default_user", "المستخدم")}
                 </div>
                 {(isSuperAdmin || isSupervisor || isFinancialManager) && (
                   <div style={{ marginTop: "2px" }}>
@@ -2368,7 +2708,7 @@ function MainAppContent() {
                           fontWeight: "bold",
                         }}
                       >
-                        👑 مدير
+                        {t("role_super_admin_short", "👑 مدير")}
                       </span>
                     )}
                     {isSupervisor && (
@@ -2382,7 +2722,7 @@ function MainAppContent() {
                           fontWeight: "bold",
                         }}
                       >
-                        🛡️ مشرف
+                        {t("role_supervisor_short", "🛡️ مشرف")}
                       </span>
                     )}
                     {isFinancialManager && (
@@ -2396,7 +2736,7 @@ function MainAppContent() {
                           fontWeight: "bold",
                         }}
                       >
-                        💰 مالي
+                        {t("role_financial_manager_short", "💰 مالي")}
                       </span>
                     )}
                   </div>
@@ -2416,7 +2756,8 @@ function MainAppContent() {
                 boxShadow: "0 4px 12px rgba(124, 58, 237, 0.2)",
               }}
             >
-              <span style={{ fontSize: "1.1rem" }}>✨</span> إضافة خدمة
+              <span style={{ fontSize: "1.1rem" }}>✨</span>{" "}
+              {t("add_service_btn", "إضافة خدمة")}
             </button>
           </div>
         )}
@@ -2440,7 +2781,7 @@ function MainAppContent() {
           {[
             {
               id: "market",
-              label: "دليل الخدمات",
+              label: t("tab_market", "دليل الخدمات"),
               icon: "🔍",
               color: "#7c3aed",
             },
@@ -2448,25 +2789,25 @@ function MainAppContent() {
               ? [
                   {
                     id: "provider",
-                    label: "أعمالي",
+                    label: t("tab_provider", "أعمالي"),
                     icon: "💼",
                     color: "#059669",
                   },
                   {
                     id: "my_services",
-                    label: "خدماتي",
+                    label: t("tab_my_services", "خدماتي"),
                     icon: "⚙️",
                     color: "#f59e0b",
                   },
                   {
                     id: "calendar",
-                    label: "التقويم",
+                    label: t("tab_calendar", "التقويم"),
                     icon: "📅",
                     color: "#3b82f6",
                   },
                   {
                     id: "invoices",
-                    label: "الفواتير",
+                    label: t("tab_invoices", "الفواتير"),
                     icon: "🧾",
                     color: "#8b5cf6",
                   },
@@ -2474,7 +2815,7 @@ function MainAppContent() {
                     ? [
                         {
                           id: "reports",
-                          label: "التقارير",
+                          label: t("tab_reports", "التقارير"),
                           icon: "📊",
                           color: "#d946ef",
                         },
@@ -2484,7 +2825,7 @@ function MainAppContent() {
                     ? [
                         {
                           id: "admin",
-                          label: "الإدارة",
+                          label: t("tab_admin", "الإدارة"),
                           icon: "⚙️",
                           color: "#ef4444",
                         },
@@ -2492,7 +2833,7 @@ function MainAppContent() {
                     : []),
                   {
                     id: "profile",
-                    label: "حسابي",
+                    label: t("tab_profile", "حسابي"),
                     icon: "👤",
                     color: "#1e293b",
                   },
@@ -2619,7 +2960,7 @@ function MainAppContent() {
                                 fontWeight: "bold",
                               }}
                             >
-                              ⏳ جاري جلب الفواتير...
+                              {t("loading_invoices", "⏳ جاري جلب الفواتير...")}
                             </div>
                           }
                         >
@@ -2655,7 +2996,10 @@ function MainAppContent() {
                                 fontWeight: "bold",
                               }}
                             >
-                              📊 جاري تجهيز التقارير والإحصائيات...
+                              {t(
+                                "loading_reports",
+                                "📊 جاري تجهيز التقارير والإحصائيات...",
+                              )}
                             </div>
                           }
                         >
@@ -2680,7 +3024,10 @@ function MainAppContent() {
                               fontSize: "1.2rem",
                             }}
                           >
-                            👑 جاري فتح لوحة الإدارة العليا...
+                            {t(
+                              "loading_admin",
+                              "👑 جاري فتح لوحة الإدارة العليا...",
+                            )}
                           </div>
                         }
                       >
@@ -2760,7 +3107,10 @@ function MainAppContent() {
                                 fontSize: "1.3rem",
                               }}
                             >
-                              ليس لديك أي خدمات مضافة بعد
+                              {t(
+                                "no_services_added",
+                                "ليس لديك أي خدمات مضافة بعد",
+                              )}
                             </h3>
                             <button
                               onClick={() => {
@@ -2773,19 +3123,22 @@ function MainAppContent() {
                                 fontSize: "1.1rem",
                               }}
                             >
-                              ✨ أضف خدمتك الأولى والآن وانطلق
+                              {t(
+                                "add_first_service_btn",
+                                "✨ أضف خدمتك الأولى والآن وانطلق",
+                              )}
                             </button>
                           </div>
                         )}
                         {myOfferings.map((off, index) => {
                           const modelLabels = {
-                            fixed: "مهمة",
-                            hourly: "ساعة",
-                            period: "فترة",
-                            daily: "يوم",
-                            monthly: "شهر",
-                            yearly: "سنة",
-                            free: "تطوع",
+                            fixed: t("task", "مهمة"),
+                            hourly: t("hour", "ساعة"),
+                            period: t("period", "فترة"),
+                            daily: t("day", "يوم"),
+                            monthly: t("month", "شهر"),
+                            yearly: t("year", "سنة"),
+                            free: t("volunteer", "تطوع"),
                           };
                           const curr = off.currency || "USD";
 
@@ -2901,8 +3254,14 @@ function MainAppContent() {
                                     }}
                                   >
                                     {off.is_24_7
-                                      ? `🟢 متاح 24 ساعة للعمل`
-                                      : `🕒 دوام: ${off.work_start_time?.substring(
+                                      ? t(
+                                          "available_24_7_badge",
+                                          "🟢 متاح 24 ساعة للعمل",
+                                        )
+                                      : `${t(
+                                          "working_hours_badge",
+                                          "🕒 دوام: ",
+                                        )}${off.work_start_time?.substring(
                                           0,
                                           5,
                                         )} - ${off.work_end_time?.substring(
@@ -2938,9 +3297,9 @@ function MainAppContent() {
                                       }}
                                     >
                                       {off.price_upon_agreement
-                                        ? "حسب الاتفاق 🤝"
+                                        ? t("price_agreement", "حسب الاتفاق 🤝")
                                         : off.pricing_model === "free"
-                                        ? `💚 عمل تطوعي`
+                                        ? t("volunteer_work", "💚 عمل تطوعي")
                                         : `${off.price} ${curr}`}
                                     </span>
                                     {!off.price_upon_agreement && (
@@ -2952,9 +3311,9 @@ function MainAppContent() {
                                           fontWeight: "bold",
                                         }}
                                       >
-                                        السعر محدد لكل{" "}
+                                        {t("price_per", "السعر محدد لكل ")}
                                         {modelLabels[off.pricing_model] ||
-                                          "مهمة"}
+                                          t("task", "مهمة")}
                                       </span>
                                     )}
                                   </div>
@@ -2987,9 +3346,12 @@ function MainAppContent() {
                                         height: "45px",
                                         transition: "0.2s",
                                       }}
-                                      title="عرض الخدمة في المتجر أو مشاركتها"
+                                      title={t(
+                                        "view_share_service",
+                                        "عرض الخدمة في المتجر أو مشاركتها",
+                                      )}
                                     >
-                                      🔗 عرض
+                                      {t("view_btn", "🔗 عرض")}
                                     </button>
                                     <button
                                       onClick={() => openEditModal(off)}
@@ -3008,7 +3370,10 @@ function MainAppContent() {
                                         height: "45px",
                                         transition: "0.2s",
                                       }}
-                                      title="تعديل الخدمة"
+                                      title={t(
+                                        "edit_service_tooltip",
+                                        "تعديل الخدمة",
+                                      )}
                                     >
                                       ✏️
                                     </button>
@@ -3032,7 +3397,10 @@ function MainAppContent() {
                                         height: "45px",
                                         transition: "0.2s",
                                       }}
-                                      title="حذف الخدمة"
+                                      title={t(
+                                        "delete_service_tooltip",
+                                        "حذف الخدمة",
+                                      )}
                                     >
                                       🗑️
                                     </button>
@@ -3094,7 +3462,10 @@ function MainAppContent() {
                                   fontWeight: "900",
                                 }}
                               >
-                                رابط متجرك الخاص المباشر
+                                {t(
+                                  "store_link_title",
+                                  "رابط متجرك الخاص المباشر",
+                                )}
                               </h3>
                               <p
                                 style={{
@@ -3104,9 +3475,10 @@ function MainAppContent() {
                                   lineHeight: "1.6",
                                 }}
                               >
-                                انسخ هذا الرابط وشاركه في حساباتك (تويتر،
-                                واتساب، انستقرام) ليتمكن العملاء من الدخول لملفك
-                                وحجز خدماتك مباشرة فوراً بضغطة واحدة.
+                                {t(
+                                  "store_link_desc",
+                                  "انسخ هذا الرابط وشاركه في حساباتك (تويتر، واتساب، انستقرام) ليتمكن العملاء من الدخول لملفك وحجز خدماتك مباشرة فوراً بضغطة واحدة.",
+                                )}
                               </p>
                             </div>
                           </div>
@@ -3114,7 +3486,10 @@ function MainAppContent() {
                             onClick={() => {
                               if (!userProfile?.username) {
                                 alert(
-                                  "عذراً! لا يمكننا إنشاء رابط لمتجرك حتى تقوم باختيار (يوزر نيم / Username) خاص بك.\n\nيرجى الذهاب إلى تبويب 👤 [حسابي] وكتابة اليوزر نيم الخاص بك أولاً ⚠️",
+                                  t(
+                                    "store_link_error",
+                                    "عذراً! لا يمكننا إنشاء رابط لمتجرك حتى تقوم باختيار (يوزر نيم / Username) خاص بك.\n\nيرجى الذهاب إلى تبويب 👤 [حسابي] وكتابة اليوزر نيم الخاص بك أولاً ⚠️",
+                                  ),
                                 );
                                 return;
                               }
@@ -3132,8 +3507,10 @@ function MainAppContent() {
                                   .writeText(storeUrl)
                                   .then(() => {
                                     alert(
-                                      "رائع! تم نسخ رابط متجرك بنجاح 📋✨\nالرابط هو:\n" +
-                                        storeUrl,
+                                      t(
+                                        "store_link_copied",
+                                        "رائع! تم نسخ رابط متجرك بنجاح 📋✨\nالرابط هو:\n",
+                                      ) + storeUrl,
                                     );
                                   })
                                   .catch((err) => {
@@ -3145,8 +3522,10 @@ function MainAppContent() {
                                     document.execCommand("copy");
                                     document.body.removeChild(textArea);
                                     alert(
-                                      "رائع! تم نسخ رابط متجرك بنجاح 📋✨\nالرابط هو:\n" +
-                                        storeUrl,
+                                      t(
+                                        "store_link_copied",
+                                        "رائع! تم نسخ رابط متجرك بنجاح 📋✨\nالرابط هو:\n",
+                                      ) + storeUrl,
                                     );
                                   });
                               } else {
@@ -3158,8 +3537,10 @@ function MainAppContent() {
                                 document.execCommand("copy");
                                 document.body.removeChild(textArea);
                                 alert(
-                                  "رائع! تم نسخ رابط متجرك بنجاح 📋✨\nالرابط هو:\n" +
-                                    storeUrl,
+                                  t(
+                                    "store_link_copied",
+                                    "رائع! تم نسخ رابط متجرك بنجاح 📋✨\nالرابط هو:\n",
+                                  ) + storeUrl,
                                 );
                               }
                             }}
@@ -3189,8 +3570,8 @@ function MainAppContent() {
                                 "translateY(0)")
                             }
                           >
-                            <span style={{ fontSize: "1.3rem" }}>📋</span> نسخ
-                            الرابط الآن
+                            <span style={{ fontSize: "1.3rem" }}>📋</span>{" "}
+                            {t("copy_link_btn", "نسخ الرابط الآن")}
                           </button>
                         </div>
 
@@ -3258,7 +3639,10 @@ function MainAppContent() {
                                   letterSpacing: "0.5px",
                                 }}
                               >
-                                أرباح المنصة الصافية
+                                {t(
+                                  "net_platform_profits",
+                                  "أرباح المنصة الصافية",
+                                )}
                               </h3>
                             </div>
                             <div
@@ -3341,7 +3725,10 @@ function MainAppContent() {
                                   letterSpacing: "0.5px",
                                 }}
                               >
-                                أرباح الحجوزات الخاصة
+                                {t(
+                                  "private_bookings_profits",
+                                  "أرباح الحجوزات الخاصة",
+                                )}
                               </h3>
                             </div>
                             <div
@@ -3365,90 +3752,6 @@ function MainAppContent() {
                                 commissionRate,
                                 "providerNet",
                               )}
-                            </div>
-                          </div>
-
-                          <div
-                            style={{
-                              background: "#fff",
-                              padding: "30px",
-                              borderRadius: "24px",
-                              border: "1px solid #e2e8f0",
-                              boxShadow: "0 10px 30px rgba(0,0,0,0.04)",
-                              display: "flex",
-                              flexDirection: "column",
-                              justifyContent: "center",
-                              transition: "0.3s",
-                              position: "relative",
-                              overflow: "hidden",
-                            }}
-                            onMouseOver={(e) =>
-                              (e.currentTarget.style.transform =
-                                "translateY(-5px)")
-                            }
-                            onMouseOut={(e) =>
-                              (e.currentTarget.style.transform =
-                                "translateY(0)")
-                            }
-                          >
-                            <div
-                              style={{
-                                position: "absolute",
-                                left: "-10px",
-                                bottom: "-20px",
-                                fontSize: "7rem",
-                                opacity: 0.05,
-                              }}
-                            >
-                              ✅
-                            </div>
-                            <div
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "12px",
-                                marginBottom: "15px",
-                                color: "#64748b",
-                                position: "relative",
-                                zIndex: 1,
-                              }}
-                            >
-                              <span style={{ fontSize: "1.8rem" }}>✅</span>
-                              <h3
-                                style={{
-                                  margin: 0,
-                                  fontSize: "1.2rem",
-                                  fontWeight: "bold",
-                                  letterSpacing: "0.5px",
-                                }}
-                              >
-                                الخدمات المكتملة بنجاح
-                              </h3>
-                            </div>
-                            <div
-                              style={{
-                                fontSize: "2.5rem",
-                                fontWeight: "900",
-                                color: "#1e293b",
-                                textAlign: "left",
-                                position: "relative",
-                                zIndex: 1,
-                              }}
-                            >
-                              {
-                                providerBookings.filter(
-                                  (b) => b.status === "completed",
-                                ).length
-                              }{" "}
-                              <span
-                                style={{
-                                  fontSize: "1.2rem",
-                                  color: "#94a3b8",
-                                  fontWeight: "bold",
-                                }}
-                              >
-                                عملية منفذة
-                              </span>
                             </div>
                           </div>
 
@@ -3507,7 +3810,10 @@ function MainAppContent() {
                                   letterSpacing: "0.5px",
                                 }}
                               >
-                                أرباح التسويق بالعمولة
+                                {t(
+                                  "affiliate_profits",
+                                  "أرباح التسويق بالعمولة",
+                                )}
                               </h3>
                             </div>
                             <div
@@ -3535,10 +3841,13 @@ function MainAppContent() {
                                 fontWeight: "bold",
                               }}
                             >
-                              <span>العملاء: {myAffiliateStats.clients}</span>
                               <span>
-                                المستحق: {myAffiliateStats.unpaid.toFixed(2)}{" "}
-                                SAR
+                                {t("affiliate_clients", "العملاء: ")}
+                                {myAffiliateStats.clients}
+                              </span>
+                              <span>
+                                {t("affiliate_due", "المستحق: ")}
+                                {myAffiliateStats.unpaid.toFixed(2)} SAR
                               </span>
                             </div>
                             <div
@@ -3554,8 +3863,10 @@ function MainAppContent() {
                                 fontWeight: "bold",
                               }}
                             >
-                              * تضاف الأرباح لرصيدك فور سداد المزود لعمولة
-                              المنصة.
+                              {t(
+                                "affiliate_note",
+                                "* تضاف الأرباح لرصيدك فور سداد المزود لعمولة المنصة.",
+                              )}
                             </div>
                           </div>
                         </div>
@@ -3600,7 +3911,10 @@ function MainAppContent() {
                                     fontWeight: "900",
                                   }}
                                 >
-                                  مستحقات المنصة معلقة
+                                  {t(
+                                    "platform_dues_pending",
+                                    "مستحقات المنصة معلقة",
+                                  )}
                                 </h3>
                                 <p
                                   style={{
@@ -3645,7 +3959,10 @@ function MainAppContent() {
                               }
                             >
                               <span style={{ fontSize: "1.3rem" }}>💳</span>{" "}
-                              المبادرة بسداد العمولات الآن
+                              {t(
+                                "pay_commissions_btn",
+                                "المبادرة بسداد العمولات الآن",
+                              )}
                             </button>
                           </div>
                         )}
@@ -3682,7 +3999,10 @@ function MainAppContent() {
                                   fontWeight: "900",
                                 }}
                               >
-                                لوحة تحكم حجوزاتي كمزود خدمه
+                                {t(
+                                  "provider_dashboard_title",
+                                  "لوحة تحكم حجوزاتي كمزود خدمه",
+                                )}
                               </h2>
                               <p
                                 style={{
@@ -3691,8 +4011,10 @@ function MainAppContent() {
                                   fontSize: "0.95rem",
                                 }}
                               >
-                                إدارة ومتابعة جميع الطلبات الواردة لخدماتك من
-                                العملاء لتسعيرها أو تنفيذها.
+                                {t(
+                                  "provider_dashboard_desc",
+                                  "إدارة ومتابعة جميع الطلبات الواردة لخدماتك من العملاء لتسعيرها أو تنفيذها.",
+                                )}
                               </p>
                             </div>
                           </div>
@@ -3739,7 +4061,10 @@ function MainAppContent() {
                                   fontWeight: "900",
                                 }}
                               >
-                                حجوزاتي وطلباتي كعميل
+                                {t(
+                                  "client_dashboard_title",
+                                  "حجوزاتي وطلباتي كعميل",
+                                )}
                               </h2>
                               <p
                                 style={{
@@ -3748,8 +4073,10 @@ function MainAppContent() {
                                   fontSize: "0.95rem",
                                 }}
                               >
-                                تتبع حالات الخدمات التي قمت بطلبها أنت من مزودين
-                                آخرين في المنصة.
+                                {t(
+                                  "client_dashboard_desc",
+                                  "تتبع حالات الخدمات التي قمت بطلبها أنت من مزودين آخرين في المنصة.",
+                                )}
                               </p>
                             </div>
                           </div>
@@ -3799,7 +4126,9 @@ function MainAppContent() {
           >
             <span style={{ fontSize: "1.3rem" }}>✅</span>
             <span style={{ fontWeight: "bold", color: "#334155" }}>
-              {licenseName || "موثق من الجهات الرسمية"}:
+              {licenseName ||
+                t("verified_by_authorities", "موثق من الجهات الرسمية")}
+              :
             </span>
             <a
               href={licenseLink || "#"}
@@ -3819,7 +4148,9 @@ function MainAppContent() {
           </div>
         )}
         <p style={{ margin: 0, fontWeight: "bold", fontSize: "1rem" }}>
-          © {new Date().getFullYear()} {platformName} (جميع الحقوق محفوظة )
+          © {new Date().getFullYear()} {platformName}{" "}
+          {t("all_rights_reserved", " (جميع الحقوق محفوظة )")}
+          <br />
           email:bookonmap@hotmail.com ترخيص FL-822660150
         </p>
         <div
@@ -3845,7 +4176,7 @@ function MainAppContent() {
             onMouseOver={(e) => (e.currentTarget.style.color = "#312e81")}
             onMouseOut={(e) => (e.currentTarget.style.color = "#4f46e5")}
           >
-            شروط الاستخدام
+            {t("terms_of_use", "شروط الاستخدام")}
           </span>{" "}
           <span style={{ color: "#cbd5e1" }}>|</span>
           <span
@@ -3859,7 +4190,7 @@ function MainAppContent() {
             onMouseOver={(e) => (e.currentTarget.style.color = "#312e81")}
             onMouseOut={(e) => (e.currentTarget.style.color = "#4f46e5")}
           >
-            سياسة الخصوصية
+            {t("privacy_policy", "سياسة الخصوصية")}
           </span>{" "}
           <span style={{ color: "#cbd5e1" }}>|</span>
           <span
@@ -3873,7 +4204,7 @@ function MainAppContent() {
             onMouseOver={(e) => (e.currentTarget.style.color = "#312e81")}
             onMouseOut={(e) => (e.currentTarget.style.color = "#4f46e5")}
           >
-            سياسات الدفع والاسترجاع
+            {t("refund_policies", "سياسات الدفع والاسترجاع")}
           </span>{" "}
           <span style={{ color: "#cbd5e1" }}>|</span>
           <span
@@ -3895,7 +4226,7 @@ function MainAppContent() {
             }
             onMouseOut={(e) => (e.currentTarget.style.transform = "scale(1)")}
           >
-            <span>✉️</span> تواصل مع الإدارة
+            <span>✉️</span> {t("contact_admin_footer", "تواصل مع الإدارة")}
           </span>
         </div>
       </div>
@@ -3910,6 +4241,7 @@ function MainAppContent() {
 
 // ✨ بوابة الدخول السرية للمرحلة التجريبية (Beta Gate) ✨
 const BetaGate = ({ children }) => {
+  const { t } = useTranslation();
   const [isUnlocked, setIsUnlocked] = useState(
     localStorage.getItem("beta_unlocked") === "true",
   );
@@ -3948,7 +4280,7 @@ const BetaGate = ({ children }) => {
         <h2
           style={{ color: "#f8fafc", margin: "0 0 10px 0", fontSize: "1.8rem" }}
         >
-          منصة مغلقة مؤقتاً
+          {t("beta_closed_title", "منصة مغلقة مؤقتاً")}
         </h2>
         <p
           style={{
@@ -3958,12 +4290,14 @@ const BetaGate = ({ children }) => {
             lineHeight: "1.6",
           }}
         >
-          المنصة حالياً في مرحلة الاختبار المغلق (Beta). يرجى إدخال رمز المرور
-          السري المخصص للوصول.
+          {t(
+            "beta_closed_desc",
+            "المنصة حالياً في مرحلة الاختبار المغلق (Beta). يرجى إدخال رمز المرور السري المخصص للوصول.",
+          )}
         </p>
         <input
           type="password"
-          placeholder="أدخل الرمز هنا..."
+          placeholder={t("enter_beta_code", "أدخل الرمز هنا...")}
           value={passcode}
           onChange={(e) => setPasscode(e.target.value)}
           style={{
@@ -3991,7 +4325,7 @@ const BetaGate = ({ children }) => {
               localStorage.setItem("beta_unlocked", "true");
               setIsUnlocked(true);
             } else {
-              alert("الرمز غير صحيح ❌");
+              alert(t("invalid_beta_code", "الرمز غير صحيح ❌"));
               setPasscode("");
             }
           }}
@@ -4014,7 +4348,7 @@ const BetaGate = ({ children }) => {
             (e.currentTarget.style.backgroundColor = "#3b82f6")
           }
         >
-          دخول للمنصة 🔓
+          {t("enter_platform_btn", "دخول للمنصة 🔓")}
         </button>
       </div>
     </div>

@@ -144,8 +144,9 @@ export default function AdminReports({
   affiliateRate,
   platName,
 }) {
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
   const dateLocale = i18n?.language === "en" ? "en-US" : "ar-SA";
+  const isRTL = i18n?.language === "ar";
 
   const [data, setData] = useState({ users: [], bookings: [], categories: [] });
   const [loading, setLoading] = useState(true);
@@ -210,37 +211,48 @@ export default function AdminReports({
 
   // ✉️ دالة إرسال التنبيه الداخلي للنظام ✉️
   const handleSendSysMsg = async (userId, bookingId) => {
-    if (!sysMsgText.trim()) return alert("الرجاء كتابة رسالة التنبيه.");
+    if (!sysMsgText.trim())
+      return alert(t("alert_msg_required", "الرجاء كتابة رسالة التنبيه."));
     try {
       await supabase.from("notifications").insert([
         {
           user_id: userId,
-          title: `تنبيه مالي للحجز #${bookingId.substring(0, 8).toUpperCase()}`,
+          title: `${t("financial_alert_title", "تنبيه مالي للحجز #")}${bookingId
+            .substring(0, 8)
+            .toUpperCase()}`,
           message: sysMsgText,
           is_read: false,
         },
       ]);
-      alert("تم إرسال التنبيه للمزود داخل النظام بنجاح! 🔔✅");
+      alert(
+        t(
+          "alert_sent_success",
+          "تم إرسال التنبيه للمزود داخل النظام بنجاح! 🔔✅",
+        ),
+      );
       setActiveMsgId(null);
       setSysMsgText("");
     } catch (err) {
-      alert("حدث خطأ أثناء الإرسال: " + err.message);
+      alert(t("send_error_prefix", "حدث خطأ أثناء الإرسال: ") + err.message);
     }
   };
 
   const handleAdminDeleteBooking = async (id) => {
     if (
       window.confirm(
-        "🚨 تحذير: هل أنت متأكد من حذف هذا الحجز نهائياً من قاعدة البيانات؟ لا يمكن التراجع.",
+        t(
+          "confirm_delete_booking_admin",
+          "🚨 تحذير: هل أنت متأكد من حذف هذا الحجز نهائياً من قاعدة البيانات؟ لا يمكن التراجع.",
+        ),
       )
     ) {
       try {
         const { error } = await supabase.from("bookings").delete().eq("id", id);
         if (error) throw error;
-        alert("تم حذف الحجز بنجاح ✅");
+        alert(t("delete_success", "تم حذف الحجز بنجاح ✅"));
         fetchStats();
       } catch (err) {
-        alert("حدث خطأ أثناء الحذف: " + err.message);
+        alert(t("delete_error", "حدث خطأ أثناء الحذف: ") + err.message);
       }
     }
   };
@@ -248,16 +260,24 @@ export default function AdminReports({
   const handleAdminDeleteUser = async (id) => {
     if (
       window.confirm(
-        "🚨 تحذير خطير: حذف المستخدم سيؤدي إلى مسح بياناته. هل أنت متأكد؟",
+        t(
+          "confirm_delete_user_admin",
+          "🚨 تحذير خطير: حذف المستخدم سيؤدي إلى مسح بياناته. هل أنت متأكد؟",
+        ),
       )
     ) {
       try {
         const { error } = await supabase.from("profiles").delete().eq("id", id);
         if (error) throw error;
-        alert("تم حذف المستخدم بنجاح ✅");
+        alert(t("user_deleted_success", "تم حذف المستخدم بنجاح ✅"));
         fetchStats();
       } catch (err) {
-        alert("حدث خطأ! قد يكون المستخدم مرتبطاً بحجوزات سابقة.");
+        alert(
+          t(
+            "user_delete_error",
+            "حدث خطأ! قد يكون المستخدم مرتبطاً بحجوزات سابقة.",
+          ),
+        );
       }
     }
   };
@@ -270,7 +290,7 @@ export default function AdminReports({
         .eq("id", id);
       fetchStats();
     } catch (err) {
-      alert("خطأ: " + err.message);
+      alert(t("error_prefix", "خطأ: ") + err.message);
     }
   };
 
@@ -316,7 +336,6 @@ export default function AdminReports({
     (b) => b.status === "completed",
   );
 
-  // الحسابات هنا ستتجاهل العمولات للحجوزات الخاصة لأن الدالة ترجع 0.00
   const totalProfitText = sumByCurrency(completedBookings, commissionRate);
   const collectedProfitText = sumByCurrency(
     completedBookings.filter((b) => b.is_commission_paid),
@@ -394,14 +413,16 @@ export default function AdminReports({
       if (error) throw error;
 
       alert(
-        `تم تسجيل سداد مبلغ ${payoutModalData.unpaidEarnings.toFixed(
-          2,
-        )} بنجاح للمسوق ${payoutModalData.full_name} ✅`,
+        t("payout_success_alert", "تم تسجيل سداد مبلغ ") +
+          payoutModalData.unpaidEarnings.toFixed(2) +
+          t("payout_success_end", " بنجاح للمسوق ") +
+          payoutModalData.full_name +
+          " ✅",
       );
       setPayoutModalData(null);
       fetchStats();
     } catch (err) {
-      alert("حدث خطأ أثناء السداد: " + err.message);
+      alert(t("payout_error", "حدث خطأ أثناء السداد: ") + err.message);
     } finally {
       setIsProcessingPayout(false);
     }
@@ -410,9 +431,9 @@ export default function AdminReports({
   const printBookingsReport = () => {
     const printWindow = window.open("", "_blank");
     printWindow.document.write(
-      `<html dir="rtl">
+      `<html dir="${isRTL ? "rtl" : "ltr"}">
         <head>
-          <title>تقرير الحجوزات الشامل</title>
+          <title>${t("print_bookings_title", "تقرير الحجوزات الشامل")}</title>
           <style>
             body{font-family:system-ui; padding:30px; color:#1e293b; font-size: 0.9rem;} 
             table{width:100%; border-collapse:collapse; margin-top:20px; text-align:center;} 
@@ -422,21 +443,27 @@ export default function AdminReports({
           </style>
         </head>
         <body>
-          <h1 style="color:#7c3aed; border-bottom:3px solid #7c3aed; padding-bottom:10px;">تقرير الحجوزات والعمليات - ${platName}</h1>
+          <h1 style="color:#7c3aed; border-bottom:3px solid #7c3aed; padding-bottom:10px;">${t(
+            "print_bookings_heading",
+            "تقرير الحجوزات والعمليات",
+          )} - ${platName}</h1>
           <div style="background:#eff6ff; padding:15px; border:1px dashed #3b82f6; font-size:1.1rem; font-weight:bold; margin-bottom:20px;">
-            إجمالي العمولات للتقرير الحالي: <span style="color:#2563eb">${currentReportTotalText}</span>
+            ${t(
+              "print_total_commissions",
+              "إجمالي العمولات للتقرير الحالي:",
+            )} <span style="color:#2563eb">${currentReportTotalText}</span>
           </div>
           <table>
             <thead>
               <tr>
-                <th>رقم الحجز</th>
-                <th>المزود والخدمة</th>
-                <th>التاريخ والوقت</th>
-                <th>بيانات العميل</th>
-                <th>الإجمالي</th>
-                <th>صافي المزود</th>
-                <th>عمولة المنصة</th>
-                <th>الحالة</th>
+                <th>${t("th_booking_id", "رقم الحجز")}</th>
+                <th>${t("th_provider_service", "المزود والخدمة")}</th>
+                <th>${t("th_date_time", "التاريخ والوقت")}</th>
+                <th>${t("th_client_info", "بيانات العميل")}</th>
+                <th>${t("th_total", "الإجمالي")}</th>
+                <th>${t("th_provider_net", "صافي المزود")}</th>
+                <th>${t("th_platform_commission", "عمولة المنصة")}</th>
+                <th>${t("th_status", "الحالة")}</th>
               </tr>
             </thead>
             <tbody>
@@ -445,7 +472,6 @@ export default function AdminReports({
                   const curr = b.offerings?.currency || "SAR";
                   const fin = calculateFinancials(b, commissionRate);
 
-                  // تواريخ الفاتورة للطباعة
                   const startObj = b.appointment_date
                     ? new Date(b.appointment_date)
                     : null;
@@ -468,16 +494,22 @@ export default function AdminReports({
                       })
                     : "";
 
-                  let datePrintHtml = "غير محدد";
+                  let datePrintHtml = t("not_specified", "غير محدد");
                   if (startF) {
                     datePrintHtml = `
-                      <div class="date-block" style="text-align: right;">
-                        <strong>من:</strong> ${startF.gregDate} (${sTime})<br/>
-                        <strong>إلى:</strong> ${
-                          endF
-                            ? `${endF.gregDate} (${eTime})`
-                            : `${startF.gregDate} (${eTime || "غير محدد"})`
-                        }
+                      <div class="date-block" style="text-align: ${
+                        isRTL ? "right" : "left"
+                      };">
+                        <strong>${t("print_from", "من:")}</strong> ${
+                      startF.gregDate
+                    } (${sTime})<br/>
+                        <strong>${t("print_to", "إلى:")}</strong> ${
+                      endF
+                        ? `${endF.gregDate} (${eTime})`
+                        : `${startF.gregDate} (${
+                            eTime || t("not_specified", "غير محدد")
+                          })`
+                    }
                       </div>
                     `;
                   }
@@ -486,9 +518,12 @@ export default function AdminReports({
                   const isUrl = locationData.includes("http");
                   const locString = locationData
                     ? isUrl
-                      ? `<a href="${locationData}" target="_blank" style="color:#2563eb; text-decoration:none;">📍 عرض الخريطة</a>`
+                      ? `<a href="${locationData}" target="_blank" style="color:#2563eb; text-decoration:none;">📍 ${t(
+                          "view_map",
+                          "عرض الخريطة",
+                        )}</a>`
                       : `📍 ${locationData}`
-                    : "🌐 أونلاين / غير محدد";
+                    : t("online_or_unspecified", "🌐 أونلاين / غير محدد");
 
                   const pUser = b.offerings?.profiles?.username
                     ? `<br><small style="color:#2563eb;" dir="ltr">@${b.offerings.profiles.username}</small>`
@@ -497,17 +532,20 @@ export default function AdminReports({
                     ? `<br><small style="color:#059669;" dir="ltr">@${b.profiles.username}</small>`
                     : "";
 
-                  const commissionColor = b.is_manual_booking
-                    ? "#166534"
-                    : b.is_commission_paid
-                    ? "#10b981"
-                    : "#ef4444";
-
                   const commissionBadge = b.is_manual_booking
-                    ? `<span style="background:#f0fdf4; color:#166534; border:1px solid #bbf7d0; padding:3px 8px; border-radius:6px; font-size:0.75rem; margin-top:5px; display:inline-block;">معفى (حجز خاص) 📞</span>`
+                    ? `<span style="background:#f0fdf4; color:#166534; border:1px solid #bbf7d0; padding:3px 8px; border-radius:6px; font-size:0.75rem; margin-top:5px; display:inline-block;">${t(
+                        "exempt_private",
+                        "معفى (حجز خاص) 📞",
+                      )}</span>`
                     : b.is_commission_paid
-                    ? `<span style="background:#d1fae5; color:#047857; padding:3px 8px; border-radius:6px; font-size:0.75rem; margin-top:5px; display:inline-block;">مسددة ✅</span>`
-                    : `<span style="background:#fef2f2; color:#b91c1c; padding:3px 8px; border-radius:6px; font-size:0.75rem; margin-top:5px; display:inline-block;">غير مسددة ❌</span>`;
+                    ? `<span style="background:#d1fae5; color:#047857; padding:3px 8px; border-radius:6px; font-size:0.75rem; margin-top:5px; display:inline-block;">${t(
+                        "paid_badge",
+                        "مسددة ✅",
+                      )}</span>`
+                    : `<span style="background:#fef2f2; color:#b91c1c; padding:3px 8px; border-radius:6px; font-size:0.75rem; margin-top:5px; display:inline-block;">${t(
+                        "unpaid_badge",
+                        "غير مسددة ❌",
+                      )}</span>`;
 
                   return `
                   <tr>
@@ -515,19 +553,21 @@ export default function AdminReports({
                       0,
                       8,
                     )}</td>
-                    <td style="text-align:right;">
+                    <td style="text-align:${isRTL ? "right" : "left"};">
                       <strong>${
-                        b.offerings?.profiles?.full_name || "غير محدد"
+                        b.offerings?.profiles?.full_name ||
+                        t("unspecified", "غير محدد")
                       }</strong> ${pUser}<br>
-                      <small style="color:#475569; font-weight:bold; display:block; margin-top:5px;">الخدمة: ${
-                        b.offerings?.title
-                      }</small>
+                      <small style="color:#475569; font-weight:bold; display:block; margin-top:5px;">${t(
+                        "service_label_print",
+                        "الخدمة:",
+                      )} ${b.offerings?.title}</small>
                       <small style="background:#f8fafc; padding:3px; border-radius:4px; display:inline-block; margin-top:5px; font-weight:bold;">${locString}</small>
                     </td>
                     <td>${datePrintHtml}</td>
-                    <td style="text-align:right;">
+                    <td style="text-align:${isRTL ? "right" : "left"};">
                       <strong>${
-                        b.profiles?.full_name || "غير محدد"
+                        b.profiles?.full_name || t("unspecified", "غير محدد")
                       }</strong> ${cUser}<br>
                       <small dir="ltr" style="display:block; margin-top:5px; font-weight:bold;">📞 ${
                         b.profiles?.phone
@@ -539,7 +579,7 @@ export default function AdminReports({
                     <td style="color:#10b981; font-weight:bold; direction:ltr;">${fin.providerNet.toFixed(
                       2,
                     )} ${curr}</td>
-                    <td style="color:${commissionColor}; font-weight:bold; direction:ltr;">
+                    <td style="font-weight:bold; direction:ltr;">
                       ${fin.platformCommission.toFixed(2)} ${curr}<br>
                       ${commissionBadge}
                     </td>
@@ -560,16 +600,41 @@ export default function AdminReports({
   const printUsersReport = () => {
     const printWindow = window.open("", "_blank");
     printWindow.document.write(
-      `<html dir="rtl"><head><title>تقرير المستخدمين</title><style>body{font-family:system-ui; padding:30px; color:#1e293b;} table{width:100%; border-collapse:collapse; margin-top:20px; text-align:center;} th, td{padding:10px; border:1px solid #cbd5e1;}</style></head><body><h1 style="color:#7c3aed; border-bottom:3px solid #7c3aed; padding-bottom:10px;">تقرير المستخدمين - ${platName}</h1><p><strong>العدد المطبوع:</strong> ${
-        filteredUsers.length
-      } مستخدم</p><table><thead><tr><th>الاسم (اليوزر)</th><th>رقم التواصل</th><th>النوع</th><th>الحالة</th></tr></thead><tbody>${filteredUsers
+      `<html dir="${isRTL ? "rtl" : "ltr"}"><head><title>${t(
+        "print_users_title",
+        "تقرير المستخدمين",
+      )}</title><style>body{font-family:system-ui; padding:30px; color:#1e293b;} table{width:100%; border-collapse:collapse; margin-top:20px; text-align:center;} th, td{padding:10px; border:1px solid #cbd5e1;}</style></head><body><h1 style="color:#7c3aed; border-bottom:3px solid #7c3aed; padding-bottom:10px;">${t(
+        "print_users_heading",
+        "تقرير المستخدمين",
+      )} - ${platName}</h1><p><strong>${t(
+        "printed_count",
+        "العدد المطبوع:",
+      )}</strong> ${filteredUsers.length} ${t(
+        "users_unit",
+        "مستخدم",
+      )}</p><table><thead><tr><th>${t(
+        "th_name_username",
+        "الاسم (اليوزر)",
+      )}</th><th>${t("th_contact_number", "رقم التواصل")}</th><th>${t(
+        "th_type",
+        "النوع",
+      )}</th><th>${t(
+        "th_status",
+        "الحالة",
+      )}</th></tr></thead><tbody>${filteredUsers
         .map(
           (u) =>
-            `<tr><td>${u.full_name || "بدون اسم"}</td><td dir="ltr">${
-              u.phone || "-"
+            `<tr><td>${
+              u.full_name || t("no_name", "بدون اسم")
+            }</td><td dir="ltr">${u.phone || "-"}</td><td>${
+              u.provider_type === "institution"
+                ? t("institution_type_print", "مؤسسة")
+                : t("individual_type_print", "فرد")
             }</td><td>${
-              u.provider_type === "institution" ? "مؤسسة" : "فرد"
-            }</td><td>${u.is_active ? "نشط" : "موقوف"}</td></tr>`,
+              u.is_active
+                ? t("active_status", "نشط")
+                : t("suspended_status", "موقوف")
+            }</td></tr>`,
         )
         .join(
           "",
@@ -581,12 +646,30 @@ export default function AdminReports({
   const printAffiliatesReport = () => {
     const printWindow = window.open("", "_blank");
     printWindow.document.write(
-      `<html dir="rtl"><head><title>تقرير المسوقين</title><style>body{font-family:system-ui; padding:30px; color:#1e293b;} table{width:100%; border-collapse:collapse; margin-top:20px; text-align:center;} th, td{padding:10px; border:1px solid #cbd5e1;}</style></head><body><h1 style="color:#7c3aed; border-bottom:3px solid #7c3aed; padding-bottom:10px;">تقرير المسوقين والأرباح - ${platName}</h1><table><thead><tr><th>المسوق</th><th>عدد العملاء</th><th>أرباح المنصة</th><th>أرباح المسوق (المستحقة)</th></tr></thead><tbody>${affiliateStats
+      `<html dir="${isRTL ? "rtl" : "ltr"}"><head><title>${t(
+        "print_affiliates_title",
+        "تقرير المسوقين",
+      )}</title><style>body{font-family:system-ui; padding:30px; color:#1e293b;} table{width:100%; border-collapse:collapse; margin-top:20px; text-align:center;} th, td{padding:10px; border:1px solid #cbd5e1;}</style></head><body><h1 style="color:#7c3aed; border-bottom:3px solid #7c3aed; padding-bottom:10px;">${t(
+        "print_affiliates_heading",
+        "تقرير المسوقين والأرباح",
+      )} - ${platName}</h1><table><thead><tr><th>${t(
+        "th_marketer",
+        "المسوق",
+      )}</th><th>${t("th_clients_count", "عدد العملاء")}</th><th>${t(
+        "th_platform_profits",
+        "أرباح المنصة",
+      )}</th><th>${t(
+        "th_marketer_due",
+        "أرباح المسوق (المستحقة)",
+      )}</th></tr></thead><tbody>${affiliateStats
         .map(
           (a) =>
             `<tr><td>${a.full_name} (@${a.username})</td><td>${
               a.referredUsersList.length
-            } عملاء</td><td>${a.totalPlatformCommission.toFixed(
+            } ${t(
+              "clients_unit",
+              "عملاء",
+            )}</td><td>${a.totalPlatformCommission.toFixed(
               2,
             )} SAR</td><td style="color:#10b981; font-weight:bold;">${a.unpaidEarnings.toFixed(
               2,
@@ -609,7 +692,7 @@ export default function AdminReports({
           fontWeight: "bold",
         }}
       >
-        ⏳ جاري تحميل لوحة التقارير...
+        {t("loading_reports", "⏳ جاري تحميل لوحة التقارير...")}
       </div>
     );
 
@@ -620,7 +703,7 @@ export default function AdminReports({
         display: "flex",
         flexDirection: "column",
         gap: "25px",
-        direction: "rtl",
+        direction: isRTL ? "rtl" : "ltr",
         borderTop: "4px solid #7c3aed",
       }}
     >
@@ -639,7 +722,7 @@ export default function AdminReports({
               }}
             >
               <h2 style={{ margin: 0, color: "#1e293b", fontSize: "1.4rem" }}>
-                💸 سداد أرباح مسوق
+                {t("payout_modal_title", "💸 سداد أرباح مسوق")}
               </h2>
               <button
                 onClick={() => setPayoutModalData(null)}
@@ -674,7 +757,9 @@ export default function AdminReports({
                   justifyContent: "space-between",
                 }}
               >
-                <strong style={{ color: "#475569" }}>المسوق:</strong>
+                <strong style={{ color: "#475569" }}>
+                  {t("marketer_label", "المسوق:")}
+                </strong>
                 <span style={{ fontWeight: "bold", color: "#1e293b" }}>
                   {payoutModalData.full_name} (@{payoutModalData.username})
                 </span>
@@ -686,7 +771,9 @@ export default function AdminReports({
                   justifyContent: "space-between",
                 }}
               >
-                <strong style={{ color: "#475569" }}>المستحق الآن:</strong>
+                <strong style={{ color: "#475569" }}>
+                  {t("due_now_label", "المستحق الآن:")}
+                </strong>
                 <span
                   style={{
                     fontWeight: "900",
@@ -709,7 +796,7 @@ export default function AdminReports({
                     marginBottom: "5px",
                   }}
                 >
-                  💳 بيانات التحويل (الآيبان):
+                  {t("bank_iban_data", "💳 بيانات التحويل (الآيبان):")}
                 </strong>
                 <div
                   style={{
@@ -720,11 +807,14 @@ export default function AdminReports({
                     color: payoutModalData.bank_iban ? "#1e40af" : "#ef4444",
                     fontWeight: "bold",
                     direction: "ltr",
-                    textAlign: "right",
+                    textAlign: isRTL ? "right" : "left",
                   }}
                 >
                   {payoutModalData.bank_iban ||
-                    "لم يقم المسوق بإضافة رقم الآيبان في ملفه!"}
+                    t(
+                      "no_iban_added",
+                      "لم يقم المسوق بإضافة رقم الآيبان في ملفه!",
+                    )}
                 </div>
               </div>
               <div style={{ marginBottom: "5px" }}>
@@ -735,10 +825,11 @@ export default function AdminReports({
                     marginBottom: "5px",
                   }}
                 >
-                  👤 رقم الهوية (للتوثيق):
+                  {t("national_id_verification", "👤 رقم الهوية (للتوثيق):")}
                 </strong>
                 <div style={{ color: "#1e293b", fontWeight: "bold" }}>
-                  {payoutModalData.national_id || "غير متوفر"}
+                  {payoutModalData.national_id ||
+                    t("not_available", "غير متوفر")}
                 </div>
               </div>
             </div>
@@ -770,8 +861,8 @@ export default function AdminReports({
                 }}
               >
                 {isProcessingPayout
-                  ? "⏳ جاري التنفيذ..."
-                  : "تأكيد السداد وتصفير الرصيد ✅"}
+                  ? t("processing", "⏳ جاري التنفيذ...")
+                  : t("confirm_payout_btn", "تأكيد السداد وتصفير الرصيد ✅")}
               </button>
               <button
                 onClick={() => setPayoutModalData(null)}
@@ -786,7 +877,7 @@ export default function AdminReports({
                   cursor: "pointer",
                 }}
               >
-                إلغاء
+                {t("cancel_btn", "إلغاء")}
               </button>
             </div>
             {!payoutModalData.bank_iban && (
@@ -802,8 +893,10 @@ export default function AdminReports({
                   borderRadius: "10px",
                 }}
               >
-                ⚠️ تنبيه: قم بتحويل المبلغ للمسوق بأي طريقة أخرى قبل تأكيد
-                السداد هنا.
+                {t(
+                  "payout_manual_warning",
+                  "⚠️ تنبيه: قم بتحويل المبلغ للمسوق بأي طريقة أخرى قبل تأكيد السداد هنا.",
+                )}
               </p>
             )}
           </div>
@@ -828,7 +921,7 @@ export default function AdminReports({
             fontWeight: "900",
           }}
         >
-          📊 التقارير والإحصائيات
+          📊 {t("reports_stats_title", "التقارير والإحصائيات")}
         </h2>
         <button
           onClick={fetchStats}
@@ -845,7 +938,7 @@ export default function AdminReports({
             gap: "6px",
           }}
         >
-          <span>🔄</span> تحديث البيانات
+          <span>🔄</span> {t("refresh_data", "تحديث البيانات")}
         </button>
       </div>
 
@@ -859,7 +952,7 @@ export default function AdminReports({
         <div style={reportCard("#3b82f6")}>
           <div style={{ fontSize: "2rem", marginBottom: "5px" }}>📁</div>
           <h4 style={{ margin: "0 0 10px 0", color: "#64748b" }}>
-            إجمالي الحجوزات
+            {t("total_bookings_card", "إجمالي الحجوزات")}
           </h4>
           <p
             style={{
@@ -875,7 +968,7 @@ export default function AdminReports({
         <div style={reportCard("#10b981")}>
           <div style={{ fontSize: "2rem", marginBottom: "5px" }}>💰</div>
           <h4 style={{ margin: "0 0 10px 0", color: "#64748b" }}>
-            عمولة محصلة
+            {t("collected_commission_card", "عمولة محصلة")}
           </h4>
           <p
             style={{
@@ -892,7 +985,7 @@ export default function AdminReports({
         <div style={reportCard("#ef4444")}>
           <div style={{ fontSize: "2rem", marginBottom: "5px" }}>⏳</div>
           <h4 style={{ margin: "0 0 10px 0", color: "#64748b" }}>
-            عمولة معلقة
+            {t("pending_commission_card", "عمولة معلقة")}
           </h4>
           <p
             style={{
@@ -909,7 +1002,7 @@ export default function AdminReports({
         <div style={reportCard("#7c3aed")}>
           <div style={{ fontSize: "2rem", marginBottom: "5px" }}>💎</div>
           <h4 style={{ margin: "0 0 10px 0", color: "#64748b" }}>
-            الإيراد المتوقع
+            {t("expected_revenue_card", "الإيراد المتوقع")}
           </h4>
           <p
             style={{
@@ -957,7 +1050,7 @@ export default function AdminReports({
               transition: "0.2s",
             }}
           >
-            📑 تقارير الحجوزات
+            📑 {t("tab_bookings_reports", "تقارير الحجوزات")}
           </button>
           <button
             onClick={() => setReportTab("users")}
@@ -974,7 +1067,7 @@ export default function AdminReports({
               transition: "0.2s",
             }}
           >
-            👥 تقارير المستخدمين
+            👥 {t("tab_users_reports", "تقارير المستخدمين")}
           </button>
           <button
             onClick={() => setReportTab("affiliates")}
@@ -993,7 +1086,7 @@ export default function AdminReports({
               transition: "0.2s",
             }}
           >
-            💰 المسوقين والأرباح
+            💰 {t("tab_affiliates_profits", "المسوقين والأرباح")}
           </button>
         </div>
         <div>
@@ -1012,7 +1105,7 @@ export default function AdminReports({
                 gap: "8px",
               }}
             >
-              <span>🖨️</span> طباعة الحجوزات
+              <span>🖨️</span> {t("print_bookings_btn", "طباعة الحجوزات")}
             </button>
           )}
           {reportTab === "users" && (
@@ -1030,7 +1123,7 @@ export default function AdminReports({
                 gap: "8px",
               }}
             >
-              <span>🖨️</span> طباعة المستخدمين
+              <span>🖨️</span> {t("print_users_btn", "طباعة المستخدمين")}
             </button>
           )}
           {reportTab === "affiliates" && (
@@ -1048,7 +1141,7 @@ export default function AdminReports({
                 gap: "8px",
               }}
             >
-              <span>🖨️</span> طباعة المسوقين
+              <span>🖨️</span> {t("print_affiliates_btn", "طباعة المسوقين")}
             </button>
           )}
         </div>
@@ -1072,8 +1165,12 @@ export default function AdminReports({
                 fontSize: "0.95rem",
               }}
             >
-              💡 نسبة ربح المسوق محددة بـ {(affiliateRate * 100).toFixed(0)}% من
-              (عمولة المنصة للحجوزات المكتملة للعملاء الذين سجلوا عبره).
+              💡 {t("affiliate_rate_notice", "نسبة ربح المسوق محددة بـ")}{" "}
+              {(affiliateRate * 100).toFixed(0)}%{" "}
+              {t(
+                "affiliate_rate_notice_end",
+                "من (عمولة المنصة للحجوزات المكتملة للعملاء الذين سجلوا عبره).",
+              )}
             </span>
           </div>
           <div
@@ -1100,11 +1197,17 @@ export default function AdminReports({
                     borderBottom: "2px solid #e2e8f0",
                   }}
                 >
-                  <th style={thS}>الاسم واليوزر (المسوق)</th>
-                  <th style={thS}>العملاء المسجلين عبره</th>
-                  <th style={thS}>تفاصيل الأرباح التاريخية</th>
-                  <th style={thS}>المستحق حالياً</th>
-                  <th style={thS}>إجراء السداد</th>
+                  <th style={thS}>
+                    {t("th_name_username_marketer", "الاسم واليوزر (المسوق)")}
+                  </th>
+                  <th style={thS}>
+                    {t("th_referred_clients", "العملاء المسجلين عبره")}
+                  </th>
+                  <th style={thS}>
+                    {t("th_historical_profits", "تفاصيل الأرباح التاريخية")}
+                  </th>
+                  <th style={thS}>{t("th_current_due", "المستحق حالياً")}</th>
+                  <th style={thS}>{t("th_payout_action", "إجراء السداد")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -1125,7 +1228,7 @@ export default function AdminReports({
                     <td
                       style={{
                         ...tdS,
-                        textAlign: "right",
+                        textAlign: isRTL ? "right" : "left",
                         verticalAlign: "top",
                       }}
                     >
@@ -1143,7 +1246,7 @@ export default function AdminReports({
                           color: "#10b981",
                           fontSize: "0.85rem",
                           direction: "ltr",
-                          textAlign: "right",
+                          textAlign: isRTL ? "right" : "left",
                           marginTop: "4px",
                           fontWeight: "bold",
                         }}
@@ -1182,7 +1285,7 @@ export default function AdminReports({
                                 fontSize: "0.85rem",
                               }}
                             >
-                              👤 {ru.full_name || "بدون اسم"}
+                              👤 {ru.full_name || t("no_name", "بدون اسم")}
                             </span>
                             {ru.username ? (
                               <span
@@ -1203,7 +1306,7 @@ export default function AdminReports({
                                   marginTop: "2px",
                                 }}
                               >
-                                (بدون يوزر)
+                                ({t("no_username", "بدون يوزر")})
                               </span>
                             )}
                           </div>
@@ -1213,9 +1316,10 @@ export default function AdminReports({
                     <td
                       style={{
                         ...tdS,
-                        textAlign: "right",
+                        textAlign: isRTL ? "right" : "left",
                         verticalAlign: "top",
-                        borderRight: "1px dashed #e2e8f0",
+                        borderRight: isRTL ? "1px dashed #e2e8f0" : "none",
+                        borderLeft: isRTL ? "none" : "1px dashed #e2e8f0",
                       }}
                     >
                       <div
@@ -1225,7 +1329,10 @@ export default function AdminReports({
                           marginBottom: "8px",
                         }}
                       >
-                        الحجوزات المنفذة لعملائه:{" "}
+                        {t(
+                          "executed_bookings_clients",
+                          "الحجوزات المنفذة لعملائه:",
+                        )}{" "}
                         <strong
                           style={{ color: "#1e293b", fontSize: "1.1rem" }}
                         >
@@ -1239,7 +1346,10 @@ export default function AdminReports({
                           marginBottom: "10px",
                         }}
                       >
-                        إجمالي عمولة المنصة:{" "}
+                        {t(
+                          "total_platform_commission_label",
+                          "إجمالي عمولة المنصة:",
+                        )}{" "}
                         <strong
                           style={{
                             color: "#1e293b",
@@ -1259,7 +1369,7 @@ export default function AdminReports({
                           paddingTop: "10px",
                         }}
                       >
-                        نصيب المسوق الكلي:{" "}
+                        {t("total_marketer_share", "نصيب المسوق الكلي:")}{" "}
                         <span
                           style={{
                             direction: "ltr",
@@ -1304,7 +1414,6 @@ export default function AdminReports({
                           fontSize: "0.9rem",
                           cursor:
                             a.unpaidEarnings > 0 ? "pointer" : "not-allowed",
-                          transition: "0.2s",
                           boxShadow:
                             a.unpaidEarnings > 0
                               ? "0 4px 15px rgba(16, 185, 129, 0.25)"
@@ -1312,8 +1421,8 @@ export default function AdminReports({
                         }}
                       >
                         {a.unpaidEarnings > 0
-                          ? "سداد الآن 💳"
-                          : "مسدد بالكامل ✅"}
+                          ? t("pay_now_btn", "سداد الآن 💳")
+                          : t("fully_paid_badge", "مسدد بالكامل ✅")}
                       </button>
                     </td>
                   </tr>
@@ -1328,7 +1437,10 @@ export default function AdminReports({
                         fontSize: "1.1rem",
                       }}
                     >
-                      لا يوجد مسوقين مستحقين حتى الآن.
+                      {t(
+                        "no_eligible_marketers",
+                        "لا يوجد مسوقين مستحقين حتى الآن.",
+                      )}
                     </td>
                   </tr>
                 )}
@@ -1362,18 +1474,28 @@ export default function AdminReports({
               }}
             >
               <strong style={{ fontSize: "0.8rem", color: "#64748b" }}>
-                حالة الحجز:
+                {t("booking_status_label", "حالة الحجز:")}
               </strong>
               <select
                 value={activeStatusFilter}
                 onChange={(e) => setActiveStatusFilter(e.target.value)}
                 style={smInput}
               >
-                <option value="all">🚦 عرض جميع الحالات</option>
-                <option value="completed">✅ منفذ (مكتمل)</option>
-                <option value="pending">⏳ قيد المعالجة</option>
-                <option value="confirmed">👍 مؤكد</option>
-                <option value="cancelled">❌ ملغى</option>
+                <option value="all">
+                  {t("all_statuses_opt", "🚦 عرض جميع الحالات")}
+                </option>
+                <option value="completed">
+                  {t("status_completed_opt", "✅ منفذ (مكتمل)")}
+                </option>
+                <option value="pending">
+                  {t("status_pending_opt", "⏳ قيد المعالجة")}
+                </option>
+                <option value="confirmed">
+                  {t("status_confirmed_opt", "👍 مؤكد")}
+                </option>
+                <option value="cancelled">
+                  {t("status_cancelled_opt", "❌ ملغى")}
+                </option>
               </select>
             </div>
             <div
@@ -1385,16 +1507,22 @@ export default function AdminReports({
               }}
             >
               <strong style={{ fontSize: "0.8rem", color: "#64748b" }}>
-                حالة السداد للمنصة:
+                {t("platform_payment_status", "حالة السداد للمنصة:")}
               </strong>
               <select
                 value={paymentFilter}
                 onChange={(e) => setPaymentFilter(e.target.value)}
                 style={smInput}
               >
-                <option value="all">💳 عرض كل العمولات</option>
-                <option value="paid">✅ المسددة فقط</option>
-                <option value="unpaid">❌ غير المسددة فقط</option>
+                <option value="all">
+                  {t("all_commissions_opt", "💳 عرض كل العمولات")}
+                </option>
+                <option value="paid">
+                  {t("paid_only_opt", "✅ المسددة فقط")}
+                </option>
+                <option value="unpaid">
+                  {t("unpaid_only_opt", "❌ غير المسددة فقط")}
+                </option>
               </select>
             </div>
             <div
@@ -1406,11 +1534,14 @@ export default function AdminReports({
               }}
             >
               <strong style={{ fontSize: "0.8rem", color: "#64748b" }}>
-                بحث سريع:
+                {t("quick_search", "بحث سريع:")}
               </strong>
               <input
                 type="text"
-                placeholder="ابحث برقم الحجز، العميل أو المزود..."
+                placeholder={t(
+                  "quick_search_placeholder",
+                  "ابحث برقم الحجز، العميل أو المزود...",
+                )}
                 value={userSearch}
                 onChange={(e) => setUserSearch(e.target.value)}
                 style={smInput}
@@ -1430,7 +1561,10 @@ export default function AdminReports({
             }}
           >
             <strong style={{ color: "#1e293b", fontSize: "1.1rem" }}>
-              مجموع عمولات التقرير المفلتر حالياً:
+              {t(
+                "filtered_report_total",
+                "مجموع عمولات التقرير المفلتر حالياً:",
+              )}
             </strong>
             <strong
               style={{
@@ -1471,14 +1605,24 @@ export default function AdminReports({
                     borderBottom: "2px solid #e2e8f0",
                   }}
                 >
-                  <th style={thS}>المزود والخدمة</th>
-                  <th style={thS}>الموعد والموقع</th>
-                  <th style={thS}>العميل والتواصل</th>
-                  <th style={thS}>الإجمالي</th>
-                  <th style={thS}>صافي المزود</th>
-                  <th style={thS}>عمولة المنصة</th>
-                  <th style={thS}>الحالة</th>
-                  <th style={{ ...thS, width: "80px" }}>إجراء</th>
+                  <th style={thS}>
+                    {t("th_provider_service", "المزود والخدمة")}
+                  </th>
+                  <th style={thS}>
+                    {t("th_appointment_location", "الموعد والموقع")}
+                  </th>
+                  <th style={thS}>
+                    {t("th_client_contact", "العميل والتواصل")}
+                  </th>
+                  <th style={thS}>{t("th_total", "الإجمالي")}</th>
+                  <th style={thS}>{t("th_provider_net", "صافي المزود")}</th>
+                  <th style={thS}>
+                    {t("th_platform_commission", "عمولة المنصة")}
+                  </th>
+                  <th style={thS}>{t("th_status", "الحالة")}</th>
+                  <th style={{ ...thS, width: "80px" }}>
+                    {t("th_action", "إجراء")}
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -1489,7 +1633,6 @@ export default function AdminReports({
                   const locationData = b.location || "";
                   const isUrl = locationData.includes("http");
 
-                  // تجهيز التواريخ للعرض في الجدول
                   const startObj = b.appointment_date
                     ? new Date(b.appointment_date)
                     : null;
@@ -1527,7 +1670,9 @@ export default function AdminReports({
                         (e.currentTarget.style.backgroundColor = "transparent")
                       }
                     >
-                      <td style={{ ...tdS, textAlign: "right" }}>
+                      <td
+                        style={{ ...tdS, textAlign: isRTL ? "right" : "left" }}
+                      >
                         <div
                           style={{
                             fontWeight: "900",
@@ -1536,7 +1681,8 @@ export default function AdminReports({
                           }}
                         >
                           💼{" "}
-                          {b.offerings?.profiles?.full_name || "مزود غير معروف"}
+                          {b.offerings?.profiles?.full_name ||
+                            t("unknown_provider", "مزود غير معروف")}
                         </div>
                         {b.offerings?.profiles?.username && (
                           <div
@@ -1560,7 +1706,9 @@ export default function AdminReports({
                             fontWeight: "bold",
                           }}
                         >
-                          📌 خدمة: {b.offerings?.title || "غير محددة"}
+                          📌 {t("service_label_table", "خدمة:")}{" "}
+                          {b.offerings?.title ||
+                            t("unspecified_service", "غير محددة")}
                         </div>
                         <div
                           style={{
@@ -1572,7 +1720,8 @@ export default function AdminReports({
                             paddingTop: "5px",
                           }}
                         >
-                          رقم الحجز: #{b.id.substring(0, 8).toUpperCase()}
+                          {t("booking_id_label", "رقم الحجز:")} #
+                          {b.id.substring(0, 8).toUpperCase()}
                         </div>
                       </td>
 
@@ -1580,7 +1729,7 @@ export default function AdminReports({
                       <td
                         style={{
                           ...tdS,
-                          textAlign: "right",
+                          textAlign: isRTL ? "right" : "left",
                           verticalAlign: "top",
                         }}
                       >
@@ -1601,7 +1750,7 @@ export default function AdminReports({
                               }}
                             >
                               <strong style={{ color: "#64748b" }}>
-                                البدء:
+                                {t("start_label", "البدء:")}
                               </strong>
                               <br />
                               📅 {startF.gregDate} ({sTime})<br />
@@ -1618,7 +1767,10 @@ export default function AdminReports({
                             <div
                               style={{ fontSize: "0.85rem", color: "#64748b" }}
                             >
-                              تاريخ البدء غير محدد
+                              {t(
+                                "start_date_unspecified",
+                                "تاريخ البدء غير محدد",
+                              )}
                             </div>
                           )}
 
@@ -1638,7 +1790,7 @@ export default function AdminReports({
                               }}
                             >
                               <strong style={{ color: "#64748b" }}>
-                                الانتهاء:
+                                {t("end_label", "الانتهاء:")}
                               </strong>
                               <br />
                               🏁 {endF.gregDate} ({eTime})<br />
@@ -1655,15 +1807,16 @@ export default function AdminReports({
                             <div
                               style={{
                                 fontSize: "0.85rem",
-                                color: "#64748b",
+                                color: "#1e293b",
                                 lineHeight: "1.6",
                               }}
                             >
                               <strong style={{ color: "#64748b" }}>
-                                الانتهاء:
+                                {t("end_label", "الانتهاء:")}
                               </strong>
                               <br />
-                              🏁 نفس يوم البدء ({eTime || "غير محدد"})
+                              🏁 {t("same_as_start", "نفس يوم البدء")} (
+                              {eTime || t("not_specified", "غير محدد")})
                             </div>
                           )}
 
@@ -1691,7 +1844,7 @@ export default function AdminReports({
                                     gap: "5px",
                                   }}
                                 >
-                                  عرض الخريطة 🌍
+                                  {t("view_map_emoji", "عرض الخريطة 🌍")}
                                 </a>
                               ) : (
                                 <span style={{ color: "#475569" }}>
@@ -1700,7 +1853,10 @@ export default function AdminReports({
                               )
                             ) : (
                               <span style={{ color: "#94a3b8" }}>
-                                🌐 أونلاين / غير محدد
+                                {t(
+                                  "online_or_unspecified",
+                                  "🌐 أونلاين / غير محدد",
+                                )}
                               </span>
                             )}
                           </div>
@@ -1710,7 +1866,7 @@ export default function AdminReports({
                       <td
                         style={{
                           ...tdS,
-                          textAlign: "right",
+                          textAlign: isRTL ? "right" : "left",
                           verticalAlign: "top",
                         }}
                       >
@@ -1721,7 +1877,9 @@ export default function AdminReports({
                             fontSize: "1rem",
                           }}
                         >
-                          🙋‍♂️ {b.profiles?.full_name || "عميل غير معروف"}
+                          🙋‍♂️{" "}
+                          {b.profiles?.full_name ||
+                            t("unknown_client", "عميل غير معروف")}
                         </div>
                         {b.profiles?.username && (
                           <div
@@ -1743,11 +1901,11 @@ export default function AdminReports({
                             fontSize: "0.85rem",
                             marginTop: "10px",
                             direction: "ltr",
-                            textAlign: "right",
+                            textAlign: isRTL ? "right" : "left",
                             fontWeight: "bold",
                           }}
                         >
-                          📞 {b.profiles?.phone || "لا يوجد رقم"}
+                          📞 {b.profiles?.phone || t("no_phone", "لا يوجد رقم")}
                         </div>
                       </td>
 
@@ -1798,7 +1956,7 @@ export default function AdminReports({
                               border: "1px solid #bbf7d0",
                             }}
                           >
-                            📞 حجز خاص (معفى)
+                            {t("private_booking_exempt", "📞 حجز خاص (معفى)")}
                           </div>
                         ) : b.is_commission_paid ? (
                           <div
@@ -1813,7 +1971,7 @@ export default function AdminReports({
                               display: "inline-block",
                             }}
                           >
-                            مسددة ✅
+                            {t("paid_badge", "مسددة ✅")}
                           </div>
                         ) : (
                           <div
@@ -1830,18 +1988,30 @@ export default function AdminReports({
                               href={`https://wa.me/${(
                                 b.offerings?.profiles?.phone || ""
                               ).replace(/\D/g, "")}?text=${encodeURIComponent(
-                                `مرحباً ${
+                                `${t("whatsapp_reminder_hello", "مرحباً")} ${
                                   b.offerings?.profiles?.full_name ||
-                                  "مزود الخدمة"
-                                }،\n\nنود تذكيركم بضرورة سداد عمولة المنصة المستحقة بمبلغ *${fin.platformCommission.toFixed(
+                                  t("service_provider_default", "مزود الخدمة")
+                                }،\n\n${t(
+                                  "whatsapp_reminder_body",
+                                  "نود تذكيركم بضرورة سداد عمولة المنصة المستحقة بمبلغ",
+                                )} *${fin.platformCommission.toFixed(
                                   2,
-                                )} ${currency}*\nلرقم الحجز: #${b.id
+                                )} ${currency}*\n${t(
+                                  "whatsapp_reminder_booking_id",
+                                  "لرقم الحجز:",
+                                )} #${b.id
                                   .substring(0, 8)
-                                  .toUpperCase()}\n\nوشكراً لتعاونكم.`,
+                                  .toUpperCase()}\n\n${t(
+                                  "whatsapp_reminder_thanks",
+                                  "وشكراً لتعاونكم.",
+                                )}`,
                               )}`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              title="مراسلة عبر الواتساب"
+                              title={t(
+                                "whatsapp_tooltip",
+                                "مراسلة عبر الواتساب",
+                              )}
                               style={{
                                 display: "inline-flex",
                                 alignItems: "center",
@@ -1868,7 +2038,7 @@ export default function AdminReports({
                                   "#fef2f2")
                               }
                             >
-                              <span>💬</span> واتساب
+                              <span>💬</span> {t("whatsapp_btn", "واتساب")}
                             </a>
 
                             {/* 2. المراسلة الداخلية في النظام */}
@@ -1892,7 +2062,10 @@ export default function AdminReports({
                                   onChange={(e) =>
                                     setSysMsgText(e.target.value)
                                   }
-                                  placeholder="اكتب التنبيه هنا..."
+                                  placeholder={t(
+                                    "type_alert_placeholder",
+                                    "اكتب التنبيه هنا...",
+                                  )}
                                   style={{
                                     ...smInput,
                                     padding: "6px",
@@ -1920,7 +2093,7 @@ export default function AdminReports({
                                       cursor: "pointer",
                                     }}
                                   >
-                                    إرسال
+                                    {t("send_btn", "إرسال")}
                                   </button>
                                   <button
                                     onClick={() => setActiveMsgId(null)}
@@ -1943,9 +2116,15 @@ export default function AdminReports({
                                 onClick={() => {
                                   setActiveMsgId(b.id);
                                   setSysMsgText(
-                                    `تذكير ودي: نرجو منكم المبادرة بسداد عمولة المنصة (${fin.platformCommission.toFixed(
+                                    `${t(
+                                      "system_reminder_prefix",
+                                      "تذكير ودي: نرجو منكم المبادرة بسداد عمولة المنصة",
+                                    )} (${fin.platformCommission.toFixed(
                                       2,
-                                    )} ${currency}) للحجز المكتمل لضمان استمرار تقديم الخدمات.`,
+                                    )} ${currency}) ${t(
+                                      "system_reminder_suffix",
+                                      "للحجز المكتمل لضمان استمرار تقديم الخدمات.",
+                                    )}`,
                                   );
                                 }}
                                 style={{
@@ -1973,7 +2152,8 @@ export default function AdminReports({
                                     "#fff")
                                 }
                               >
-                                <span>🔔</span> تنبيه بالنظام
+                                <span>🔔</span>{" "}
+                                {t("system_alert_btn", "تنبيه بالنظام")}
                               </button>
                             )}
                           </div>
@@ -2001,10 +2181,10 @@ export default function AdminReports({
                           }}
                         >
                           {b.status === "completed"
-                            ? "منفذ"
+                            ? t("status_executed", "منفذ")
                             : b.status === "cancelled"
-                            ? "ملغى"
-                            : "معلق"}
+                            ? t("status_cancelled", "ملغى")
+                            : t("status_pending", "معلق")}
                         </span>
                       </td>
                       <td style={{ ...tdS }}>
@@ -2017,6 +2197,8 @@ export default function AdminReports({
                             borderRadius: "10px",
                             padding: "8px 12px",
                             cursor: "pointer",
+                            fontWeight: "bold",
+                            fontSize: "0.85rem",
                             transition: "0.2s",
                           }}
                           onMouseOver={(e) =>
@@ -2025,9 +2207,12 @@ export default function AdminReports({
                           onMouseOut={(e) =>
                             (e.currentTarget.style.background = "#fef2f2")
                           }
-                          title="حذف الحجز نهائياً"
+                          title={t(
+                            "delete_booking_tooltip",
+                            "حذف الحجز نهائياً",
+                          )}
                         >
-                          🗑️ حذف
+                          🗑️ {t("delete_btn", "حذف")}
                         </button>
                       </td>
                     </tr>
@@ -2043,7 +2228,7 @@ export default function AdminReports({
                         fontSize: "1.1rem",
                       }}
                     >
-                      لا توجد حجوزات تطابق البحث.
+                      {t("no_matching_bookings", "لا توجد حجوزات تطابق البحث.")}
                     </td>
                   </tr>
                 )}
@@ -2073,11 +2258,14 @@ export default function AdminReports({
                 marginBottom: "8px",
               }}
             >
-              بحث سريع عن مستخدم:
+              {t("quick_search_user", "بحث سريع عن مستخدم:")}
             </strong>
             <input
               type="text"
-              placeholder="اكتب الاسم، رقم الجوال، أو الإيميل للبحث..."
+              placeholder={t(
+                "quick_search_user_placeholder",
+                "اكتب الاسم، رقم الجوال، أو الإيميل للبحث...",
+              )}
               value={userSearch}
               onChange={(e) => setUserSearch(e.target.value)}
               style={{
@@ -2112,11 +2300,13 @@ export default function AdminReports({
                     borderBottom: "2px solid #e2e8f0",
                   }}
                 >
-                  <th style={thS}>الاسم واليوزر</th>
-                  <th style={thS}>رقم التواصل</th>
-                  <th style={thS}>النوع</th>
-                  <th style={thS}>الحالة</th>
-                  <th style={thS}>إجراءات الإدارة</th>
+                  <th style={thS}>{t("th_name_username", "الاسم واليوزر")}</th>
+                  <th style={thS}>{t("th_contact_number", "رقم التواصل")}</th>
+                  <th style={thS}>{t("th_type", "النوع")}</th>
+                  <th style={thS}>{t("th_status", "الحالة")}</th>
+                  <th style={thS}>
+                    {t("th_admin_actions", "إجراءات الإدارة")}
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -2134,7 +2324,7 @@ export default function AdminReports({
                       (e.currentTarget.style.backgroundColor = "transparent")
                     }
                   >
-                    <td style={{ ...tdS, textAlign: "right" }}>
+                    <td style={{ ...tdS, textAlign: isRTL ? "right" : "left" }}>
                       <div
                         style={{
                           fontWeight: "900",
@@ -2142,7 +2332,7 @@ export default function AdminReports({
                           fontSize: "1.05rem",
                         }}
                       >
-                        {u.full_name || "بدون اسم"}
+                        {u.full_name || t("no_name", "بدون اسم")}
                       </div>
                       <div
                         style={{
@@ -2162,7 +2352,9 @@ export default function AdminReports({
                             @{u.username}
                           </span>
                         ) : (
-                          <span style={{ opacity: 0.6 }}>(لم يعين يوزر)</span>
+                          <span style={{ opacity: 0.6 }}>
+                            ({t("no_username_set", "لم يعين يوزر")})
+                          </span>
                         )}
                       </div>
                     </td>
@@ -2198,8 +2390,8 @@ export default function AdminReports({
                         }}
                       >
                         {u.provider_type === "institution"
-                          ? "🏢 مؤسسة"
-                          : "👤 فرد"}
+                          ? t("institution_badge", "🏢 مؤسسة")
+                          : t("individual_badge", "👤 فرد")}
                       </span>
                     </td>
                     <td style={{ ...tdS }}>
@@ -2213,7 +2405,9 @@ export default function AdminReports({
                           color: u.is_active ? "#059669" : "#dc2626",
                         }}
                       >
-                        {u.is_active ? "نشط ✅" : "موقوف 🚫"}
+                        {u.is_active
+                          ? t("active_badge", "نشط ✅")
+                          : t("suspended_badge", "موقوف 🚫")}
                       </span>
                     </td>
                     <td
@@ -2246,7 +2440,9 @@ export default function AdminReports({
                           (e.currentTarget.style.transform = "scale(1)")
                         }
                       >
-                        {u.is_active ? "إيقاف" : "تفعيل"}
+                        {u.is_active
+                          ? t("suspend_action", "إيقاف")
+                          : t("activate_action", "تفعيل")}
                       </button>
                       <button
                         onClick={() => handleAdminDeleteUser(u.id)}
@@ -2267,9 +2463,9 @@ export default function AdminReports({
                         onMouseOut={(e) =>
                           (e.currentTarget.style.background = "#fef2f2")
                         }
-                        title="حذف المستخدم نهائياً"
+                        title={t("delete_user_tooltip", "حذف المستخدم نهائياً")}
                       >
-                        حذف 🗑️
+                        {t("delete_btn", "حذف")} 🗑️
                       </button>
                     </td>
                   </tr>
@@ -2284,7 +2480,7 @@ export default function AdminReports({
                         fontSize: "1.1rem",
                       }}
                     >
-                      لا يوجد مستخدمين.
+                      {t("no_users_found", "لا يوجد مستخدمين.")}
                     </td>
                   </tr>
                 )}

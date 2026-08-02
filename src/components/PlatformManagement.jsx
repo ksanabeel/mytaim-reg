@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
+import { useTranslation } from "react-i18next"; // مكتبة الترجمة لاستخراج لغة المستخدم
 
 // --- التنسيقات والدوال المساعدة ---
 const thS = {
@@ -146,6 +147,9 @@ export default function PlatformManagement({
   playStoreLink,
   setPlayStoreLink,
 }) {
+  const { t, i18n } = useTranslation();
+  const isRTL = i18n?.language === "ar";
+
   const [activeAdminTab, setActiveAdminTab] = useState("settings");
   const [users, setUsers] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -183,9 +187,13 @@ export default function PlatformManagement({
   const [inputAppleStore, setInputAppleStore] = useState(appleStoreLink || "");
   const [inputPlayStore, setInputPlayStore] = useState(playStoreLink || "");
 
-  const [inputTerms, setInputTerms] = useState("");
-  const [inputPrivacy, setInputPrivacy] = useState("");
-  const [inputRefund, setInputRefund] = useState("");
+  // حقول السياسات المنفصلة (عربي وإنجليزي)
+  const [inputTermsAr, setInputTermsAr] = useState("");
+  const [inputTermsEn, setInputTermsEn] = useState("");
+  const [inputPrivacyAr, setInputPrivacyAr] = useState("");
+  const [inputPrivacyEn, setInputPrivacyEn] = useState("");
+  const [inputRefundAr, setInputRefundAr] = useState("");
+  const [inputRefundEn, setInputRefundEn] = useState("");
 
   const [newCatAr, setNewCatAr] = useState("");
   const [newCatEn, setNewCatEn] = useState("");
@@ -240,9 +248,16 @@ export default function PlatformManagement({
       setCategories(cats);
 
       if (settsData) {
-        setInputTerms(settsData.terms_text || "");
-        setInputPrivacy(settsData.privacy_text || "");
-        setInputRefund(settsData.refund_text || "");
+        setInputTermsAr(settsData.terms_text_ar || settsData.terms_text || "");
+        setInputTermsEn(settsData.terms_text_en || "");
+        setInputPrivacyAr(
+          settsData.privacy_text_ar || settsData.privacy_text || "",
+        );
+        setInputPrivacyEn(settsData.privacy_text_en || "");
+        setInputRefundAr(
+          settsData.refund_text_ar || settsData.refund_text || "",
+        );
+        setInputRefundEn(settsData.refund_text_en || "");
 
         setInputAnnouncementText(settsData.announcement_text || "");
         setInputAnnouncementLink(settsData.announcement_link || "");
@@ -302,7 +317,7 @@ export default function PlatformManagement({
               b.review ||
               b.comment ||
               b.feedback ||
-              "تم التقييم بدون تعليق نصي.",
+              t("no_text_review", "تم التقييم بدون تعليق نصي."),
             profiles: customerProfile,
             offerings: offering,
           };
@@ -320,7 +335,7 @@ export default function PlatformManagement({
           .map((m) => ({
             ...m,
             profiles: u.find((user) => user.id === m.user_id) || {
-              full_name: "غير متوفر",
+              full_name: t("not_available", "غير متوفر"),
             },
           }))
           .sort(
@@ -338,89 +353,6 @@ export default function PlatformManagement({
   useEffect(() => {
     fetchAdminData();
   }, []);
-
-  const handleApproveCommission = async (messageOrId) => {
-    const msgId =
-      typeof messageOrId === "object" ? messageOrId.id : messageOrId;
-    const { data: msgData } = await supabase
-      .from("contact_messages")
-      .select("user_id")
-      .eq("id", msgId)
-      .maybeSingle();
-
-    const providerId = msgData?.user_id;
-
-    if (!providerId) {
-      return alert("عذراً، هذا الإيصال مرسل من زائر غير مسجل في النظام.");
-    }
-
-    const choice = window.prompt(
-      "لتصفية حساب المزود، اختر الطريقة المناسبة:\n\n1 - تصفية (كافة العمولات المعلقة) دفعة واحدة.\n2 - تصفية (حجز واحد محدد).\n\n⚠️ ملاحظة: إذا كان المبلغ المحول ناقصاً، اضغط (إلغاء) واستخدم زر المراسلة لطلب باقي المبلغ.\n\nأدخل الرقم (1) أو (2):",
-    );
-
-    if (!choice) return;
-
-    try {
-      if (choice === "1") {
-        const { data: offeringsData } = await supabase
-          .from("offerings")
-          .select("id")
-          .eq("provider_id", providerId);
-
-        if (offeringsData && offeringsData.length > 0) {
-          const offeringIds = offeringsData.map((o) => o.id);
-
-          await supabase
-            .from("bookings")
-            .update({ is_commission_paid: true })
-            .in("offering_id", offeringIds)
-            .eq("status", "completed")
-            .eq("is_commission_paid", false);
-        }
-
-        await supabase.from("notifications").insert([
-          {
-            user_id: providerId,
-            title: "تم اعتماد سداد العمولات بنجاح 💰✅",
-            message: `شكرًا لك، اعتمدت الإدارة المالية حوالتك البنكية. تم تصفية (كافة المستحقات المعلقة) وتحديث رصيدك بنجاح.`,
-            is_read: false,
-          },
-        ]);
-      } else if (choice === "2") {
-        const bookingIdInput = window.prompt(
-          "الرجاء إدخال (رقم الحجز) المراد تصفية عمولته:",
-        );
-        if (!bookingIdInput) return;
-
-        await supabase
-          .from("bookings")
-          .update({ is_commission_paid: true })
-          .eq("id", bookingIdInput);
-
-        await supabase.from("notifications").insert([
-          {
-            user_id: providerId,
-            title: "تم اعتماد سداد العمولة بنجاح ✅",
-            message: `شكرًا لك، اعتمدت الإدارة المالية حوالتك البنكية للحجز رقم (${bookingIdInput}). تم إخفاء المطالبة بنجاح.`,
-            is_read: false,
-          },
-        ]);
-      } else {
-        return alert("خيار غير صحيح، الرجاء إدخال رقم 1 أو 2.");
-      }
-
-      await supabase
-        .from("contact_messages")
-        .update({ is_read: true })
-        .eq("id", msgId);
-
-      alert("تم اعتماد السداد المالي وتحديث حساب المزود بنجاح! 🎉");
-      fetchAdminData();
-      if (onRefresh) onRefresh();
-    } catch (err) {
-      alert("حدث خطأ مالي أثناء محاولة الاعتماد: " + err.message);
-    }
-  };
 
   const handleUpdateSettings = async () => {
     const newRateDec = inputRate / 100;
@@ -466,10 +398,12 @@ export default function PlatformManagement({
         setIsAnnouncementActive(inputIsAnnouncementActive);
         setAppleStoreLink(inputAppleStore);
         setPlayStoreLink(inputPlayStore);
-        alert("تم حفظ الإعدادات والتعديلات بنجاح ✅");
+        alert(
+          t("settings_saved_success", "تم حفظ الإعدادات والتعديلات بنجاح ✅"),
+        );
       }
     } catch (err) {
-      alert("حدث خطأ أثناء الحفظ.");
+      alert(t("save_error", "حدث خطأ أثناء الحفظ."));
     }
   };
 
@@ -478,9 +412,12 @@ export default function PlatformManagement({
       const { error: settingsError } = await supabase
         .from("platform_settings")
         .update({
-          terms_text: inputTerms,
-          privacy_text: inputPrivacy,
-          refund_text: inputRefund,
+          terms_text_ar: inputTermsAr,
+          terms_text_en: inputTermsEn,
+          privacy_text_ar: inputPrivacyAr,
+          privacy_text_en: inputPrivacyEn,
+          refund_text_ar: inputRefundAr,
+          refund_text_en: inputRefundEn,
         })
         .eq("id", 1);
 
@@ -488,7 +425,10 @@ export default function PlatformManagement({
 
       if (
         window.confirm(
-          "تم حفظ السياسات بنجاح ✅\n\nهل هذا التعديل (جوهري) وتريد إجبار جميع المستخدمين الحاليين على الموافقة على الشروط الجديدة عند دخولهم القادم للمنصة؟",
+          t(
+            "policies_force_approval_prompt",
+            "تم حفظ السياسات بنجاح ✅\n\nهل هذا التعديل (جوهري) وتريد إجبار جميع المستخدمين الحاليين على الموافقة على الشروط الجديدة عند دخولهم القادم للمنصة؟",
+          ),
         )
       ) {
         const { error: profilesError } = await supabase
@@ -496,18 +436,30 @@ export default function PlatformManagement({
           .update({ terms_accepted: false })
           .not("id", "is", null);
         if (profilesError) throw profilesError;
-        alert("تم الحفظ وإجبار الجميع على الموافقة من جديد بنجاح! 🚀📜");
+        alert(
+          t(
+            "policies_forced_success",
+            "تم الحفظ وإجبار الجميع على الموافقة من جديد بنجاح! 🚀📜",
+          ),
+        );
       } else {
-        alert("تم حفظ السياسات دون إجبار المستخدمين القدامى.");
+        alert(
+          t(
+            "policies_saved_only",
+            "تم حفظ السياسات دون إجبار المستخدمين القدامى.",
+          ),
+        );
       }
     } catch (err) {
-      alert("حدث خطأ أثناء الحفظ: " + err.message);
+      alert(t("policies_save_error", "حدث خطأ أثناء الحفظ: ") + err.message);
     }
   };
 
   const handleAddCategory = async () => {
     if (!newCatAr || !newCatEn)
-      return alert("الرجاء إدخال اسم القسم بالعربي والإنجليزي.");
+      return alert(
+        t("cat_fields_required", "الرجاء إدخال اسم القسم بالعربي والإنجليزي."),
+      );
     const safeId =
       newCatEn
         .toLowerCase()
@@ -529,21 +481,22 @@ export default function PlatformManagement({
         setNewCatAr("");
         setNewCatEn("");
         setNewCatIcon("");
-        alert("تمت إضافة القسم بنجاح ✅");
+        alert(t("cat_added_success", "تمت إضافة القسم بنجاح ✅"));
       }
     } catch (err) {
-      alert("حدث خطأ.");
+      alert(t("error_prefix", "خطأ: ") + err.message);
     }
   };
 
   const handleDeleteCategory = async (id) => {
-    if (window.confirm("هل أنت متأكد من حذف هذا القسم؟")) {
+    if (
+      window.confirm(t("confirm_delete_cat", "هل أنت متأكد من حذف هذا القسم؟"))
+    ) {
       await supabase.from("categories").delete().eq("id", id);
       fetchAdminData();
     }
   };
 
-  // ✨ دالة فتح نافذة تعديل القسم ✨
   const openEditCategory = (cat) => {
     setEditingCatId(cat.id);
     setEditCatForm({
@@ -554,10 +507,9 @@ export default function PlatformManagement({
     setIsEditCatModalOpen(true);
   };
 
-  // ✨ دالة حفظ تعديل القسم ✨
   const handleSaveEditCategory = async () => {
     if (!editCatForm.label_ar.trim())
-      return alert("الرجاء إدخال الاسم بالعربي");
+      return alert(t("cat_ar_required", "الرجاء إدخال الاسم بالعربي"));
 
     try {
       const { error } = await supabase
@@ -570,15 +522,15 @@ export default function PlatformManagement({
         .eq("id", editingCatId);
 
       if (!error) {
-        alert("تم تعديل القسم بنجاح ✅");
+        alert(t("cat_edited_success", "تم تعديل القسم بنجاح ✅"));
         setIsEditCatModalOpen(false);
         setEditingCatId(null);
         fetchAdminData();
       } else {
-        alert("حدث خطأ أثناء التعديل: " + error.message);
+        alert(t("cat_edit_error", "حدث خطأ أثناء التعديل: ") + error.message);
       }
     } catch (err) {
-      alert("حدث خطأ.");
+      alert(t("error_prefix", "خطأ: ") + err.message);
     }
   };
 
@@ -591,7 +543,7 @@ export default function PlatformManagement({
       fetchAdminData();
       onRefresh();
     } catch (err) {
-      alert("خطأ: " + err.message);
+      alert(t("error_prefix", "خطأ: ") + err.message);
     }
   };
 
@@ -604,24 +556,32 @@ export default function PlatformManagement({
       fetchAdminData();
       onRefresh();
     } catch (err) {
-      alert("خطأ: " + err.message);
+      alert(t("error_prefix", "خطأ: ") + err.message);
     }
   };
 
   const handleAdminDeleteUser = async (id) => {
     if (
       window.confirm(
-        "🚨 تحذير خطير: حذف المستخدم سيؤدي إلى مسح بياناته. هل أنت متأكد?",
+        t(
+          "confirm_delete_user_admin",
+          "🚨 تحذير خطير: حذف المستخدم سيؤدي إلى مسح بياناته. هل أنت متأكد?",
+        ),
       )
     ) {
       try {
         const { error } = await supabase.from("profiles").delete().eq("id", id);
         if (error) throw error;
-        alert("تم حذف المستخدم بنجاح ✅");
+        alert(t("user_deleted_success", "تم حذف المستخدم بنجاح ✅"));
         fetchAdminData();
         onRefresh();
       } catch (err) {
-        alert("حدث خطأ! قد يكون المستخدم مرتبطاً بحجوزات سابقة.");
+        alert(
+          t(
+            "user_delete_error",
+            "حدث خطأ! قد يكون المستخدم مرتبطاً بحجوزات سابقة.",
+          ),
+        );
       }
     }
   };
@@ -634,7 +594,8 @@ export default function PlatformManagement({
   };
 
   const saveForceEdit = async () => {
-    if (!newUsername.trim()) return alert("يجب كتابة اسم مستخدم");
+    if (!newUsername.trim())
+      return alert(t("username_required", "يجب كتابة اسم مستخدم"));
     try {
       const { error } = await supabase
         .from("profiles")
@@ -644,23 +605,25 @@ export default function PlatformManagement({
         })
         .eq("id", editingUser.id);
       if (!error) {
-        alert("تم التعديل الإجباري بنجاح! 👑");
+        alert(t("force_edit_success", "تم التعديل الإجباري بنجاح! 👑"));
         setIsForceEditModalOpen(false);
         fetchAdminData();
         onRefresh();
       } else {
         error.code === "23505"
-          ? alert("اسم المستخدم هذا محجوز لشخص آخر.")
-          : alert("خطأ: " + error.message);
+          ? alert(t("username_taken", "اسم المستخدم هذا محجوز لشخص آخر."))
+          : alert(t("error_prefix", "خطأ: ") + error.message);
       }
     } catch (err) {
-      alert("خطأ أثناء التعديل");
+      alert(t("force_edit_error", "خطأ أثناء التعديل"));
     }
   };
 
   const handleSendBroadcast = async () => {
     if (!broadcastMessageText.trim())
-      return alert("الرجاء كتابة نص الرسالة أولاً ✍️");
+      return alert(
+        t("broadcast_msg_required", "الرجاء كتابة نص الرسالة أولاً ✍️"),
+      );
 
     setIsBroadcasting(true);
     let targetUsers = users;
@@ -677,12 +640,17 @@ export default function PlatformManagement({
 
     if (targetUsers.length === 0) {
       setIsBroadcasting(false);
-      return alert("لا يوجد مستخدمين في هذه الشريحة لإرسال الرسالة لهم.");
+      return alert(
+        t(
+          "no_users_in_segment",
+          "لا يوجد مستخدمين في هذه الشريحة لإرسال الرسالة لهم.",
+        ),
+      );
     }
 
     const notificationsToInsert = targetUsers.map((u) => ({
       user_id: u.id,
-      title: "إعلان إداري هام 📢",
+      title: t("broadcast_notif_title", "إعلان إداري هام 📢"),
       message: broadcastMessageText,
     }));
 
@@ -691,19 +659,30 @@ export default function PlatformManagement({
         .from("notifications")
         .insert(notificationsToInsert);
       if (error) throw error;
-      alert(`تم إرسال الرسالة إلى (${targetUsers.length}) مستخدم بنجاح! ✅`);
+      alert(
+        t("broadcast_sent_success_prefix", "تم إرسال الرسالة إلى (") +
+          targetUsers.length +
+          t("broadcast_sent_success_suffix", ") مستخدم بنجاح! ✅"),
+      );
       setIsBroadcastModalOpen(false);
       setBroadcastMessageText("");
     } catch (err) {
-      alert("حدث خطأ أثناء الإرسال الجماعي: " + err.message);
+      alert(
+        t("broadcast_error", "حدث خطأ أثناء الإرسال الجماعي: ") + err.message,
+      );
     } finally {
       setIsBroadcasting(false);
     }
   };
 
   const handleHideComment = async (id, source_table) => {
-    if (window.confirm("إخفاء التعليق لكونه مسيئاً؟")) {
-      const hiddenText = "🚫 تم إخفاء التعليق لمخالفته سياسة المنصة.";
+    if (
+      window.confirm(t("confirm_hide_offensive", "إخفاء التعليق لكونه مسيئاً؟"))
+    ) {
+      const hiddenText = t(
+        "offensive_hidden_text",
+        "🚫 تم إخفاء التعليق لمخالفته سياسة المنصة.",
+      );
       try {
         if (source_table === "bookings") {
           const { data: bData } = await supabase
@@ -739,10 +718,10 @@ export default function PlatformManagement({
             await supabase.from("reviews").update(payload).eq("id", id);
           }
         }
-        alert("تم إخفاء التعليق بنجاح ✅");
+        alert(t("comment_hidden_success", "تم إخفاء التعليق بنجاح ✅"));
         fetchAdminData();
       } catch (err) {
-        alert("حدث خطأ.");
+        alert(t("error_prefix", "خطأ: ") + err.message);
       }
     }
   };
@@ -767,11 +746,14 @@ export default function PlatformManagement({
 
         if (isImage) {
           return (
-            <div key={index} style={{ marginTop: "15px", textAlign: "right" }}>
+            <div
+              key={index}
+              style={{ marginTop: "15px", textAlign: isRTL ? "right" : "left" }}
+            >
               <a href={part} target="_blank" rel="noopener noreferrer">
                 <img
                   src={part}
-                  alt="إيصال سداد"
+                  alt={t("payment_receipt_alt", "إيصال سداد")}
                   style={{
                     maxWidth: "100%",
                     maxHeight: "180px",
@@ -782,7 +764,7 @@ export default function PlatformManagement({
                     objectFit: "contain",
                     backgroundColor: "#f8fafc",
                   }}
-                  title="اضغط لمعاينة وتكبير الإيصال"
+                  title={t("zoom_receipt_title", "اضغط لمعاينة وتكبير الإيصال")}
                 />
               </a>
             </div>
@@ -809,7 +791,7 @@ export default function PlatformManagement({
                   fontSize: "0.85rem",
                 }}
               >
-                📄 عرض المرفق المالي (PDF / رابط)
+                📄 {t("view_attachment_link", "عرض المرفق المالي (PDF / رابط)")}
               </a>
             </div>
           );
@@ -840,7 +822,7 @@ export default function PlatformManagement({
         display: "flex",
         flexDirection: "column",
         gap: "25px",
-        direction: "rtl",
+        direction: isRTL ? "rtl" : "ltr",
         borderTop: "4px solid #ef4444",
       }}
     >
@@ -855,7 +837,8 @@ export default function PlatformManagement({
           gap: "10px",
         }}
       >
-        <span>👑</span> لوحة تحكم الإدارة {isFin && "والمالية العليا"}
+        <span>👑</span> {t("admin_dashboard_title", "لوحة تحكم الإدارة")}{" "}
+        {isFin && t("and_upper_finance", "والمالية العليا")}
       </h2>
 
       {/* شريط تبويبات الإدارة الذكي */}
@@ -875,7 +858,7 @@ export default function PlatformManagement({
             onClick={() => setActiveAdminTab("settings")}
             style={tabBtnStyle(activeAdminTab === "settings")}
           >
-            🛠️ إعدادات المنصة
+            🛠️ {t("tab_platform_settings", "إعدادات المنصة")}
           </button>
         )}
         {!isFin && (
@@ -883,7 +866,7 @@ export default function PlatformManagement({
             onClick={() => setActiveAdminTab("policies")}
             style={tabBtnStyle(activeAdminTab === "policies")}
           >
-            📜 سياسات المنصة
+            📜 {t("tab_platform_policies", "سياسات المنصة")}
           </button>
         )}
         {!isFin && (
@@ -891,7 +874,7 @@ export default function PlatformManagement({
             onClick={() => setActiveAdminTab("categories")}
             style={tabBtnStyle(activeAdminTab === "categories")}
           >
-            📁 الأقسام
+            📁 {t("tab_categories", "الأقسام")}
           </button>
         )}
         {!isFin && (
@@ -899,20 +882,20 @@ export default function PlatformManagement({
             onClick={() => setActiveAdminTab("users")}
             style={tabBtnStyle(activeAdminTab === "users")}
           >
-            👥 المستخدمين
+            👥 {t("tab_users", "المستخدمين")}
           </button>
         )}
         <button
           onClick={() => setActiveAdminTab("reviews")}
           style={tabBtnStyle(activeAdminTab === "reviews")}
         >
-          ⭐ التقييمات
+          ⭐ {t("tab_reviews", "التقييمات")}
         </button>
         <button
           onClick={() => setActiveAdminTab("messages")}
           style={tabBtnStyle(activeAdminTab === "messages")}
         >
-          ✉️ رسائل وإيصالات الوارد{" "}
+          ✉️ {t("tab_messages_receipts", "رسائل وإيصالات الوارد")}{" "}
           {messages.filter((m) => !m.is_read).length > 0 && (
             <span
               style={{
@@ -921,7 +904,8 @@ export default function PlatformManagement({
                 padding: "2px 8px",
                 borderRadius: "12px",
                 fontSize: "0.75rem",
-                marginLeft: "5px",
+                marginLeft: isRTL ? "0" : "5px",
+                marginRight: isRTL ? "5px" : "0",
               }}
             >
               {messages.filter((m) => !m.is_read).length}
@@ -962,7 +946,7 @@ export default function PlatformManagement({
               }}
             >
               <h3 style={{ margin: 0, color: "#3b82f6", fontSize: "1.1rem" }}>
-                🎨 الهوية البصرية
+                🎨 {t("visual_identity", "الهوية البصرية")}
               </h3>
               <div>
                 <strong
@@ -973,7 +957,7 @@ export default function PlatformManagement({
                     fontSize: "0.85rem",
                   }}
                 >
-                  اسم المنصة:
+                  {t("platform_name_setting", "اسم المنصة:")}
                 </strong>
                 <input
                   type="text"
@@ -991,7 +975,7 @@ export default function PlatformManagement({
                     fontSize: "0.85rem",
                   }}
                 >
-                  رابط اللوجو (أو ارفع صورة):
+                  {t("platform_logo_url", "رابط اللوجو (أو ارفع صورة):")}
                 </strong>
                 <div style={{ display: "flex", gap: "10px" }}>
                   <input
@@ -1039,7 +1023,7 @@ export default function PlatformManagement({
               }}
             >
               <h3 style={{ margin: 0, color: "#10b981", fontSize: "1.1rem" }}>
-                💰 العمولات والأرباح
+                💰 {t("commissions_and_profits", "العمولات والأرباح")}
               </h3>
               <div style={{ display: "flex", gap: "20px" }}>
                 <div style={{ flex: 1 }}>
@@ -1051,7 +1035,7 @@ export default function PlatformManagement({
                       fontSize: "0.85rem",
                     }}
                   >
-                    عمولة المنصة (%):
+                    {t("platform_commission_pct", "عمولة المنصة (%):")}
                   </strong>
                   <input
                     type="number"
@@ -1076,7 +1060,7 @@ export default function PlatformManagement({
                       fontSize: "0.85rem",
                     }}
                   >
-                    ربح المسوق (%):
+                    {t("marketer_profit_pct", "ربح المسوق (%):")}
                   </strong>
                   <input
                     type="number"
@@ -1103,12 +1087,15 @@ export default function PlatformManagement({
                     fontSize: "0.85rem",
                   }}
                 >
-                  الحسابات البنكية للمنصة:
+                  {t("platform_bank_accounts", "الحسابات البنكية للمنصة:")}
                 </strong>
                 <textarea
                   value={inputBankAccounts}
                   onChange={(e) => setInputBankAccounts(e.target.value)}
-                  placeholder="مثال: البنك الراجحي..."
+                  placeholder={t(
+                    "bank_accounts_placeholder",
+                    "مثال: البنك الراجحي...",
+                  )}
                   style={{
                     ...smInput,
                     width: "100%",
@@ -1140,7 +1127,7 @@ export default function PlatformManagement({
               }}
             >
               <h3 style={{ margin: 0, color: "#f59e0b", fontSize: "1.1rem" }}>
-                📢 الشريط الإعلاني الذكي
+                📢 {t("smart_announcement_bar", "الشريط الإعلاني الذكي")}
               </h3>
               <label
                 style={{
@@ -1161,8 +1148,8 @@ export default function PlatformManagement({
                   style={{ transform: "scale(1.2)" }}
                 />
                 {inputIsAnnouncementActive
-                  ? "مفعل (يظهر للزوار)"
-                  : "معطل (مخفي)"}
+                  ? t("active_visible", "مفعل (يظهر للزوار)")
+                  : t("disabled_hidden", "معطل (مخفي)")}
               </label>
             </div>
             <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
@@ -1175,13 +1162,16 @@ export default function PlatformManagement({
                     fontSize: "0.85rem",
                   }}
                 >
-                  نص الإعلان أو التنبيه:
+                  {t("announcement_text_label", "نص الإعلان أو التنبيه:")}
                 </strong>
                 <input
                   type="text"
                   value={inputAnnouncementText}
                   onChange={(e) => setInputAnnouncementText(e.target.value)}
-                  placeholder="مثال: حمل تطبيق دعوة الآن..."
+                  placeholder={t(
+                    "announcement_placeholder",
+                    "مثال: حمل تطبيق دعوة الآن...",
+                  )}
                   style={{ ...smInput, width: "100%", boxSizing: "border-box" }}
                 />
               </div>
@@ -1194,7 +1184,7 @@ export default function PlatformManagement({
                     fontSize: "0.85rem",
                   }}
                 >
-                  رابط الإعلان (اختياري):
+                  {t("announcement_link_label", "رابط الإعلان (اختياري):")}
                 </strong>
                 <input
                   type="text"
@@ -1224,7 +1214,7 @@ export default function PlatformManagement({
             }}
           >
             <h3 style={{ margin: 0, color: "#1e293b", fontSize: "1.1rem" }}>
-              📱 روابط تحميل التطبيقات
+              📱 {t("app_download_links", "روابط تحميل التطبيقات")}
             </h3>
             <div style={{ display: "flex", gap: "15px", flexWrap: "wrap" }}>
               <div style={{ flex: 1, minWidth: "200px" }}>
@@ -1236,7 +1226,7 @@ export default function PlatformManagement({
                     fontSize: "0.85rem",
                   }}
                 >
-                  رابط (App Store):
+                  {t("apple_store_link_label", "رابط (App Store):")}
                 </strong>
                 <input
                   type="text"
@@ -1260,7 +1250,7 @@ export default function PlatformManagement({
                     fontSize: "0.85rem",
                   }}
                 >
-                  رابط (Google Play):
+                  {t("google_play_link_label", "رابط (Google Play):")}
                 </strong>
                 <input
                   type="text"
@@ -1297,7 +1287,7 @@ export default function PlatformManagement({
               }}
             >
               <h3 style={{ margin: 0, color: "#7c3aed", fontSize: "1.1rem" }}>
-                📝 نصوص واجهة المتجر
+                📝 {t("store_interface_texts", "نصوص واجهة المتجر")}
               </h3>
               <div style={{ display: "flex", gap: "10px" }}>
                 <div style={{ flex: 1 }}>
@@ -1309,7 +1299,7 @@ export default function PlatformManagement({
                       fontSize: "0.8rem",
                     }}
                   >
-                    ترحيب (عربي):
+                    {t("welcome_ar_input", "ترحيب (عربي):")}
                   </strong>
                   <input
                     type="text"
@@ -1331,7 +1321,7 @@ export default function PlatformManagement({
                       fontSize: "0.8rem",
                     }}
                   >
-                    ترحيب (إنجليزي):
+                    {t("welcome_en_input", "ترحيب (إنجليزي):")}
                   </strong>
                   <input
                     type="text"
@@ -1359,7 +1349,7 @@ export default function PlatformManagement({
               }}
             >
               <h3 style={{ margin: 0, color: "#f59e0b", fontSize: "1.1rem" }}>
-                🛡️ التوثيق والتراخيص
+                🛡️ {t("verification_and_licenses", "التوثيق والتراخيص")}
               </h3>
               <div>
                 <strong
@@ -1370,7 +1360,7 @@ export default function PlatformManagement({
                     fontSize: "0.85rem",
                   }}
                 >
-                  جهة التوثيق:
+                  {t("verification_authority", "جهة التوثيق:")}
                 </strong>
                 <input
                   type="text"
@@ -1389,7 +1379,7 @@ export default function PlatformManagement({
                       fontSize: "0.8rem",
                     }}
                   >
-                    رقم الترخيص:
+                    {t("license_number_label", "رقم الترخيص:")}
                   </strong>
                   <input
                     type="text"
@@ -1400,7 +1390,7 @@ export default function PlatformManagement({
                       width: "100%",
                       boxSizing: "border-box",
                       direction: "ltr",
-                      textAlign: "right",
+                      textAlign: isRTL ? "right" : "left",
                     }}
                   />
                 </div>
@@ -1419,16 +1409,16 @@ export default function PlatformManagement({
               fontWeight: "900",
               fontSize: "1.1rem",
               marginTop: "10px",
-              alignSelf: "flex-end",
+              alignSelf: isRTL ? "flex-end" : "flex-start",
               boxShadow: "0 6px 15px rgba(239, 68, 68, 0.3)",
             }}
           >
-            💾 حفظ الإعدادات بالكامل
+            💾 {t("save_all_settings_btn", "حفظ الإعدادات بالكامل")}
           </button>
         </div>
       )}
 
-      {/* ================= تبويب السياسات (محدث مع الخصوصية والاسترجاع) ================= */}
+      {/* ================= تبويب السياسات (محدث بأعمدة منفصلة: عربي وإنجليزي) ================= */}
       {activeAdminTab === "policies" && !isFin && (
         <div
           style={{
@@ -1437,7 +1427,7 @@ export default function PlatformManagement({
             borderRadius: "20px",
             display: "flex",
             flexDirection: "column",
-            gap: "20px",
+            gap: "25px",
             border: "1px solid #e2e8f0",
           }}
         >
@@ -1455,23 +1445,64 @@ export default function PlatformManagement({
                 color: "#1e293b",
                 fontSize: "1.1rem",
                 display: "block",
-                marginBottom: "10px",
+                marginBottom: "15px",
               }}
             >
-              📜 الشروط والأحكام للإستخدام:
+              📜{" "}
+              {t("terms_and_conditions_policy", "الشروط والأحكام للإستخدام:")}
             </strong>
-            <textarea
-              value={inputTerms}
-              onChange={(e) => setInputTerms(e.target.value)}
-              style={{
-                ...smInput,
-                width: "100%",
-                boxSizing: "border-box",
-                height: "150px",
-                resize: "vertical",
-                backgroundColor: "#f8fafc",
-              }}
-            />
+            <div style={{ display: "flex", gap: "15px", flexWrap: "wrap" }}>
+              <div style={{ flex: 1, minWidth: "280px" }}>
+                <label
+                  style={{
+                    fontSize: "0.85rem",
+                    color: "#64748b",
+                    display: "block",
+                    marginBottom: "5px",
+                  }}
+                >
+                  النص بالعربي (AR):
+                </label>
+                <textarea
+                  value={inputTermsAr}
+                  onChange={(e) => setInputTermsAr(e.target.value)}
+                  style={{
+                    ...smInput,
+                    width: "100%",
+                    boxSizing: "border-box",
+                    height: "150px",
+                    resize: "vertical",
+                    backgroundColor: "#f8fafc",
+                  }}
+                />
+              </div>
+              <div style={{ flex: 1, minWidth: "280px" }}>
+                <label
+                  style={{
+                    fontSize: "0.85rem",
+                    color: "#64748b",
+                    display: "block",
+                    marginBottom: "5px",
+                  }}
+                >
+                  النص بالإنجليزي (EN):
+                </label>
+                <textarea
+                  value={inputTermsEn}
+                  onChange={(e) => setInputTermsEn(e.target.value)}
+                  dir="ltr"
+                  style={{
+                    ...smInput,
+                    width: "100%",
+                    boxSizing: "border-box",
+                    height: "150px",
+                    resize: "vertical",
+                    backgroundColor: "#f8fafc",
+                    textAlign: "left",
+                  }}
+                />
+              </div>
+            </div>
           </div>
 
           {/* سياسة الخصوصية */}
@@ -1488,23 +1519,63 @@ export default function PlatformManagement({
                 color: "#1e293b",
                 fontSize: "1.1rem",
                 display: "block",
-                marginBottom: "10px",
+                marginBottom: "15px",
               }}
             >
-              🔐 سياسة الخصوصية:
+              🔐 {t("privacy_policy_title", "سياسة الخصوصية:")}
             </strong>
-            <textarea
-              value={inputPrivacy}
-              onChange={(e) => setInputPrivacy(e.target.value)}
-              style={{
-                ...smInput,
-                width: "100%",
-                boxSizing: "border-box",
-                height: "150px",
-                resize: "vertical",
-                backgroundColor: "#f8fafc",
-              }}
-            />
+            <div style={{ display: "flex", gap: "15px", flexWrap: "wrap" }}>
+              <div style={{ flex: 1, minWidth: "280px" }}>
+                <label
+                  style={{
+                    fontSize: "0.85rem",
+                    color: "#64748b",
+                    display: "block",
+                    marginBottom: "5px",
+                  }}
+                >
+                  النص بالعربي (AR):
+                </label>
+                <textarea
+                  value={inputPrivacyAr}
+                  onChange={(e) => setInputPrivacyAr(e.target.value)}
+                  style={{
+                    ...smInput,
+                    width: "100%",
+                    boxSizing: "border-box",
+                    height: "150px",
+                    resize: "vertical",
+                    backgroundColor: "#f8fafc",
+                  }}
+                />
+              </div>
+              <div style={{ flex: 1, minWidth: "280px" }}>
+                <label
+                  style={{
+                    fontSize: "0.85rem",
+                    color: "#64748b",
+                    display: "block",
+                    marginBottom: "5px",
+                  }}
+                >
+                  النص بالإنجليزي (EN):
+                </label>
+                <textarea
+                  value={inputPrivacyEn}
+                  onChange={(e) => setInputPrivacyEn(e.target.value)}
+                  dir="ltr"
+                  style={{
+                    ...smInput,
+                    width: "100%",
+                    boxSizing: "border-box",
+                    height: "150px",
+                    resize: "vertical",
+                    backgroundColor: "#f8fafc",
+                    textAlign: "left",
+                  }}
+                />
+              </div>
+            </div>
           </div>
 
           {/* سياسات الدفع والاسترجاع */}
@@ -1521,23 +1592,63 @@ export default function PlatformManagement({
                 color: "#1e293b",
                 fontSize: "1.1rem",
                 display: "block",
-                marginBottom: "10px",
+                marginBottom: "15px",
               }}
             >
-              💳 سياسات الدفع والاسترجاع:
+              💳 {t("refund_policy_title", "سياسات الدفع والاسترجاع:")}
             </strong>
-            <textarea
-              value={inputRefund}
-              onChange={(e) => setInputRefund(e.target.value)}
-              style={{
-                ...smInput,
-                width: "100%",
-                boxSizing: "border-box",
-                height: "150px",
-                resize: "vertical",
-                backgroundColor: "#f8fafc",
-              }}
-            />
+            <div style={{ display: "flex", gap: "15px", flexWrap: "wrap" }}>
+              <div style={{ flex: 1, minWidth: "280px" }}>
+                <label
+                  style={{
+                    fontSize: "0.85rem",
+                    color: "#64748b",
+                    display: "block",
+                    marginBottom: "5px",
+                  }}
+                >
+                  النص بالعربي (AR):
+                </label>
+                <textarea
+                  value={inputRefundAr}
+                  onChange={(e) => setInputRefundAr(e.target.value)}
+                  style={{
+                    ...smInput,
+                    width: "100%",
+                    boxSizing: "border-box",
+                    height: "150px",
+                    resize: "vertical",
+                    backgroundColor: "#f8fafc",
+                  }}
+                />
+              </div>
+              <div style={{ flex: 1, minWidth: "280px" }}>
+                <label
+                  style={{
+                    fontSize: "0.85rem",
+                    color: "#64748b",
+                    display: "block",
+                    marginBottom: "5px",
+                  }}
+                >
+                  النص بالإنجليزي (EN):
+                </label>
+                <textarea
+                  value={inputRefundEn}
+                  onChange={(e) => setInputRefundEn(e.target.value)}
+                  dir="ltr"
+                  style={{
+                    ...smInput,
+                    width: "100%",
+                    boxSizing: "border-box",
+                    height: "150px",
+                    resize: "vertical",
+                    backgroundColor: "#f8fafc",
+                    textAlign: "left",
+                  }}
+                />
+              </div>
+            </div>
           </div>
 
           <button
@@ -1551,11 +1662,11 @@ export default function PlatformManagement({
               cursor: "pointer",
               fontWeight: "900",
               fontSize: "1.1rem",
-              alignSelf: "flex-end",
+              alignSelf: isRTL ? "flex-end" : "flex-start",
               boxShadow: "0 6px 15px rgba(245, 158, 11, 0.3)",
             }}
           >
-            حفظ وتحديث السياسات 📝
+            {t("save_update_policies_btn", "حفظ وتحديث السياسات 📝")}
           </button>
         </div>
       )}
@@ -1593,7 +1704,7 @@ export default function PlatformManagement({
                   marginBottom: "5px",
                 }}
               >
-                الاسم بالعربي:
+                {t("cat_ar_name", "الاسم بالعربي:")}
               </strong>
               <input
                 value={newCatAr}
@@ -1610,7 +1721,7 @@ export default function PlatformManagement({
                   marginBottom: "5px",
                 }}
               >
-                الاسم بالإنجليزي:
+                {t("cat_en_name", "الاسم بالإنجليزي:")}
               </strong>
               <input
                 value={newCatEn}
@@ -1632,7 +1743,7 @@ export default function PlatformManagement({
                   marginBottom: "5px",
                 }}
               >
-                الأيقونة 🌟:
+                {t("cat_icon_label", "الأيقونة 🌟:")}
               </strong>
               <input
                 value={newCatIcon}
@@ -1660,22 +1771,24 @@ export default function PlatformManagement({
                 boxShadow: "0 4px 10px rgba(16, 185, 129, 0.3)",
               }}
             >
-              ➕ إضافة قسم
+              {t("add_category_btn", "➕ إضافة قسم")}
             </button>
           </div>
 
           {/* جدول الأقسام بالتمرير الأفقي */}
           <h3 style={{ color: "#1e293b", margin: "20px 0 15px 0" }}>
-            📁 الأقسام الحالية
+            📁 {t("current_categories", "الأقسام الحالية")}
           </h3>
           <div style={tableWrapperS}>
             <table style={responsiveTableS}>
               <thead>
                 <tr style={{ backgroundColor: "#f1f5f9" }}>
-                  <th style={thS}>الأيقونة</th>
-                  <th style={thS}>الاسم بالعربي</th>
-                  <th style={thS}>الاسم بالإنجليزي</th>
-                  <th style={{ ...thS, textAlign: "center" }}>إجراءات القسم</th>
+                  <th style={thS}>{t("th_icon", "الأيقونة")}</th>
+                  <th style={thS}>{t("th_ar_name", "الاسم بالعربي")}</th>
+                  <th style={thS}>{t("th_en_name", "الاسم بالإنجليزي")}</th>
+                  <th style={{ ...thS, textAlign: "center" }}>
+                    {t("th_category_actions", "إجراءات القسم")}
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -1708,9 +1821,12 @@ export default function PlatformManagement({
                           color: "#3b82f6",
                           border: "1px solid #bfdbfe",
                         }}
-                        title="تعديل اسم أو أيقونة القسم"
+                        title={t(
+                          "edit_cat_tooltip",
+                          "تعديل اسم أو أيقونة القسم",
+                        )}
                       >
-                        ✏️ تعديل
+                        ✏️ {t("edit_btn", "تعديل")}
                       </button>
                       <button
                         onClick={() => handleDeleteCategory(c.id)}
@@ -1719,9 +1835,9 @@ export default function PlatformManagement({
                           color: "#ef4444",
                           border: "1px solid #fca5a5",
                         }}
-                        title="حذف القسم نهائياً"
+                        title={t("delete_cat_tooltip", "حذف القسم نهائياً")}
                       >
-                        🗑️ حذف
+                        🗑️ {t("delete_btn", "حذف")}
                       </button>
                     </td>
                   </tr>
@@ -1736,7 +1852,7 @@ export default function PlatformManagement({
                         color: "#94a3b8",
                       }}
                     >
-                      لا توجد أقسام مسجلة.
+                      {t("no_categories_registered", "لا توجد أقسام مسجلة.")}
                     </td>
                   </tr>
                 )}
@@ -1767,7 +1883,7 @@ export default function PlatformManagement({
             }}
           >
             <h3 style={{ margin: 0, color: "#1e293b" }}>
-              👥 إدارة المستخدمين ({users.length})
+              👥 {t("manage_users_count", "إدارة المستخدمين")} ({users.length})
             </h3>
             <button
               onClick={() => setIsBroadcastModalOpen(true)}
@@ -1777,7 +1893,7 @@ export default function PlatformManagement({
                 fontSize: "1rem",
               }}
             >
-              📢 إرسال إعلان جماعي
+              📢 {t("send_broadcast_btn", "إرسال إعلان جماعي")}
             </button>
           </div>
 
@@ -1785,10 +1901,12 @@ export default function PlatformManagement({
             <table style={responsiveTableS}>
               <thead>
                 <tr style={{ backgroundColor: "#f1f5f9", textAlign: "center" }}>
-                  <th style={thS}>المستخدم</th>
-                  <th style={thS}>الصلاحية</th>
-                  <th style={thS}>الحالة</th>
-                  <th style={thS}>إجراءات الإدارة</th>
+                  <th style={thS}>{t("th_user", "المستخدم")}</th>
+                  <th style={thS}>{t("th_role", "الصلاحية")}</th>
+                  <th style={thS}>{t("th_status", "الحالة")}</th>
+                  <th style={thS}>
+                    {t("th_admin_actions", "إجراءات الإدارة")}
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -1818,10 +1936,18 @@ export default function PlatformManagement({
                           outline: "none",
                         }}
                       >
-                        <option value="user">👤 عادي</option>
-                        <option value="supervisor">🛡️ مشرف</option>
-                        <option value="financial_manager">💰 مدير مالي</option>
-                        <option value="admin">👑 مدير المنصة</option>
+                        <option value="user">
+                          👤 {t("role_standard", "عادي")}
+                        </option>
+                        <option value="supervisor">
+                          🛡️ {t("role_supervisor", "مشرف")}
+                        </option>
+                        <option value="financial_manager">
+                          💰 {t("role_financial_mgr", "مدير مالي")}
+                        </option>
+                        <option value="admin">
+                          👑 {t("role_platform_admin", "مدير المنصة")}
+                        </option>
                       </select>
                     </td>
                     <td style={tdS}>
@@ -1836,7 +1962,9 @@ export default function PlatformManagement({
                           fontSize: "0.85rem",
                         }}
                       >
-                        {u.is_active !== false ? "نشط ✅" : "موقوف 🚫"}
+                        {u.is_active !== false
+                          ? t("active_badge", "نشط ✅")
+                          : t("suspended_badge", "موقوف 🚫")}
                       </span>
                     </td>
                     <td
@@ -1854,9 +1982,9 @@ export default function PlatformManagement({
                           color: "#3b82f6",
                           border: "1px solid #bfdbfe",
                         }}
-                        title="تعديل"
+                        title={t("edit_btn", "تعديل")}
                       >
-                        ✏️ تعديل
+                        ✏️ {t("edit_btn", "تعديل")}
                       </button>
                       <button
                         onClick={() =>
@@ -1869,9 +1997,15 @@ export default function PlatformManagement({
                             u.is_active !== false ? "#fcd34d" : "#6ee7b7"
                           }`,
                         }}
-                        title={u.is_active !== false ? "إيقاف" : "تفعيل"}
+                        title={
+                          u.is_active !== false
+                            ? t("suspend_action", "إيقاف")
+                            : t("activate_action", "تفعيل")
+                        }
                       >
-                        {u.is_active !== false ? "⏸️ إيقاف" : "▶️ تفعيل"}
+                        {u.is_active !== false
+                          ? t("pause_action", "⏸️ إيقاف")
+                          : t("play_action", "▶️ تفعيل")}
                       </button>
                       <button
                         onClick={() => handleAdminDeleteUser(u.id)}
@@ -1880,9 +2014,9 @@ export default function PlatformManagement({
                           color: "#ef4444",
                           border: "1px solid #fca5a5",
                         }}
-                        title="حذف نهائي"
+                        title={t("permanent_delete", "حذف نهائي")}
                       >
-                        🗑️ حذف
+                        🗑️ {t("delete_btn", "حذف")}
                       </button>
                     </td>
                   </tr>
@@ -1904,17 +2038,19 @@ export default function PlatformManagement({
           }}
         >
           <h3 style={{ color: "#1e293b", marginBottom: "15px" }}>
-            ⭐ إدارة التقييمات
+            ⭐ {t("manage_reviews_title", "إدارة التقييمات")}
           </h3>
           <div style={tableWrapperS}>
             <table style={responsiveTableS}>
               <thead>
                 <tr style={{ backgroundColor: "#f1f5f9" }}>
-                  <th style={thS}>صاحب التقييم</th>
-                  <th style={thS}>الخدمة المُقيمة</th>
-                  <th style={thS}>التقييم</th>
-                  <th style={thS}>التعليق</th>
-                  <th style={thS}>إجراء</th>
+                  <th style={thS}>{t("th_reviewer", "صاحب التقييم")}</th>
+                  <th style={thS}>
+                    {t("th_rated_service", "الخدمة المُقيمة")}
+                  </th>
+                  <th style={thS}>{t("th_rating", "التقييم")}</th>
+                  <th style={thS}>{t("th_comment", "التعليق")}</th>
+                  <th style={thS}>{t("th_action", "إجراء")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -1924,9 +2060,12 @@ export default function PlatformManagement({
                     style={{ borderBottom: "1px solid #f1f5f9" }}
                   >
                     <td style={{ ...tdS, fontWeight: "bold" }}>
-                      {r.profiles?.full_name || "عميل"}
+                      {r.profiles?.full_name || t("client_default", "عميل")}
                     </td>
-                    <td style={tdS}>{r.offerings?.title || "خدمة محذوفة"}</td>
+                    <td style={tdS}>
+                      {r.offerings?.title ||
+                        t("deleted_service", "خدمة محذوفة")}
+                    </td>
                     <td
                       style={{ ...tdS, color: "#f59e0b", fontSize: "1.1rem" }}
                     >
@@ -1952,7 +2091,7 @@ export default function PlatformManagement({
                             border: "1px solid #fca5a5",
                           }}
                         >
-                          🚫 إخفاء مسيء
+                          🚫 {t("hide_offensive_btn", "إخفاء مسيء")}
                         </button>
                       )}
                     </td>
@@ -1968,7 +2107,7 @@ export default function PlatformManagement({
                         color: "#94a3b8",
                       }}
                     >
-                      لا توجد تقييمات حالياً.
+                      {t("no_reviews_currently", "لا توجد تقييمات حالياً.")}
                     </td>
                   </tr>
                 )}
@@ -1993,13 +2132,18 @@ export default function PlatformManagement({
               <thead>
                 <tr style={{ backgroundColor: "#f1f5f9" }}>
                   <th style={{ ...thS, width: "110px", textAlign: "center" }}>
-                    الحالة
+                    {t("th_status", "الحالة")}
                   </th>
-                  <th style={thS}>المرسل</th>
-                  <th style={thS}>النوع</th>
-                  <th style={thS}>الموضوع والتفاصيل المادية</th>
+                  <th style={thS}>{t("th_sender", "المرسل")}</th>
+                  <th style={thS}>{t("th_type", "النوع")}</th>
+                  <th style={thS}>
+                    {t(
+                      "th_subject_financial_details",
+                      "الموضوع والتفاصيل المادية",
+                    )}
+                  </th>
                   <th style={{ ...thS, textAlign: "center", width: "160px" }}>
-                    إجراءات السداد
+                    {t("th_payment_actions", "إجراءات السداد")}
                   </th>
                 </tr>
               </thead>
@@ -2022,7 +2166,9 @@ export default function PlatformManagement({
                           color: m.is_read ? "#475569" : "#fff",
                         }}
                       >
-                        {m.is_read ? "معتمد/مقروء" : "جديد 🆕"}
+                        {m.is_read
+                          ? t("approved_read", "معتمد/مقروء")
+                          : t("new_badge", "جديد 🆕")}
                       </span>
                     </td>
                     <td style={tdS}>
@@ -2041,7 +2187,9 @@ export default function PlatformManagement({
                           color: m.type === "receipt" ? "#065f46" : "#334155",
                         }}
                       >
-                        {m.type === "receipt" ? "🧾 إيصال سداد" : "❓ استفسار"}
+                        {m.type === "receipt"
+                          ? t("receipt_badge", "🧾 إيصال سداد")
+                          : t("inquiry_badge", "❓ استفسار")}
                       </span>
                     </td>
                     <td style={tdS}>
@@ -2070,7 +2218,8 @@ export default function PlatformManagement({
                             onClick={() => handleApproveCommission(m.id)}
                             style={{ ...admBtn("#10b981"), width: "100%" }}
                           >
-                            💰 اعتماد وإخفاء المطالبة
+                            💰{" "}
+                            {t("approve_hide_claim", "اعتماد وإخفاء المطالبة")}
                           </button>
                         )}
                         {!m.is_read && (
@@ -2078,12 +2227,16 @@ export default function PlatformManagement({
                             onClick={() => handleMarkMessageRead(m.id)}
                             style={{ ...admBtn("#64748b"), width: "100%" }}
                           >
-                            مقروء
+                            {t("mark_read_btn", "مقروء")}
                           </button>
                         )}
                         <button
                           onClick={async () => {
-                            if (window.confirm("حذف؟")) {
+                            if (
+                              window.confirm(
+                                t("confirm_delete_generic", "حذف؟"),
+                              )
+                            ) {
                               await supabase
                                 .from("contact_messages")
                                 .delete()
@@ -2097,7 +2250,7 @@ export default function PlatformManagement({
                             border: "1px solid #fca5a5",
                           }}
                         >
-                          حذف
+                          {t("delete_btn", "حذف")}
                         </button>
                       </div>
                     </td>
@@ -2113,7 +2266,7 @@ export default function PlatformManagement({
                         color: "#94a3b8",
                       }}
                     >
-                      صندوق الوارد فارغ.
+                      {t("inbox_empty", "صندوق الوارد فارغ.")}
                     </td>
                   </tr>
                 )}
@@ -2130,7 +2283,7 @@ export default function PlatformManagement({
         <div style={modalOverlay}>
           <div style={{ ...modalContent, maxWidth: "450px" }}>
             <h3 style={{ margin: "0 0 20px 0", color: "#1e293b" }}>
-              🛠️ التعديل الإجباري لليوزر
+              🛠️ {t("force_edit_username_title", "التعديل الإجباري لليوزر")}
             </h3>
             <label
               style={{
@@ -2140,7 +2293,7 @@ export default function PlatformManagement({
                 color: "#475569",
               }}
             >
-              الاسم الكامل:
+              {t("full_name_label", "الاسم الكامل:")}
             </label>
             <input
               type="text"
@@ -2156,7 +2309,7 @@ export default function PlatformManagement({
                 color: "#ef4444",
               }}
             >
-              اليوزر نيم بالقوة:
+              {t("force_username_label", "اليوزر نيم بالقوة:")}
             </label>
             <input
               type="text"
@@ -2174,13 +2327,13 @@ export default function PlatformManagement({
                 onClick={saveForceEdit}
                 style={{ flex: 1, ...admBtn("#7c3aed") }}
               >
-                حفظ التعديل
+                {t("save_edit_btn", "حفظ التعديل")}
               </button>
               <button
                 onClick={() => setIsForceEditModalOpen(false)}
                 style={{ flex: 1, ...admBtn("#94a3b8") }}
               >
-                إلغاء
+                {t("cancel_btn", "إلغاء")}
               </button>
             </div>
           </div>
@@ -2192,7 +2345,7 @@ export default function PlatformManagement({
         <div style={modalOverlay}>
           <div style={{ ...modalContent, maxWidth: "450px" }}>
             <h3 style={{ margin: "0 0 20px 0", color: "#3b82f6" }}>
-              ✏️ تعديل القسم
+              ✏️ {t("edit_category_title", "تعديل القسم")}
             </h3>
 
             <label
@@ -2203,7 +2356,7 @@ export default function PlatformManagement({
                 color: "#475569",
               }}
             >
-              الاسم بالعربي:
+              {t("cat_ar_name", "الاسم بالعربي:")}
             </label>
             <input
               type="text"
@@ -2227,7 +2380,7 @@ export default function PlatformManagement({
                 color: "#475569",
               }}
             >
-              الاسم بالإنجليزي:
+              {t("cat_en_name", "الاسم بالإنجليزي:")}
             </label>
             <input
               type="text"
@@ -2252,7 +2405,7 @@ export default function PlatformManagement({
                 color: "#475569",
               }}
             >
-              الأيقونة 🌟:
+              {t("cat_icon_label", "الأيقونة 🌟:")}
             </label>
             <input
               type="text"
@@ -2268,7 +2421,7 @@ export default function PlatformManagement({
                 onClick={handleSaveEditCategory}
                 style={{ flex: 1, ...admBtn("#3b82f6") }}
               >
-                💾 حفظ التعديلات
+                💾 {t("save_edits_btn", "حفظ التعديلات")}
               </button>
               <button
                 onClick={() => {
@@ -2277,7 +2430,7 @@ export default function PlatformManagement({
                 }}
                 style={{ flex: 1, ...admBtn("#94a3b8") }}
               >
-                إلغاء
+                {t("cancel_btn", "إلغاء")}
               </button>
             </div>
           </div>
@@ -2297,7 +2450,8 @@ export default function PlatformManagement({
                 gap: "10px",
               }}
             >
-              <span>📢</span> إرسال إعلان / تنبيه جماعي
+              <span>📢</span>{" "}
+              {t("broadcast_modal_title", "إرسال إعلان / تنبيه جماعي")}
             </h3>
 
             <label
@@ -2308,7 +2462,7 @@ export default function PlatformManagement({
                 color: "#475569",
               }}
             >
-              اختر الشريحة المستهدفة:
+              {t("target_segment_label", "اختر الشريحة المستهدفة:")}
             </label>
             <select
               value={broadcastTarget}
@@ -2321,11 +2475,20 @@ export default function PlatformManagement({
                 width: "100%",
               }}
             >
-              <option value="all">🌐 إرسال للجميع (كل المسجلين)</option>
-              <option value="users_only">👤 المستخدمين العاديين فقط</option>
-              <option value="admins">🛡️ المدراء والمشرفين فقط</option>
+              <option value="all">
+                {t("segment_all", "🌐 إرسال للجميع (كل المسجلين)")}
+              </option>
+              <option value="users_only">
+                {t("segment_users_only", "👤 المستخدمين العاديين فقط")}
+              </option>
+              <option value="admins">
+                {t("segment_admins", "🛡️ المدراء والمشرفين فقط")}
+              </option>
               <option value="inactive">
-                🚫 المستخدمين الموقوفين أو غير النشطين
+                {t(
+                  "segment_inactive",
+                  "🚫 المستخدمين الموقوفين أو غير النشطين",
+                )}
               </option>
             </select>
 
@@ -2337,12 +2500,15 @@ export default function PlatformManagement({
                 color: "#475569",
               }}
             >
-              نص الرسالة (سيصل كإشعار منبثق):
+              {t("broadcast_msg_label", "نص الرسالة (سيصل كإشعار منبثق):")}
             </label>
             <textarea
               value={broadcastMessageText}
               onChange={(e) => setBroadcastMessageText(e.target.value)}
-              placeholder="اكتب التنبيه أو التحديث هنا..."
+              placeholder={t(
+                "broadcast_placeholder",
+                "اكتب التنبيه أو التحديث هنا...",
+              )}
               style={{
                 ...smInput,
                 height: "120px",
@@ -2362,14 +2528,14 @@ export default function PlatformManagement({
                 }}
               >
                 {isBroadcasting
-                  ? "⏳ جاري الإرسال..."
-                  : "🚀 إرسال الإعلان الآن"}
+                  ? t("sending", "⏳ جاري الإرسال...")
+                  : t("send_announcement_btn", "🚀 إرسال الإعلان الآن")}
               </button>
               <button
                 onClick={() => setIsBroadcastModalOpen(false)}
                 style={{ flex: 1, ...admBtn("#ef4444") }}
               >
-                إلغاء
+                {t("cancel_btn", "إلغاء")}
               </button>
             </div>
           </div>

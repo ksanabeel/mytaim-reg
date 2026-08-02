@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 import BookingRow from "./BookingRow"; // التأكد من استدعاء البطاقة المحدثة
+import { useTranslation } from "react-i18next"; // ✨ استيراد أداة الترجمة
 
 // ✨ المكون الرئيسي (نظام التبويبات) ✨
 export default function ProviderSchedule({
@@ -9,6 +10,7 @@ export default function ProviderSchedule({
   fetchBookings,
   isProviderView = true,
 }) {
+  const { t } = useTranslation(); // ✨ تفعيل الترجمة
   const [activeTab, setActiveTab] = useState("new");
 
   useEffect(() => {
@@ -72,14 +74,22 @@ export default function ProviderSchedule({
       }}
     >
       <h3 style={{ margin: "0 0 10px 0", fontWeight: "900" }}>
-        {isProviderView ? "لوحة تحكم أعمالي 💼" : "طلباتي وحجوزاتي 🛒"}
+        {isProviderView
+          ? t("provider_schedule_title", "لوحة تحكم أعمالي 💼")
+          : t("client_schedule_title", "طلباتي وحجوزاتي 🛒")}
       </h3>
       <p
         style={{ color: "#64748b", fontSize: "0.85rem", marginBottom: "20px" }}
       >
         {isProviderView
-          ? "إدارة ومتابعة الطلبات، مع إمكانية أرشفة الطلبات المنتهية لتنظيف الشاشة."
-          : "متابعة حالة طلباتك وتقييم الخدمات بعد الإنجاز، مع إمكانية أرشفة الطلب المنتهي."}
+          ? t(
+              "provider_schedule_desc",
+              "إدارة ومتابعة الطلبات، مع إمكانية أرشفة الطلبات المنتهية لتنظيف الشاشة.",
+            )
+          : t(
+              "client_schedule_desc",
+              "متابعة حالة طلباتك وتقييم الخدمات بعد الإنجاز، مع إمكانية أرشفة الطلب المنتهي.",
+            )}
       </p>
 
       {/* 🔘 شريط التبويبات */}
@@ -96,19 +106,20 @@ export default function ProviderSchedule({
           onClick={() => setActiveTab("new")}
           style={tabBtnStyle("new", "#3b82f6")}
         >
-          🆕 طلبات جديدة ({newBookings.length})
+          {t("tab_new_bookings", "🆕 طلبات جديدة")} ({newBookings.length})
         </button>
         <button
           onClick={() => setActiveTab("active")}
           style={tabBtnStyle("active", "#10b981")}
         >
-          ⏳ قيد التنفيذ ({activeBookings.length})
+          {t("tab_active_bookings", "⏳ قيد التنفيذ")} ({activeBookings.length})
         </button>
         <button
           onClick={() => setActiveTab("history")}
           style={tabBtnStyle("history", "#64748b")}
         >
-          📂 السجل المكتمل ({historyBookings.length})
+          {t("tab_history_bookings", "📂 السجل المكتمل")} (
+          {historyBookings.length})
         </button>
       </div>
 
@@ -125,7 +136,7 @@ export default function ProviderSchedule({
               fontWeight: "bold",
             }}
           >
-            لا توجد طلبات في هذا القسم..
+            {t("no_bookings_in_section", "لا توجد طلبات في هذا القسم..")}
           </div>
         ) : (
           displayedBookings.map((b) => (
