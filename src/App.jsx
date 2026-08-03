@@ -1571,7 +1571,7 @@ function MainAppContent() {
                       href="mailto:finance@bookonmap.com"
                       style={{ color: "#2563eb", textDecoration: "underline" }}
                     >
-                      finance@bookonmap.com
+                      finance@bookonmap.com --- bookonmap@hotmail.com
                     </a>
                   </p>
                   <button
