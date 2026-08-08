@@ -5,7 +5,6 @@ import { useTranslation } from "react-i18next";
 // 🚀 تهيئة Capacitor لضمان الدخول داخل التطبيق (Native/In-App UX)
 import { Browser } from "@capacitor/browser";
 import { App } from "@capacitor/app";
-import { SignInWithApple } from "@capacitor-community/apple-sign-in";
 
 const Login = () => {
   const { t, i18n } = useTranslation();
