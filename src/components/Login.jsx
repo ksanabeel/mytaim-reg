@@ -120,29 +120,19 @@ const Login = () => {
 
   const handleAppleLogin = async () => {
     try {
-      const { response } = await SignInWithApple.authorize({
-        clientId: "com.bookonmap.app",
-        scopes: "email name",
-      });
-
-      const idToken = response.identityToken;
-      if (!idToken) {
-        throw new Error("لم يتم إرجاع رمز تحقق من أبل");
-      }
-
-      const { data, error } = await supabase.auth.signInWithIdToken({
+      const { error } = await supabase.auth.signInWithOAuth({
         provider: "apple",
-        token: idToken,
+        options: {
+          redirectTo: "com.bookonmap.app://auth-callback",
+          skipBrowserRedirect: false,
+        },
       });
-
       if (error) throw error;
-      console.log("تم تسجيل الدخول بنجاح!", data);
     } catch (error) {
-      console.error("حدث خطأ أثناء تسجيل الدخول بـ Apple:", error);
-      alert("حدث خطأ أثناء تسجيل الدخول بحساب أبل.");
+      console.error("Apple Login Error:", error);
+      alert("حدث خطأ أثناء تسجيل الدخول بحساب أبل: " + error.message);
     }
   };
-
   const handleEmailAuth = async (e) => {
     e.preventDefault();
     setLoading(true);
