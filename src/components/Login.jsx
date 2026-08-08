@@ -108,7 +108,7 @@ const Login = () => {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: "com.bookonmap.app://auth-callback",
+          redirectTo: window.location.origin,
         },
       });
       if (error) throw error;
@@ -122,7 +122,7 @@ const Login = () => {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "apple",
         options: {
-          redirectTo: "com.bookonmap.app://auth-callback",
+          redirectTo: window.location.origin,
         },
       });
       if (error) throw error;
@@ -131,6 +131,7 @@ const Login = () => {
       alert("حدث خطأ أثناء تسجيل الدخول بحساب أبل: " + error.message);
     }
   };
+
   const handleEmailAuth = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -574,7 +575,6 @@ const styles = {
     padding: "14px",
     borderRadius: "12px",
     border: "none",
-    backgroundColor: "linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%)",
     backgroundColor: "#1e293b",
     color: "#fff",
     cursor: "pointer",
