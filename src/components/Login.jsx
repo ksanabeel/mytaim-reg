@@ -123,7 +123,6 @@ const Login = () => {
         provider: "apple",
         options: {
           redirectTo: "com.bookonmap.app://auth-callback",
-          skipBrowserRedirect: false,
         },
       });
       if (error) throw error;
