@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 // 🚀 تهيئة Capacitor لضمان الدخول داخل التطبيق (Native/In-App UX)
 import { Browser } from "@capacitor/browser";
 import { App } from "@capacitor/app";
+import { SignInWithApple } from "@capacitor-community/apple-sign-in";
 
 const Login = () => {
   const { t, i18n } = useTranslation();
@@ -119,19 +120,29 @@ const Login = () => {
 
   const handleAppleLogin = async () => {
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: "apple",
-        options: {
-          // هذا الرابط هو الذي يعيد المستخدم للتطبيق بعد بصمة أبل
-          redirectTo: "com.bookonmap.app://auth-callback",
-        },
+      const { response } = await SignInWithApple.authorize({
+        clientId: "com.bookonmap.app",
+        scopes: "email name",
       });
+
+      const idToken = response.identityToken;
+      if (!idToken) {
+        throw new Error("لم يتم إرجاع رمز تحقق من أبل");
+      }
+
+      const { data, error } = await supabase.auth.signInWithIdToken({
+        provider: "apple",
+        token: idToken,
+      });
+
       if (error) throw error;
+      console.log("تم تسجيل الدخول بنجاح!", data);
     } catch (error) {
-      console.error("Apple Login Error:", error);
-      alert("حدث خطأ أثناء تسجيل الدخول عبر أبل: " + error.message);
+      console.error("حدث خطأ أثناء تسجيل الدخول بـ Apple:", error);
+      alert("حدث خطأ أثناء تسجيل الدخول بحساب أبل.");
     }
   };
+
   const handleEmailAuth = async (e) => {
     e.preventDefault();
     setLoading(true);
