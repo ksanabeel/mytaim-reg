@@ -1,11 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { supabase } from "../lib/supabase";
 import { useTranslation } from "react-i18next";
-
-// 🚀 تهيئة Capacitor لضمان الدخول داخل التطبيق (Native/In-App UX)
-import { Browser } from "@capacitor/browser";
-import { App } from "@capacitor/app";
-import { SignInWithApple } from "@capacitor-community/apple-sign-in"; // تم إضافة مكتبة الدخول الأصلي لأبل
 
 // نصوص الصفحات القانونية (تمت صياغتها بشكل احترافي)
 const legalDocs = {
@@ -42,27 +37,6 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const [activeLegalDoc, setActiveLegalDoc] = useState(null);
 
-  // ✨ إعداد دائم داخل التطبيق لاستلام الرابط العميق (Deep Link Callback)
-  useEffect(() => {
-    // 1. استماع للرابط العميق لإنهاء الدخول بـ Supabase
-    const handleUrlOpener = (event) => {
-      if (event.url.includes("com.bookonmap.app://auth-callback")) {
-        const url = new URL(event.url);
-        if (url.hash && url.hash.includes("#access_token")) {
-          // Supabase JS سيقوم تلقائياً بإنشاء الجلسة إذا كان التوكين موجوداً في الهاش
-          console.log("Deep link received, session should create...");
-        }
-      }
-    };
-
-    App.addListener("appUrlOpen", handleUrlOpener);
-
-    // تنظيف المستمع عند مسح الـ Component
-    return () => {
-      App.removeAllListeners("appUrlOpen");
-    };
-  }, []);
-
   // تبديل اللغة
   const toggleLanguage = () => {
     const newLang = i18n.language === "ar" ? "en" : "ar";
@@ -70,16 +44,11 @@ const Login = () => {
     document.documentElement.dir = newLang === "ar" ? "rtl" : "ltr";
   };
 
-  // ✨ تعديل تسجيل دخول جوجل ليعمل داخل التطبيق عبر Deep Link
   const handleGoogleLogin = async () => {
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
-        options: {
-          // 🚨 قم بتغيير com.bookonmap.app إلى الـ Bundle ID الحقيقي الخاص بك في Xcode
-          // redirectTo: window.location.origin -> MUST CHANGE
-          redirectTo: "com.bookonmap.app://auth-callback",
-        },
+        options: { redirectTo: window.location.origin },
       });
       if (error) throw error;
     } catch (error) {
@@ -87,34 +56,15 @@ const Login = () => {
     }
   };
 
-  // ✨ تعديل تسجيل دخول أبل ليعمل بشكل أصلي (Native) داخل التطبيق
   const handleAppleLogin = async () => {
     try {
-      // 1. استدعاء نافذة أبل الأصلية (بصمة الوجه/الإصبع)
-      const { response } = await SignInWithApple.authorize({
-        clientId: "com.bookonmap.app",
-        scopes: "email name",
-      });
-
-      // 2. استخراج رمز الأمان (Token) اللي عطتنا إياه أبل
-      const idToken = response.identityToken;
-
-      if (!idToken) {
-        throw new Error("لم يتم إرجاع رمز تحقق من أبل");
-      }
-
-      // 3. إرسال الرمز إلى Supabase لتسجيل الدخول بهدوء في الخلفية
-      const { data, error } = await supabase.auth.signInWithIdToken({
+      const { error } = await supabase.auth.signInWithOAuth({
         provider: "apple",
-        token: idToken,
+        options: { redirectTo: window.location.origin },
       });
-
       if (error) throw error;
-
-      console.log("تم تسجيل الدخول بنجاح!", data);
     } catch (error) {
-      console.error("حدث خطأ أثناء تسجيل الدخول بـ Apple:", error);
-      alert("حدث خطأ أثناء تسجيل الدخول بحساب أبل.");
+      alert("لم يتم تفعيل الدخول بحساب أبل بعد في إعدادات الخادم.");
     }
   };
 
