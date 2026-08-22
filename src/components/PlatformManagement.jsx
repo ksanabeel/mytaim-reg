@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
-import { useTranslation } from "react-i18next"; // مكتبة الترجمة لاستخراج لغة المستخدم
+import { useTranslation } from "react-i18next";
 
 // --- التنسيقات والدوال المساعدة ---
 const thS = {
@@ -82,7 +82,7 @@ const tableWrapperS = {
 };
 const responsiveTableS = {
   width: "100%",
-  minWidth: "850px", // إجبار الجدول على التمرير في الشاشات الصغيرة
+  minWidth: "850px",
   borderCollapse: "collapse",
   textAlign: "right",
 };
@@ -187,7 +187,6 @@ export default function PlatformManagement({
   const [inputAppleStore, setInputAppleStore] = useState(appleStoreLink || "");
   const [inputPlayStore, setInputPlayStore] = useState(playStoreLink || "");
 
-  // حقول السياسات المنفصلة (عربي وإنجليزي)
   const [inputTermsAr, setInputTermsAr] = useState("");
   const [inputTermsEn, setInputTermsEn] = useState("");
   const [inputPrivacyAr, setInputPrivacyAr] = useState("");
@@ -199,7 +198,6 @@ export default function PlatformManagement({
   const [newCatEn, setNewCatEn] = useState("");
   const [newCatIcon, setNewCatIcon] = useState("");
 
-  // حالات تعديل الأقسام
   const [isEditCatModalOpen, setIsEditCatModalOpen] = useState(false);
   const [editingCatId, setEditingCatId] = useState(null);
   const [editCatForm, setEditCatForm] = useState({
@@ -207,9 +205,6 @@ export default function PlatformManagement({
     label_en: "",
     icon: "",
   });
-
-  const [messagingUserId, setMessagingUserId] = useState(null);
-  const [adminMessageText, setAdminMessageText] = useState("");
 
   const [isForceEditModalOpen, setIsForceEditModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
@@ -231,9 +226,10 @@ export default function PlatformManagement({
 
   const fetchAdminData = async () => {
     try {
-      const [u, cats, settsData, rawRevs, rawOffs, rawBks, rawMsgs] =
+      // 💡 الميزة الجديدة: الجلب من الجدول الشامل admin_user_list
+      let [u, cats, settsData, rawRevs, rawOffs, rawBks, rawMsgs] =
         await Promise.all([
-          fetchSafe("profiles"),
+          fetchSafe("admin_user_list"),
           fetchSafe("categories"),
           fetchSettingsSafe(),
           fetchSafe("reviews"),
@@ -241,6 +237,11 @@ export default function PlatformManagement({
           fetchSafe("bookings"),
           fetchSafe("contact_messages"),
         ]);
+
+      // نظام حماية: إذا فشل جلب العرض (View) لأي سبب، نعود للجدول الأصلي
+      if (!u || u.length === 0) {
+        u = await fetchSafe("profiles");
+      }
 
       setUsers(
         u.sort((a, b) => (a.full_name || "").localeCompare(b.full_name || "")),
@@ -1418,7 +1419,7 @@ export default function PlatformManagement({
         </div>
       )}
 
-      {/* ================= تبويب السياسات (محدث بأعمدة منفصلة: عربي وإنجليزي) ================= */}
+      {/* ================= تبويب السياسات ================= */}
       {activeAdminTab === "policies" && !isFin && (
         <div
           style={{
@@ -1671,7 +1672,7 @@ export default function PlatformManagement({
         </div>
       )}
 
-      {/* ================= تبويب الأقسام (مع زر التعديل) ================= */}
+      {/* ================= تبويب الأقسام ================= */}
       {activeAdminTab === "categories" && !isFin && (
         <div
           style={{
@@ -1813,7 +1814,6 @@ export default function PlatformManagement({
                         justifyContent: "center",
                       }}
                     >
-                      {/* ✨ زر التعديل ✨ */}
                       <button
                         onClick={() => openEditCategory(c)}
                         style={{
@@ -1901,7 +1901,8 @@ export default function PlatformManagement({
             <table style={responsiveTableS}>
               <thead>
                 <tr style={{ backgroundColor: "#f1f5f9", textAlign: "center" }}>
-                  <th style={thS}>{t("th_user", "المستخدم")}</th>
+                  {/* هنا تم تعديل العنوان ليكون "المستخدم والإيميل" */}
+                  <th style={thS}>{t("th_user", "المستخدم والإيميل")}</th>
                   <th style={thS}>{t("th_role", "الصلاحية")}</th>
                   <th style={thS}>{t("th_status", "الحالة")}</th>
                   <th style={thS}>
@@ -1918,12 +1919,32 @@ export default function PlatformManagement({
                       textAlign: "center",
                     }}
                   >
-                    <td style={tdS}>
+                    <td style={{ ...tdS, textAlign: isRTL ? "right" : "left" }}>
                       <strong>{u.full_name}</strong>
                       <br />
                       <span style={{ fontSize: "0.8rem", color: "#64748b" }}>
                         @{u.username}
                       </span>
+                      {/* 💡 هذا هو السطر الذي سيظهر الإيميل الجديد المجلوب من السوبابيز */}
+                      {u.email && (
+                        <>
+                          <br />
+                          <span
+                            dir="ltr"
+                            style={{
+                              fontSize: "0.78rem",
+                              color: "#3b82f6",
+                              backgroundColor: "#eff6ff",
+                              padding: "2px 6px",
+                              borderRadius: "6px",
+                              display: "inline-block",
+                              marginTop: "5px",
+                            }}
+                          >
+                            ✉️ {u.email}
+                          </span>
+                        </>
+                      )}
                     </td>
                     <td style={tdS}>
                       <select
@@ -2421,7 +2442,7 @@ export default function PlatformManagement({
                 onClick={handleSaveEditCategory}
                 style={{ flex: 1, ...admBtn("#3b82f6") }}
               >
-                💾 {t("save_edits_btn", "حفظ التعديلات")}
+                {t("save_edits_btn", "حفظ التعديلات")}
               </button>
               <button
                 onClick={() => {

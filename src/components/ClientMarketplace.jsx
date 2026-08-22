@@ -122,7 +122,6 @@ export default function ClientMarketplace({
 
     if (username) query = query.eq("profiles.username", username);
 
-    // 🔥 ترتيب سريع ومباشر من قاعدة البيانات بدون حسابات معقدة 🔥
     query = query.order("rating", {
       referencedTable: "profiles",
       ascending: false,
@@ -595,6 +594,7 @@ export default function ClientMarketplace({
 
     if (foundDate) {
       const pad = (num) => String(num).padStart(2, "0");
+      const nextHourDate = new Date(foundDate.getTime() + 60 * 60 * 1000);
       setBookingData({
         ...bookingData,
         startDate: `${foundDate.getFullYear()}-${pad(
@@ -603,14 +603,12 @@ export default function ClientMarketplace({
         startTime: `${pad(foundDate.getHours())}:${pad(
           foundDate.getMinutes(),
         )}`,
-        endDate: `${new Date(
-          foundDate.getTime() + 60 * 60 * 1000,
-        ).getFullYear()}-${pad(
-          new Date(foundDate.getTime() + 60 * 60 * 1000).getMonth() + 1,
-        )}-${pad(new Date(foundDate.getTime() + 60 * 60 * 1000).getDate())}`,
-        endTime: `${pad(
-          new Date(foundDate.getTime() + 60 * 60 * 1000).getHours(),
-        )}:${pad(new Date(foundDate.getTime() + 60 * 60 * 1000).getMinutes())}`,
+        endDate: `${nextHourDate.getFullYear()}-${pad(
+          nextHourDate.getMonth() + 1,
+        )}-${pad(nextHourDate.getDate())}`,
+        endTime: `${pad(nextHourDate.getHours())}:${pad(
+          nextHourDate.getMinutes(),
+        )}`,
       });
     } else {
       alert(
@@ -844,7 +842,6 @@ export default function ClientMarketplace({
     free: "تطوع",
   };
 
-  // 🔥 دالة التقييم تعتمد على التقييم المخزن مسبقاً للسرعة القصوى 🔥
   const renderStars = (profileRating) => {
     return (
       "⭐ " + (profileRating ? parseFloat(profileRating).toFixed(1) : "5.0")
@@ -1068,6 +1065,93 @@ export default function ClientMarketplace({
             >
               @{storeProfile.username}
             </span>
+
+            {/* 🔴 روابط السوشيال ميديا في الهيدر (المتجر) 🔴 */}
+            {(storeProfile.youtube_url ||
+              storeProfile.instagram_url ||
+              storeProfile.twitter_url ||
+              storeProfile.tiktok_url ||
+              storeProfile.snapchat_url ||
+              storeProfile.whatsapp ||
+              storeProfile.website_url) && (
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "center",
+                  gap: "10px",
+                  marginTop: "12px",
+                  flexWrap: "wrap",
+                }}
+              >
+                {storeProfile.youtube_url && (
+                  <a
+                    href={storeProfile.youtube_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={heroSocialBadgeS}
+                    title="يوتيوب"
+                  >
+                    ▶️ يوتيوب
+                  </a>
+                )}
+                {storeProfile.instagram_url && (
+                  <a
+                    href={storeProfile.instagram_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={heroSocialBadgeS}
+                    title="إنستغرام"
+                  >
+                    📸 إنستغرام
+                  </a>
+                )}
+                {storeProfile.twitter_url && (
+                  <a
+                    href={storeProfile.twitter_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={heroSocialBadgeS}
+                    title="منصة إكس"
+                  >
+                    🛜 إكس
+                  </a>
+                )}
+                {storeProfile.tiktok_url && (
+                  <a
+                    href={storeProfile.tiktok_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={heroSocialBadgeS}
+                    title="تيك توك"
+                  >
+                    🎵 تيك توك
+                  </a>
+                )}
+                {storeProfile.snapchat_url && (
+                  <a
+                    href={storeProfile.snapchat_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={heroSocialBadgeS}
+                    title="سناب شات"
+                  >
+                    👻 سناب
+                  </a>
+                )}
+                {storeProfile.website_url && (
+                  <a
+                    href={storeProfile.website_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={heroSocialBadgeS}
+                    title="موقع إلكتروني"
+                  >
+                    🌐 الموقع
+                  </a>
+                )}
+              </div>
+            )}
+
             {storeProfile.provider_note && (
               <p
                 style={{
@@ -1402,7 +1486,6 @@ export default function ClientMarketplace({
             const itemThemeColor = item.profiles?.theme_color || "#7c3aed";
             const isLastElement = filtered.length === index + 1;
 
-            // متغير ذكي يبحث عن تفاصيل المدة ويمسح كلمة (دوام كامل) إذا وجدت
             let durationText =
               item.duration ||
               item.duration_details ||
@@ -1420,7 +1503,6 @@ export default function ClientMarketplace({
                 className="smart-card"
                 style={smartCardS}
               >
-                {/* 🔴 الألوان الأصلية الفاقعة بدون شفافية 🔴 */}
                 <div style={cardCoverS(isFree, itemThemeColor)}>
                   <button
                     onClick={(e) => toggleFavorite(e, item.provider_id)}
@@ -1512,59 +1594,60 @@ export default function ClientMarketplace({
                     </div>
                   </div>
 
-                  {!isStoreMode && (
-                    <div
+                  {/* معلومات المزود */}
+                  <div
+                    style={{
+                      marginBottom: "8px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center", // توسيط ليتوافق مع الصورة
+                      flexWrap: "wrap",
+                      gap: "6px",
+                    }}
+                  >
+                    <span
                       style={{
-                        marginBottom: "8px",
-                        display: "flex",
-                        alignItems: "center",
-                        flexWrap: "wrap",
-                        gap: "6px",
+                        fontSize: "0.85rem",
+                        color: "#475569",
+                        fontWeight: "bold",
                       }}
                     >
+                      {item.nickname ||
+                        item.provider_name ||
+                        item.profiles?.full_name}
+                    </span>
+                    {item.profiles?.username && (
                       <span
                         style={{
-                          fontSize: "0.85rem",
-                          color: "#475569",
+                          fontSize: "0.75rem",
+                          color: itemThemeColor,
+                          backgroundColor: `${itemThemeColor}15`,
+                          padding: "2px 8px",
+                          borderRadius: "10px",
+                          direction: "ltr",
                           fontWeight: "bold",
                         }}
                       >
-                        {item.nickname ||
-                          item.provider_name ||
-                          item.profiles?.full_name}
+                        @{item.profiles.username}
                       </span>
-                      {item.profiles?.username && (
-                        <span
-                          style={{
-                            fontSize: "0.75rem",
-                            color: itemThemeColor,
-                            backgroundColor: `${itemThemeColor}15`,
-                            padding: "2px 8px",
-                            borderRadius: "10px",
-                            direction: "ltr",
-                            fontWeight: "bold",
-                          }}
-                        >
-                          @{item.profiles.username}
-                        </span>
-                      )}
-                    </div>
-                  )}
+                    )}
+                  </div>
 
                   {item.provider_role && (
-                    <div
-                      style={{
-                        backgroundColor: "#f1f5f9",
-                        color: "#3b82f6",
-                        padding: "4px 8px",
-                        borderRadius: "8px",
-                        fontSize: "0.75rem",
-                        fontWeight: "bold",
-                        display: "inline-block",
-                        marginBottom: "8px",
-                      }}
-                    >
-                      👨‍💼 {item.provider_role}
+                    <div style={{ textAlign: "center", marginBottom: "8px" }}>
+                      <div
+                        style={{
+                          backgroundColor: "#f1f5f9",
+                          color: "#3b82f6",
+                          padding: "4px 12px",
+                          borderRadius: "12px",
+                          fontSize: "0.75rem",
+                          fontWeight: "bold",
+                          display: "inline-block",
+                        }}
+                      >
+                        👨‍💼 {item.provider_role}
+                      </div>
                     </div>
                   )}
 
@@ -1575,13 +1658,19 @@ export default function ClientMarketplace({
                       color: "#1e293b",
                       fontWeight: "900",
                       lineHeight: "1.4",
+                      textAlign: "center", // توسيط
                     }}
                   >
                     {item.title}
                   </h3>
-                  <p style={cardDescriptionS} title={item.description}>
+
+                  <p
+                    style={{ ...cardDescriptionS, textAlign: "center" }}
+                    title={item.description}
+                  >
                     {item.description}
                   </p>
+
                   <div
                     style={{
                       fontSize: "0.75rem",
@@ -1589,10 +1678,163 @@ export default function ClientMarketplace({
                       marginTop: "auto",
                       marginBottom: "15px",
                       fontWeight: "bold",
+                      textAlign: "center", // توسيط الموقع فوق الأيقونات
                     }}
                   >
                     📍 {item.country || "-"}, {item.city || "-"}
                   </div>
+
+                  {/* 🔴 أيقونات التواصل الاجتماعي داخل كارد الخدمة (كما في الصورة) 🔴 */}
+                  {(item.youtube_url ||
+                    item.profiles?.youtube_url ||
+                    item.whatsapp_number ||
+                    item.whatsapp ||
+                    item.profiles?.whatsapp_number ||
+                    item.profiles?.whatsapp ||
+                    item.instagram_url ||
+                    item.profiles?.instagram_url ||
+                    item.twitter_url ||
+                    item.profiles?.twitter_url ||
+                    item.tiktok_url ||
+                    item.profiles?.tiktok_url ||
+                    item.snapchat_url ||
+                    item.profiles?.snapchat_url) && (
+                    <>
+                      <div
+                        style={{
+                          borderTop: "1px dashed #e2e8f0",
+                          width: "80%",
+                          margin: "0 auto 15px auto",
+                        }}
+                      ></div>
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "center",
+                          gap: "15px",
+                          marginBottom: "15px",
+                          flexWrap: "wrap",
+                        }}
+                      >
+                        {(item.youtube_url || item.profiles?.youtube_url) && (
+                          <a
+                            href={
+                              item.youtube_url || item.profiles?.youtube_url
+                            }
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={cardSocialIconS}
+                            title="يوتيوب"
+                          >
+                            <svg
+                              width="22"
+                              height="22"
+                              viewBox="0 0 24 24"
+                              fill="#ff0000"
+                            >
+                              <path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z" />
+                            </svg>
+                          </a>
+                        )}
+                        {(item.whatsapp_number ||
+                          item.whatsapp ||
+                          item.profiles?.whatsapp_number ||
+                          item.profiles?.whatsapp) && (
+                          <a
+                            href={`https://wa.me/${(
+                              item.whatsapp_number ||
+                              item.whatsapp ||
+                              item.profiles?.whatsapp_number ||
+                              item.profiles?.whatsapp
+                            ).replace(/\D/g, "")}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={cardSocialIconS}
+                            title="واتساب"
+                          >
+                            <svg
+                              width="22"
+                              height="22"
+                              viewBox="0 0 24 24"
+                              fill="#25D366"
+                            >
+                              <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.347-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.876 1.213 3.074.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z" />
+                            </svg>
+                          </a>
+                        )}
+                        {(item.instagram_url ||
+                          item.profiles?.instagram_url) && (
+                          <a
+                            href={
+                              item.instagram_url || item.profiles?.instagram_url
+                            }
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={cardSocialIconS}
+                            title="إنستغرام"
+                          >
+                            <svg
+                              width="20"
+                              height="20"
+                              viewBox="0 0 24 24"
+                              fill="#E1306C"
+                            >
+                              <path d="M12 2.163c3.204 0 3.584.012 4.85.063 3.252.148 4.771 1.691 4.919 4.919.051 1.266.063 1.646.063 4.85s-.012 3.584-.063 4.85c-.148 3.225-1.662 4.771-4.919 4.919-1.266.051-1.646.063-4.85.063s-3.584-.012-4.85-.063c-3.257-.148-4.771-1.694-4.919-4.919-.051-1.266-.063-1.646-.063-4.85s.012-3.584.063-4.85c.148-3.225 1.662-4.771 4.919-4.919 1.266-.051 1.646-.063 4.85-.063zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948s.014 3.667.072 4.947c.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.947.072s3.668-.014 4.948-.072c4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948s-.014-3.667-.072-4.947c-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4s1.791-4 4-4 4 1.79 4 4-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z" />
+                            </svg>
+                          </a>
+                        )}
+                        {(item.tiktok_url || item.profiles?.tiktok_url) && (
+                          <a
+                            href={item.tiktok_url || item.profiles?.tiktok_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={cardSocialIconS}
+                            title="تيك توك"
+                          >
+                            <span
+                              style={{ fontSize: "1.2rem", lineHeight: "1" }}
+                            >
+                              🎵
+                            </span>
+                          </a>
+                        )}
+                        {(item.twitter_url || item.profiles?.twitter_url) && (
+                          <a
+                            href={
+                              item.twitter_url || item.profiles?.twitter_url
+                            }
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={cardSocialIconS}
+                            title="إكس"
+                          >
+                            <span
+                              style={{ fontSize: "1.2rem", lineHeight: "1" }}
+                            >
+                              🛜
+                            </span>
+                          </a>
+                        )}
+                        {(item.snapchat_url || item.profiles?.snapchat_url) && (
+                          <a
+                            href={
+                              item.snapchat_url || item.profiles?.snapchat_url
+                            }
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={cardSocialIconS}
+                            title="سناب شات"
+                          >
+                            <span
+                              style={{ fontSize: "1.2rem", lineHeight: "1" }}
+                            >
+                              👻
+                            </span>
+                          </a>
+                        )}
+                      </div>
+                    </>
+                  )}
 
                   <div style={cardFooterS}>
                     <div
@@ -1600,6 +1842,7 @@ export default function ClientMarketplace({
                         display: "flex",
                         flexDirection: "column",
                         maxWidth: "160px",
+                        textAlign: isRTL ? "right" : "left", // إعادة توجيه السعر لليسار/اليمين
                       }}
                     >
                       <span
@@ -1622,7 +1865,6 @@ export default function ClientMarketplace({
                       </span>
 
                       <div style={{ marginTop: "4px", lineHeight: "1.4" }}>
-                        {/* عرض المسمى وآلية الحساب فقط إذا كان هناك سعر أو تسعيرة */}
                         {!isAgreement && !isFree && (
                           <span
                             style={{
@@ -1637,7 +1879,6 @@ export default function ClientMarketplace({
                           </span>
                         )}
 
-                        {/* 🔥 عرض المضمون فقط مع الأيقونة بخط أوضح 🔥 */}
                         {durationText && (
                           <span
                             style={{
@@ -2652,7 +2893,7 @@ const cardCoverS = (isFree, themeColor) => ({
   height: "90px",
   background: isFree
     ? "linear-gradient(135deg, #a7f3d0, #10b981)"
-    : `linear-gradient(135deg, ${themeColor}, ${themeColor})`, // ⬅️ الألوان الفاقعة الصافية
+    : `linear-gradient(135deg, ${themeColor}, ${themeColor})`,
   position: "relative",
 });
 const coverBadgeS = (bg, color) => ({
@@ -2794,4 +3035,33 @@ const locOk = {
   color: "#059669",
   fontWeight: "bold",
   fontSize: "0.9rem",
+};
+const heroSocialBadgeS = {
+  backgroundColor: "rgba(255, 255, 255, 0.2)",
+  color: "#ffffff",
+  padding: "6px 12px",
+  borderRadius: "12px",
+  textDecoration: "none",
+  fontSize: "0.85rem",
+  fontWeight: "bold",
+  backdropFilter: "blur(4px)",
+  transition: "0.2s",
+  display: "inline-flex",
+  alignItems: "center",
+  gap: "4px",
+};
+
+// الستايل الخاص بأيقونات السوشيال ميديا داخل الكارد (على شكل دوائر)
+const cardSocialIconS = {
+  display: "flex",
+  justifyContent: "center",
+  alignItems: "center",
+  width: "42px",
+  height: "42px",
+  borderRadius: "50%",
+  border: "1px solid #e2e8f0",
+  backgroundColor: "#ffffff",
+  textDecoration: "none",
+  transition: "0.3s",
+  boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
 };
