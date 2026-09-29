@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { supabase } from "../lib/supabase";
 import { useTranslation } from "react-i18next";
+import { Capacitor } from "@capacitor/core";
 
 // نصوص الصفحات القانونية (تمت صياغتها بشكل احترافي)
 const legalDocs = {
@@ -46,9 +47,19 @@ const Login = () => {
 
   const handleGoogleLogin = async () => {
     try {
+      // تحديد رابط العودة بناءً على بيئة التشغيل
+      let redirectUrl = window.location.origin; // الافتراضي للويب
+
+      // إذا كان المستخدم يستخدم تطبيق الجوال الفعلي
+      if (Capacitor.isNativePlatform()) {
+        redirectUrl = "com.bookonmap.app://";
+      }
+
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
-        options: { redirectTo: window.location.origin },
+        options: {
+          redirectTo: redirectUrl, // تمرير الرابط الصحيح
+        },
       });
       if (error) throw error;
     } catch (error) {
@@ -58,9 +69,19 @@ const Login = () => {
 
   const handleAppleLogin = async () => {
     try {
+      // تحديد رابط العودة بناءً على بيئة التشغيل
+      let redirectUrl = window.location.origin; // الافتراضي للويب
+
+      // إذا كان المستخدم يستخدم تطبيق الجوال الفعلي
+      if (Capacitor.isNativePlatform()) {
+        redirectUrl = "com.bookonmap.app://";
+      }
+
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "apple",
-        options: { redirectTo: window.location.origin },
+        options: {
+          redirectTo: redirectUrl, // تمرير الرابط الصحيح
+        },
       });
       if (error) throw error;
     } catch (error) {
