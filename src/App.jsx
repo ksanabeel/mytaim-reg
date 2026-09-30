@@ -4151,7 +4151,7 @@ function MainAppContent() {
           © {new Date().getFullYear()} {platformName}{" "}
           {t("all_rights_reserved", " (جميع الحقوق محفوظة )")}
           <br />
-          email:bookonmap@hotmail.com ترخيص FL-822660150
+          email:bookonmap@hotmail.com FL-822660150
         </p>
         <div
           style={{

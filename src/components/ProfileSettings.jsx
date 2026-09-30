@@ -1127,7 +1127,7 @@ export default function ProfileSettings({ session, onUpdate }) {
                 <label style={lblS}>
                   {t(
                     "license_doc_optional",
-                    "رقم الترخيص / وثيقة العمل الحر (إن وجد):",
+                    "رقم ترخيص المطور  / وثيقة العمل الحر (إن وجد):",
                   )}
                 </label>
                 <input

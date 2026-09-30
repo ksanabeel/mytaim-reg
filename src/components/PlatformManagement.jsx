@@ -1380,7 +1380,7 @@ export default function PlatformManagement({
                       fontSize: "0.8rem",
                     }}
                   >
-                    {t("license_number_label", "رقم الترخيص:")}
+                    {t("license_number_label", "رقم بالشراكه مع المطور ترخيص:")}
                   </strong>
                   <input
                     type="text"
